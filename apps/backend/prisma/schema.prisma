@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  testResults TestResult[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+model TestResult {
+  id        String   @id @default(uuid())
+  userId    String
+  wpm       Float
+  accuracy  Float
+  rawWpm    Float
+  errors    Int
+  duration  Int // in seconds (30, 60, or 180)
+  mode      TestMode @default(WORDS)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("test_results")
+}
+
+enum TestMode {
+  WORDS
+  TIME
+  QUOTE
+}
