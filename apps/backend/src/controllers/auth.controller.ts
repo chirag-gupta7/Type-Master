@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
@@ -38,9 +38,13 @@ const generateAccessToken = (userId: string, email: string): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET is not defined');
 
-  return jwt.sign({ userId, email }, secret, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
-  });
+  return jwt.sign(
+    { userId, email } as Record<string, unknown>,
+    secret as jwt.Secret,
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    } as jwt.SignOptions
+  );
 };
 
 /**
@@ -50,9 +54,13 @@ const generateRefreshToken = (userId: string, email: string): string => {
   const secret = process.env.JWT_REFRESH_SECRET;
   if (!secret) throw new Error('JWT_REFRESH_SECRET is not defined');
 
-  return jwt.sign({ userId, email }, secret, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-  });
+  return jwt.sign(
+    { userId, email } as Record<string, unknown>,
+    secret as jwt.Secret,
+    {
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    } as jwt.SignOptions
+  );
 };
 
 /**
@@ -175,7 +183,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     if (!secret) throw new Error('JWT_REFRESH_SECRET is not defined');
 
     // Verify refresh token
-    const decoded = jwt.verify(token, secret) as { userId: string; email: string };
+    const decoded = jwt.verify(token, secret as jwt.Secret) as { userId: string; email: string };
 
     // Generate new access token
     const accessToken = generateAccessToken(decoded.userId, decoded.email);

@@ -29,7 +29,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(rateLimiter);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -40,6 +40,7 @@ app.use(`/api/${API_VERSION}/users`, userRoutes);
 
 // 404 handler
 app.use((req, res) => {
+  void req;
   res.status(404).json({ error: 'Route not found' });
 });
 

@@ -1,4 +1,4 @@
-# VSCode Settings
+// VSCode Settings
 {
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,

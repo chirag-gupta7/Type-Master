@@ -7,15 +7,14 @@ interface JWTPayload {
   email: string;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: JWTPayload;
   }
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  void res;
   try {
     const authHeader = req.headers.authorization;
 
