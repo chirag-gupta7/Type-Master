@@ -90,27 +90,50 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   },
 
   setUserInput: (input: string) => {
-    const { textToType, startTime } = get();
+    const { textToType } = get();
 
     // Don't allow input beyond the text length
     if (input.length > textToType.length) {
       return;
     }
 
-    const currentErrors = calculateErrors(input, textToType);
-    const currentTime = Date.now();
-    const timeElapsed = startTime ? (currentTime - startTime) / 1000 / 60 : 0; // in minutes
+    const calculateWPMAndAccuracy = (state: TypingState) => {
+      // Do not calculate if the test is not in progress.
+      if (!state.startTime || state.status !== 'in-progress') {
+        return { wpm: 0, accuracy: 100, errors: 0 };
+      }
 
-    // Calculate real-time WPM and accuracy
-    const currentWPM = calculateWPM(input.length, currentErrors, timeElapsed);
-    const currentAccuracy = calculateAccuracy(input.length, currentErrors);
+      // Calculate elapsed time in minutes. This is the denominator for WPM.
+      const elapsed = (Date.now() - state.startTime) / 1000 / 60;
+      if (elapsed === 0) {
+        return { wpm: 0, accuracy: 100, errors: 0 }; // Avoid division by zero.
+      }
 
-    set({
-      userInput: input,
-      errors: currentErrors,
-      wpm: currentWPM,
-      accuracy: currentAccuracy,
-    });
+      const typedChars = state.userInput.length;
+      let correctChars = 0;
+      let errors = 0;
+
+      // Iterate only over the characters the user has typed so far.
+      for (let i = 0; i < typedChars; i++) {
+        if (state.userInput[i] === state.textToType[i]) {
+          correctChars++;
+        } else {
+          errors++;
+        }
+      }
+
+      // WPM is calculated based on the standard of 5 characters per word.
+      // This is the Gross WPM, based on all correctly typed characters.
+      const wpm = Math.round(correctChars / 5 / elapsed);
+
+      // Accuracy is the percentage of correctly typed characters out of all typed characters.
+      const accuracy = typedChars > 0 ? Math.round((correctChars / typedChars) * 100) : 100;
+
+      return { wpm, accuracy, errors };
+    };
+
+    const { wpm, accuracy, errors } = calculateWPMAndAccuracy(get());
+    set({ userInput: input, wpm, accuracy, errors });
 
     // Auto-finish if user completes the text
     if (input.length === textToType.length) {
