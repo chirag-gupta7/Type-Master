@@ -97,7 +97,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       return;
     }
 
-    const calculateWPMAndAccuracy = (state: TypingState) => {
+    // FIX: Pass the NEW input value directly to calculation, not read from stale state
+    const calculateWPMAndAccuracy = (newInput: string, state: TypingState) => {
       // Do not calculate if the test is not in progress.
       if (!state.startTime || state.status !== 'in-progress') {
         return { wpm: 0, accuracy: 100, errors: 0 };
@@ -109,13 +110,15 @@ export const useTypingStore = create<TypingState>((set, get) => ({
         return { wpm: 0, accuracy: 100, errors: 0 }; // Avoid division by zero.
       }
 
-      const typedChars = state.userInput.length;
+      // FIX: Use the NEW input parameter instead of state.userInput
+      const typedChars = newInput.length;
       let correctChars = 0;
       let errors = 0;
 
       // Iterate only over the characters the user has typed so far.
       for (let i = 0; i < typedChars; i++) {
-        if (state.userInput[i] === state.textToType[i]) {
+        // FIX: Compare newInput against textToType, not stale state.userInput
+        if (newInput[i] === state.textToType[i]) {
           correctChars++;
         } else {
           errors++;
@@ -132,7 +135,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       return { wpm, accuracy, errors };
     };
 
-    const { wpm, accuracy, errors } = calculateWPMAndAccuracy(get());
+    // FIX: Pass the NEW input as first parameter
+    const { wpm, accuracy, errors } = calculateWPMAndAccuracy(input, get());
     set({ userInput: input, wpm, accuracy, errors });
 
     // Auto-finish if user completes the text
