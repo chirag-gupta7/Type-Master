@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface TypingTestState {
+interface TypingState {
   status: 'waiting' | 'in-progress' | 'finished';
   textToType: string;
   userInput: string;
@@ -9,29 +9,12 @@ interface TypingTestState {
   errors: number;
   wpm: number;
   accuracy: number;
-  duration: 30 | 60 | 180;
-}
-
-interface TypingTestActions {
-  startTest: (text: string, duration: 30 | 60 | 180) => void;
+  startTest: (text: string) => void;
+  startTimer: () => void;
   setUserInput: (input: string) => void;
   endTest: () => void;
   resetTest: () => void;
 }
-
-type TypingTestStore = TypingTestState & TypingTestActions;
-
-const initialState: TypingTestState = {
-  status: 'waiting',
-  textToType: '',
-  userInput: '',
-  startTime: null,
-  endTime: null,
-  errors: 0,
-  wpm: 0,
-  accuracy: 100,
-  duration: 60,
-};
 
 /**
  * Calculate the number of errors between user input and expected text
@@ -77,29 +60,35 @@ const calculateAccuracy = (totalCharsTyped: number, totalErrors: number): number
   return Math.max(0, Math.min(100, Math.round(accuracy * 10) / 10)); // Round to 1 decimal
 };
 
-export const useTypingTestStore = create<TypingTestStore>((set, get) => ({
-  ...initialState,
+export const useTypingStore = create<TypingState>((set, get) => ({
+  status: 'waiting',
+  textToType: '',
+  userInput: '',
+  startTime: null,
+  endTime: null,
+  errors: 0,
+  wpm: 0,
+  accuracy: 100,
 
-  /**
-   * Initialize a new typing test
-   */
-  startTest: (text: string, duration: 30 | 60 | 180) => {
+  startTest: (text: string) => {
     set({
-      status: 'in-progress',
       textToType: text,
+      status: 'waiting',
+      startTime: null,
       userInput: '',
-      startTime: Date.now(),
-      endTime: null,
       errors: 0,
       wpm: 0,
       accuracy: 100,
-      duration,
     });
   },
 
-  /**
-   * Update user input and calculate errors in real-time
-   */
+  startTimer: () => {
+    set({
+      startTime: Date.now(),
+      status: 'in-progress',
+    });
+  },
+
   setUserInput: (input: string) => {
     const { textToType, startTime } = get();
 
@@ -129,9 +118,6 @@ export const useTypingTestStore = create<TypingTestStore>((set, get) => ({
     }
   },
 
-  /**
-   * End the test and calculate final metrics
-   */
   endTest: () => {
     const { userInput, textToType, startTime } = get();
     const endTime = Date.now();
@@ -154,10 +140,16 @@ export const useTypingTestStore = create<TypingTestStore>((set, get) => ({
     });
   },
 
-  /**
-   * Reset the test to initial state
-   */
   resetTest: () => {
-    set(initialState);
+    set({
+      status: 'waiting',
+      textToType: '',
+      userInput: '',
+      startTime: null,
+      endTime: null,
+      errors: 0,
+      wpm: 0,
+      accuracy: 100,
+    });
   },
 }));

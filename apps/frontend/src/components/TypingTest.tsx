@@ -1,18 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useTypingTestStore } from '@/store';
-import { testAPI, authAPI } from '@/lib/api';
-import { Button } from '@/components/ui/button';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useTypingStore } from '@/store';
+import { testAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const DURATIONS = [
-  { value: 30, label: '30s' },
-  { value: 60, label: '1m' },
-  { value: 180, label: '3m' },
-] as const;
-
 export function TypingTest() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textContainerRef = useRef<HTMLDivElement>(null);
+
   const {
     status,
     textToType,
@@ -21,295 +17,246 @@ export function TypingTest() {
     errors,
     wpm,
     accuracy,
-    duration,
     startTest,
+    startTimer,
     setUserInput,
     endTest,
     resetTest,
-  } = useTypingTestStore();
+  } = useTypingStore();
 
-  const [selectedDuration, setSelectedDuration] = useState<30 | 60 | 180>(60);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [activeDuration, setActiveDuration] = useState<30 | 60 | 180>(60);
 
-  // Focus input when test starts
+  // Function to fetch and start a new test
+  const fetchAndStartTest = useCallback(
+    async (duration: 30 | 60 | 180) => {
+      resetTest();
+      setActiveDuration(duration);
+      setTimeLeft(duration);
+      try {
+        const data = await testAPI.getTest(duration);
+        startTest(data.text);
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      } catch (error) {
+        console.error('Failed to fetch text:', error);
+      }
+    },
+    [resetTest, startTest]
+  );
+
+  // Initial fetch on component mount
   useEffect(() => {
-    if (status === 'in-progress' && inputRef.current) {
+    fetchAndStartTest(activeDuration);
+  }, [fetchAndStartTest, activeDuration]);
+
+  // Effect to manage timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout | undefined;
+    if (status === 'in-progress' && startTime && timeLeft > 0) {
+      timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = activeDuration - elapsed;
+        if (remaining <= 0) {
+          setTimeLeft(0);
+          endTest();
+          if (timer) clearInterval(timer);
+        } else {
+          setTimeLeft(remaining);
+        }
+      }, 100);
+    } else if (status === 'finished' || timeLeft === 0) {
+      if (timer) clearInterval(timer);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [status, startTime, timeLeft, activeDuration, endTest]);
+
+  // Handle user input and start timer on first keypress
+  const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    // Start timer on first keypress
+    if (status === 'waiting' && value.length > 0 && !startTime) {
+      startTimer();
+    }
+
+    setUserInput(value);
+  };
+
+  // Scroll management for typing text
+  useEffect(() => {
+    if (textContainerRef.current && userInput.length > 0) {
+      const container = textContainerRef.current;
+      const textNodes = Array.from(container.querySelectorAll('.char-span'));
+      const cursorIndex = userInput.length;
+
+      if (cursorIndex < textNodes.length) {
+        const currentCursorSpan = textNodes[cursorIndex] as HTMLElement;
+        if (currentCursorSpan) {
+          const containerRect = container.getBoundingClientRect();
+          const cursorRect = currentCursorSpan.getBoundingClientRect();
+
+          // Check if cursor is out of view (bottom)
+          if (cursorRect.bottom > containerRect.bottom - 20) {
+            container.scrollTop += cursorRect.bottom - containerRect.bottom + 40;
+          }
+          // Check if cursor is out of view (top) - for backspacing
+          if (cursorRect.top < containerRect.top + 20) {
+            container.scrollTop -= containerRect.top - cursorRect.top + 40;
+          }
+        }
+      }
+    }
+  }, [userInput]);
+
+  // Format time for display
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleRestart = () => {
+    fetchAndStartTest(activeDuration);
+  };
+
+  // Focus the input when test starts or resets
+  useEffect(() => {
+    if (status !== 'finished' && inputRef.current) {
       inputRef.current.focus();
     }
   }, [status]);
 
-  // Handle timer countdown
-  useEffect(() => {
-    if (status === 'in-progress' && startTime) {
-      const interval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const remaining = duration - elapsed;
-
-        if (remaining <= 0) {
-          setTimeRemaining(0);
-          endTest();
-        } else {
-          setTimeRemaining(remaining);
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
-    }
-
-    return undefined;
-  }, [status, startTime, duration, endTest]);
-
-  // Save test result when finished
-  useEffect(() => {
-    const saveResult = async () => {
-      if (status === 'finished' && authAPI.isAuthenticated()) {
-        try {
-          // Calculate raw WPM (without error penalty)
-          const timeInMinutes = duration / 60;
-          const rawWpm = Math.round(userInput.length / 5 / timeInMinutes);
-
-          await testAPI.saveTestResult({
-            wpm,
-            accuracy,
-            rawWpm,
-            errors,
-            duration,
-            mode: 'TIME',
-          });
-
-          setSaveMessage('✓ Result saved successfully!');
-          setTimeout(() => setSaveMessage(''), 3000);
-        } catch (error) {
-          console.error('Failed to save test result:', error);
-          setSaveMessage('✗ Failed to save result');
-          setTimeout(() => setSaveMessage(''), 3000);
-        }
-      }
-    };
-
-    saveResult();
-  }, [status, wpm, accuracy, errors, duration, userInput.length]);
-
-  const handleStartTest = async () => {
-    setIsLoading(true);
-    setSaveMessage('');
-
-    try {
-      const { text } = await testAPI.getTest(selectedDuration);
-      startTest(text, selectedDuration);
-      setTimeRemaining(selectedDuration);
-    } catch (error) {
-      console.error('Failed to fetch test:', error);
-      // Fallback to local text if API fails
-      const fallbackText = 'The quick brown fox jumps over the lazy dog.';
-      startTest(fallbackText, selectedDuration);
-      setTimeRemaining(selectedDuration);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (status === 'in-progress') {
-      setUserInput(e.target.value);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Prevent certain keys during test
-    if (status === 'in-progress') {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-      }
-    }
-  };
-
-  const handleRestart = () => {
-    resetTest();
-    setSaveMessage('');
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const renderText = () => {
-    return textToType.split('').map((char, index) => {
-      let className = 'text-muted-foreground';
-
-      if (index < userInput.length) {
-        // Character has been typed
-        if (userInput[index] === char) {
-          className = 'text-green-500';
-        } else {
-          className = 'text-red-500 bg-red-100 dark:bg-red-900/30';
-        }
-      } else if (index === userInput.length) {
-        // Current character - add cursor
-        className = 'text-foreground border-b-2 border-primary animate-pulse';
-      }
-
-      return (
-        <span key={index} className={cn('text-xl font-mono', className)}>
-          {char === ' ' ? '\u00A0' : char}
-        </span>
-      );
-    });
-  };
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight">TypeMaster</h1>
-          <p className="mt-2 text-muted-foreground">Test your typing speed and accuracy</p>
-        </div>
-
-        {/* Duration Selection */}
-        {status === 'waiting' && (
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex gap-4">
-              {DURATIONS.map((dur) => (
-                <Button
-                  key={dur.value}
-                  variant={selectedDuration === dur.value ? 'default' : 'outline'}
-                  onClick={() => setSelectedDuration(dur.value)}
-                  size="lg"
-                >
-                  {dur.label}
-                </Button>
-              ))}
-            </div>
-
-            <Button
-              size="lg"
-              onClick={handleStartTest}
-              disabled={isLoading}
-              className="min-w-[200px]"
-            >
-              {isLoading ? 'Loading...' : 'Start Test'}
-            </Button>
-
-            {!authAPI.isAuthenticated() && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-500">
-                ⚠️ Sign in to save your results
-              </p>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
+      {/* Duration Selection */}
+      <div className="mb-8 flex space-x-4">
+        {[
+          { value: 30, label: '30 Sec' },
+          { value: 60, label: '1 Min' },
+          { value: 180, label: '3 Min' },
+        ].map((duration) => (
+          <button
+            key={duration.value}
+            onClick={() => fetchAndStartTest(duration.value as 30 | 60 | 180)}
+            disabled={status === 'in-progress'}
+            className={cn(
+              'px-6 py-2.5 rounded-lg text-base font-medium transition-all duration-200',
+              activeDuration === duration.value
+                ? 'bg-primary text-primary-foreground shadow-lg scale-105'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+              status === 'in-progress' && 'opacity-50 cursor-not-allowed'
             )}
+          >
+            {duration.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Metrics Display */}
+      <div className="mb-8 flex space-x-12 text-2xl font-semibold">
+        <div className="flex flex-col items-center">
+          <span className="text-4xl font-bold text-primary">{wpm}</span>
+          <span className="text-sm text-muted-foreground mt-1">WPM</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <span className="text-4xl font-bold text-primary">{accuracy}%</span>
+          <span className="text-sm text-muted-foreground mt-1">Accuracy</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <span className="text-4xl font-bold text-primary">{formatTime(timeLeft)}</span>
+          <span className="text-sm text-muted-foreground mt-1">Time</span>
+        </div>
+      </div>
+
+      {/* Typing Text Container */}
+      <div
+        ref={textContainerRef}
+        className="relative w-full max-w-[800px] h-48 overflow-y-auto overflow-x-hidden p-8 bg-card rounded-xl shadow-2xl font-mono text-2xl leading-relaxed tracking-wide cursor-text selection:bg-transparent border-2 border-border"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {status === 'waiting' && !textToType ? (
+          <div className="text-center text-muted-foreground animate-pulse mt-16">
+            Loading test...
           </div>
-        )}
+        ) : (
+          <div className="whitespace-pre-wrap break-words">
+            {textToType.split('').map((char, index) => {
+              let charClass = 'text-gray-500 dark:text-gray-400';
+              if (index < userInput.length) {
+                charClass =
+                  char === userInput[index]
+                    ? 'text-green-500 dark:text-green-400'
+                    : 'text-red-500 dark:text-red-400';
+              }
 
-        {/* Active Test */}
-        {status === 'in-progress' && (
-          <div className="space-y-6">
-            {/* Stats Bar */}
-            <div className="flex justify-between rounded-lg bg-muted p-4">
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground">Time</div>
-                <div className="text-2xl font-bold">{formatTime(timeRemaining)}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground">WPM</div>
-                <div className="text-2xl font-bold text-primary">{wpm}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground">Accuracy</div>
-                <div className="text-2xl font-bold text-green-600">{accuracy.toFixed(1)}%</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground">Errors</div>
-                <div className="text-2xl font-bold text-red-600">{errors}</div>
-              </div>
-            </div>
+              const isCurrentChar = index === userInput.length && status === 'in-progress';
 
-            {/* Text Display */}
-            <div className="min-h-[200px] rounded-lg border bg-card p-8 leading-relaxed">
-              {renderText()}
-            </div>
-
-            {/* Hidden Input */}
-            <input
-              ref={inputRef}
-              type="text"
-              value={userInput}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              className="sr-only"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-            />
-
-            {/* Restart Button */}
-            <div className="flex justify-center">
-              <Button variant="outline" onClick={handleRestart}>
-                Restart Test
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Results */}
-        {status === 'finished' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold">Test Complete! 🎉</h2>
-              {saveMessage && (
-                <p
-                  className={cn(
-                    'mt-2 text-sm',
-                    saveMessage.includes('✓')
-                      ? 'text-green-600 dark:text-green-500'
-                      : 'text-red-600 dark:text-red-500'
+              return (
+                <span key={index} className={cn(charClass, 'relative inline-block char-span')}>
+                  {char === ' ' ? '\u00A0' : char}
+                  {isCurrentChar && (
+                    <span className="absolute left-0 top-0 w-0.5 h-full bg-primary animate-blink"></span>
                   )}
-                >
-                  {saveMessage}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Finished Overlay */}
+        {status === 'finished' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+            <div className="p-10 bg-card rounded-2xl shadow-2xl border-2 border-primary text-center">
+              <h2 className="text-4xl font-bold mb-6 text-primary">Test Finished!</h2>
+              <div className="space-y-3 mb-6">
+                <p className="text-2xl">
+                  WPM: <span className="text-green-500 font-bold">{wpm}</span>
                 </p>
-              )}
-            </div>
-
-            {/* Results Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border bg-card p-6 text-center">
-                <div className="text-sm text-muted-foreground">Words Per Minute</div>
-                <div className="mt-2 text-4xl font-bold text-primary">{wpm}</div>
+                <p className="text-2xl">
+                  Accuracy: <span className="text-green-500 font-bold">{accuracy}%</span>
+                </p>
+                <p className="text-xl text-muted-foreground">
+                  Errors: <span className="text-red-500 font-semibold">{errors}</span>
+                </p>
               </div>
-              <div className="rounded-lg border bg-card p-6 text-center">
-                <div className="text-sm text-muted-foreground">Accuracy</div>
-                <div className="mt-2 text-4xl font-bold text-green-600">{accuracy.toFixed(1)}%</div>
-              </div>
-              <div className="rounded-lg border bg-card p-6 text-center">
-                <div className="text-sm text-muted-foreground">Errors</div>
-                <div className="mt-2 text-4xl font-bold text-red-600">{errors}</div>
-              </div>
-              <div className="rounded-lg border bg-card p-6 text-center">
-                <div className="text-sm text-muted-foreground">Characters Typed</div>
-                <div className="mt-2 text-4xl font-bold">{userInput.length}</div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
-              <Button size="lg" onClick={handleRestart}>
-                Try Again
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => (window.location.href = '/dashboard')}
+              <button
+                onClick={handleRestart}
+                className="mt-4 px-8 py-3 bg-primary text-primary-foreground rounded-lg text-lg font-semibold hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                View Dashboard
-              </Button>
+                Take Another Test
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Hidden Input */}
+      <input
+        ref={inputRef}
+        type="text"
+        className="sr-only"
+        value={userInput}
+        onChange={handleUserInput}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck="false"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+
+      {/* Restart Button */}
+      {status === 'in-progress' && (
+        <button
+          onClick={handleRestart}
+          className="mt-8 px-8 py-3 bg-red-600 text-white rounded-lg text-lg font-semibold hover:bg-red-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          Restart Test
+        </button>
+      )}
     </div>
   );
 }
