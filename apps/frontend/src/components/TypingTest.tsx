@@ -99,21 +99,32 @@ const TypingTest: React.FC = () => {
   // Memoize word arrays to prevent recalculation on every render
   const words = useMemo(() => textToType.split(' '), [textToType]);
 
-  // FIX (Issue #1): Calculate the current word index correctly
-  // If the user has typed a trailing space, the split creates an empty string at the end
-  // We need to handle this to determine which word is actually being typed
+  // Calculate the current word index based on number of spaces typed
   const currentWordIndex = useMemo(() => {
-    // If input is empty, we're on the first word
     if (userInput.length === 0) return 0;
 
-    // Count the number of spaces to determine which word we're on
-    // Each space means we've moved to the next word
+    // Count spaces to determine word index
+    // "hello " has 1 space = we're on word index 1 (second word)
+    // "hello world " has 2 spaces = we're on word index 2 (third word)
     const spaceCount = (userInput.match(/ /g) || []).length;
-
-    // The current word index is equal to the number of spaces typed
-    // Example: "hello " has 1 space → we're on word index 1 (second word)
-    // Example: "hello world " has 2 spaces → we're on word index 2 (third word)
     return spaceCount;
+  }, [userInput]);
+
+  // Get the text typed for the current word (everything after last space)
+  const currentWordTyped = useMemo(() => {
+    const lastSpaceIndex = userInput.lastIndexOf(' ');
+    if (lastSpaceIndex === -1) return userInput; // No spaces yet, all input is current word
+    return userInput.slice(lastSpaceIndex + 1); // Everything after last space
+  }, [userInput]);
+
+  // Get array of completed words (split and filter out empty strings from trailing spaces)
+  const completedWords = useMemo(() => {
+    if (userInput.length === 0) return [];
+    const split = userInput.split(' ');
+    // Filter out the last empty string if input ends with space
+    return split.filter((word, idx, arr) => {
+      return idx < arr.length - 1 || word.length > 0;
+    });
   }, [userInput]);
   const prepareTest = useCallback(
     async (duration: 30 | 60 | 180) => {
@@ -277,19 +288,15 @@ const TypingTest: React.FC = () => {
               <div className="whitespace-normal text-muted-foreground">
                 {words.map((word, index) => {
                   const isActive = index === currentWordIndex;
+                  const isCompleted = index < currentWordIndex;
                   const isUpcoming = index > currentWordIndex;
 
-                  // Calculate typedWord correctly for each word state
+                  // Determine what the user has typed for this word
                   let typedWord = '';
                   if (isActive) {
-                    // For active word: Get everything after the last space
-                    const lastSpaceIndex = userInput.lastIndexOf(' ');
-                    typedWord =
-                      lastSpaceIndex >= 0 ? userInput.slice(lastSpaceIndex + 1) : userInput;
-                  } else if (index < currentWordIndex) {
-                    // For completed words: Get the exact word from the typed input
-                    const allTypedWords = userInput.split(' ');
-                    typedWord = allTypedWords[index] || '';
+                    typedWord = currentWordTyped;
+                  } else if (isCompleted) {
+                    typedWord = completedWords[index] || '';
                   }
 
                   return (
