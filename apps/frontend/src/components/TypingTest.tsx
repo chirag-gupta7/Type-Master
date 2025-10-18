@@ -234,9 +234,10 @@ const TypingTest: React.FC = () => {
                 <Clock className="text-yellow-400" /> <span>{formatTime(timeLeft)}</span>
               </div>
             </div>
+            {/* FIX: Changed overflow-hidden to overflow-y-auto to enable scrolling */}
             <div
               ref={containerRef}
-              className="text-3xl font-mono leading-relaxed tracking-wider text-left h-40 overflow-hidden relative w-full"
+              className="text-3xl font-mono leading-relaxed tracking-wider text-left h-40 overflow-y-auto overflow-x-hidden relative w-full scroll-smooth"
             >
               <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
               <div className="whitespace-normal">
