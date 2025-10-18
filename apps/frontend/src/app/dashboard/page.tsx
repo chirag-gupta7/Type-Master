@@ -34,30 +34,29 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // FIX (Issue #3): Removed duplicate nested useEffect - this was causing the component to break
   useEffect(() => {
-    useEffect(() => {
-      async function fetchDashboardData() {
-        try {
-          setLoading(true);
-          setError(null);
+    async function fetchDashboardData() {
+      try {
+        setLoading(true);
+        setError(null);
 
-          // Fetch user stats and test history
-          const [statsResponse, historyData] = await Promise.all([
-            testAPI.getUserStats(),
-            testAPI.getTestHistory(1, 10), // Get last 10 tests for chart
-          ]);
+        // Fetch user stats and test history
+        const [statsResponse, historyData] = await Promise.all([
+          testAPI.getUserStats(),
+          testAPI.getTestHistory(1, 10), // Get last 10 tests for chart
+        ]);
 
-          setStats(statsResponse.stats);
-          setHistory(historyData.tests);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-        } finally {
-          setLoading(false);
-        }
+        setStats(statsResponse.stats);
+        setHistory(historyData.tests);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
       }
+    }
 
-      fetchDashboardData();
-    }, []);
+    fetchDashboardData();
   }, []);
 
   if (loading) {

@@ -12,11 +12,18 @@ const Word = React.memo(
     targetWord,
     typedWord,
     isActive,
+    isUpcoming,
   }: {
     targetWord: string;
     typedWord: string;
     isActive: boolean;
+    isUpcoming: boolean; // FIX: New prop to handle untyped future words
   }) => {
+    // FIX: Logic for words that haven't been reached yet (Issue #2)
+    if (isUpcoming) {
+      return <span className="mr-4 text-muted-foreground">{targetWord}</span>;
+    }
+
     // Logic for words that have already been typed (not active)
     if (!isActive) {
       const isCorrect = typedWord === targetWord;
@@ -79,7 +86,22 @@ const TypingTest: React.FC = () => {
   // Memoize word arrays to prevent recalculation on every render
   const words = useMemo(() => textToType.split(' '), [textToType]);
   const typedWords = useMemo(() => userInput.split(' '), [userInput]);
-  const currentWordIndex = typedWords.length - 1;
+
+  // FIX (Issue #1): Calculate the current word index correctly
+  // If the user has typed a trailing space, the split creates an empty string at the end
+  // We need to handle this to determine which word is actually being typed
+  const currentWordIndex = useMemo(() => {
+    // If input is empty, we're on the first word
+    if (userInput.length === 0) return 0;
+
+    // If the last character is a space, we've completed the current word and moved to the next
+    if (userInput.endsWith(' ')) {
+      return typedWords.length - 1; // The empty string after space represents the next word
+    }
+
+    // Otherwise, we're still typing the current word
+    return typedWords.length - 1;
+  }, [userInput, typedWords.length]);
   const prepareTest = useCallback(
     async (duration: 30 | 60 | 180) => {
       resetTest();
@@ -220,14 +242,18 @@ const TypingTest: React.FC = () => {
               <div className="whitespace-normal">
                 {words.map((word, index) => {
                   const isActive = index === currentWordIndex;
+                  const isUpcoming = index > currentWordIndex; // FIX (Issue #2): Determine if word is untyped
+                  const typedWord = isActive
+                    ? typedWords[currentWordIndex] || ''
+                    : typedWords[index] || '';
+
                   return (
                     <span key={index} ref={isActive ? activeWordRef : null}>
                       <Word
                         targetWord={word}
-                        typedWord={
-                          isActive ? typedWords[currentWordIndex] : typedWords[index] || ''
-                        }
+                        typedWord={typedWord}
                         isActive={isActive}
+                        isUpcoming={isUpcoming}
                       />
                     </span>
                   );
