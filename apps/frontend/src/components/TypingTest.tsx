@@ -17,50 +17,61 @@ const Word = React.memo(
     targetWord: string;
     typedWord: string;
     isActive: boolean;
-    isUpcoming: boolean; // FIX: New prop to handle untyped future words
+    isUpcoming: boolean;
   }) => {
-    // FIX: Logic for words that haven't been reached yet (Issue #2)
+    // Upcoming words (not yet reached)
     if (isUpcoming) {
-      return <span className="mr-4 text-muted-foreground">{targetWord}</span>;
+      return (
+        <>
+          {targetWord}
+          <span className="mr-2"> </span>
+        </>
+      );
     }
 
-    // Logic for words that have already been typed (not active)
+    // Completed words (already typed)
     if (!isActive) {
       const isCorrect = typedWord === targetWord;
       return (
-        <span className={cn('mr-4', isCorrect ? 'text-green-400' : 'text-red-500')}>
-          {targetWord}
-        </span>
+        <>
+          <span className={isCorrect ? 'text-green-400' : 'text-red-500'}>{targetWord}</span>
+          <span className="mr-2"> </span>
+        </>
       );
     }
-    // Logic for the currently active word
+
+    // Active word (currently being typed)
     return (
-      <span className="relative mr-4 text-primary-foreground">
+      <>
         {targetWord.split('').map((char, index) => {
           const isTyped = index < typedWord.length;
           const isCorrect = isTyped && typedWord[index] === char;
           const isCursor = index === typedWord.length;
+
           return (
-            <span
-              key={index}
-              className={cn(
-                isTyped && (isCorrect ? 'text-green-400' : 'text-red-500 underline'),
-                !isTyped && 'text-muted-foreground'
-              )}
-            >
-              {/* The blinking cursor is positioned relative to the current character */}
+            <span key={index} className="relative inline-block">
+              <span
+                className={cn(
+                  isTyped && (isCorrect ? 'text-green-400' : 'text-red-500 underline'),
+                  !isTyped && 'text-muted-foreground'
+                )}
+              >
+                {char}
+              </span>
               {isCursor && (
-                <span className="absolute -left-[1px] top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
+                <span className="absolute left-full top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
               )}
-              {char}
             </span>
           );
         })}
-        {/* A separate cursor is needed for when the user is at the space after the word */}
+        {/* Cursor after the word when it's complete */}
         {typedWord.length === targetWord.length && (
-          <span className="absolute -right-1 top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
+          <span className="relative inline-block ml-0">
+            <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
+          </span>
         )}
-      </span>
+        <span className="mr-2"> </span>
+      </>
     );
   }
 );
@@ -83,9 +94,10 @@ const TypingTest: React.FC = () => {
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // FIX: Add ref for the hidden input to programmatically focus it
+  const inputRef = useRef<HTMLInputElement>(null);
   // Memoize word arrays to prevent recalculation on every render
   const words = useMemo(() => textToType.split(' '), [textToType]);
-  const typedWords = useMemo(() => userInput.split(' '), [userInput]);
 
   // FIX (Issue #1): Calculate the current word index correctly
   // If the user has typed a trailing space, the split creates an empty string at the end
@@ -94,14 +106,15 @@ const TypingTest: React.FC = () => {
     // If input is empty, we're on the first word
     if (userInput.length === 0) return 0;
 
-    // If the last character is a space, we've completed the current word and moved to the next
-    if (userInput.endsWith(' ')) {
-      return typedWords.length - 1; // The empty string after space represents the next word
-    }
+    // Count the number of spaces to determine which word we're on
+    // Each space means we've moved to the next word
+    const spaceCount = (userInput.match(/ /g) || []).length;
 
-    // Otherwise, we're still typing the current word
-    return typedWords.length - 1;
-  }, [userInput, typedWords.length]);
+    // The current word index is equal to the number of spaces typed
+    // Example: "hello " has 1 space → we're on word index 1 (second word)
+    // Example: "hello world " has 2 spaces → we're on word index 2 (third word)
+    return spaceCount;
+  }, [userInput]);
   const prepareTest = useCallback(
     async (duration: 30 | 60 | 180) => {
       resetTest();
@@ -118,6 +131,14 @@ const TypingTest: React.FC = () => {
   useEffect(() => {
     prepareTest(activeDuration);
   }, []); // Run only on initial mount
+
+  // FIX: Ensure input stays focused during typing view
+  useEffect(() => {
+    if (view === 'typing' && status !== 'finished') {
+      inputRef.current?.focus();
+    }
+  }, [view, status]);
+
   // Main timer logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -152,17 +173,28 @@ const TypingTest: React.FC = () => {
   }, [currentWordIndex]);
   const handleStartClick = () => {
     setView('typing');
+    // FIX: Focus the input immediately when test starts
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
   const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+
     // A guard to prevent the user's input from exceeding the length of the source text.
     if (value.length > textToType.length) return;
+
     // Starts the timer on the very first keypress.
     if (status === 'waiting' && value.length > 0 && view === 'typing') {
       useTypingStore.setState({ startTime: Date.now(), status: 'in-progress' });
     }
+
     if (status !== 'finished') {
       setUserInput(value);
+    }
+  };
+  // FIX: Add handler to refocus input when clicking the text container
+  const handleContainerClick = () => {
+    if (view === 'typing' && status !== 'finished') {
+      inputRef.current?.focus();
     }
   };
   const handleRestart = () => {
@@ -235,28 +267,42 @@ const TypingTest: React.FC = () => {
               </div>
             </div>
             {/* FIX: Changed overflow-hidden to overflow-y-auto to enable scrolling */}
+            {/* FIX: Added onClick handler to refocus input when clicking anywhere in text area */}
             <div
               ref={containerRef}
-              className="text-3xl font-mono leading-relaxed tracking-wider text-left h-40 overflow-y-auto overflow-x-hidden relative w-full scroll-smooth"
+              onClick={handleContainerClick}
+              className="text-3xl font-mono leading-relaxed tracking-wider text-left h-40 overflow-y-auto overflow-x-hidden relative w-full scroll-smooth cursor-text"
             >
               <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
-              <div className="whitespace-normal">
+              <div className="whitespace-normal text-muted-foreground">
                 {words.map((word, index) => {
                   const isActive = index === currentWordIndex;
-                  const isUpcoming = index > currentWordIndex; // FIX (Issue #2): Determine if word is untyped
-                  const typedWord = isActive
-                    ? typedWords[currentWordIndex] || ''
-                    : typedWords[index] || '';
+                  const isUpcoming = index > currentWordIndex;
+
+                  // Calculate typedWord correctly for each word state
+                  let typedWord = '';
+                  if (isActive) {
+                    // For active word: Get everything after the last space
+                    const lastSpaceIndex = userInput.lastIndexOf(' ');
+                    typedWord =
+                      lastSpaceIndex >= 0 ? userInput.slice(lastSpaceIndex + 1) : userInput;
+                  } else if (index < currentWordIndex) {
+                    // For completed words: Get the exact word from the typed input
+                    const allTypedWords = userInput.split(' ');
+                    typedWord = allTypedWords[index] || '';
+                  }
 
                   return (
-                    <span key={index} ref={isActive ? activeWordRef : null}>
-                      <Word
-                        targetWord={word}
-                        typedWord={typedWord}
-                        isActive={isActive}
-                        isUpcoming={isUpcoming}
-                      />
-                    </span>
+                    <React.Fragment key={index}>
+                      <span ref={isActive ? activeWordRef : null}>
+                        <Word
+                          targetWord={word}
+                          typedWord={typedWord}
+                          isActive={isActive}
+                          isUpcoming={isUpcoming}
+                        />
+                      </span>
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -264,6 +310,7 @@ const TypingTest: React.FC = () => {
             </div>
             {/* This is a hidden input field that captures all keyboard events, keeping the UI clean. */}
             <input
+              ref={inputRef}
               type="text"
               className="absolute top-[-9999px] left-[-9999px] opacity-0"
               value={userInput}
