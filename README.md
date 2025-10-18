@@ -16,6 +16,7 @@ A modern, production-ready typing speed improvement web application built with c
 - [Development](#development)
 - [Testing](#testing)
 - [Deployment](#deployment)
+- [Documentation](#documentation)
 - [API Documentation](#api-documentation)
 - [Environment Variables](#environment-variables)
 - [Contributing](#contributing)
@@ -23,6 +24,7 @@ A modern, production-ready typing speed improvement web application built with c
 ## ✨ Features
 
 ### Core Features
+
 - ✅ **User Authentication** - JWT-based authentication with HTTP-only cookies
 - ✅ **Typing Test Engine** - Multiple test modes (30s, 1min, 3min)
 - ✅ **Real-time Metrics** - Live WPM and accuracy calculation
@@ -32,6 +34,7 @@ A modern, production-ready typing speed improvement web application built with c
 - ✅ **Responsive Design** - Mobile-first, works on all devices
 
 ### Technical Features
+
 - 🔒 **Security First** - Input validation, rate limiting, CORS, Helmet
 - ⚡ **Performance** - Optimized with caching, code splitting, lazy loading
 - 🎨 **Modern UI** - Built with shadcn/ui and Tailwind CSS
@@ -42,6 +45,7 @@ A modern, production-ready typing speed improvement web application built with c
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
@@ -52,6 +56,7 @@ A modern, production-ready typing speed improvement web application built with c
 - **Testing:** Jest, React Testing Library, Playwright
 
 ### Backend
+
 - **Runtime:** Node.js 18+
 - **Framework:** Express.js
 - **Language:** TypeScript
@@ -65,6 +70,7 @@ A modern, production-ready typing speed improvement web application built with c
 - **Testing:** Jest, Supertest
 
 ### DevOps
+
 - **Version Control:** Git
 - **Package Manager:** npm
 - **CI/CD:** GitHub Actions (recommended)
@@ -125,12 +131,14 @@ typemaster/
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/yourusername/typemaster.git
 cd typemaster
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
@@ -138,16 +146,19 @@ npm install
 3. **Set up environment variables**
 
 Frontend (apps/frontend/.env):
+
 ```bash
 cp apps/frontend/.env.example apps/frontend/.env
 ```
 
 Backend (apps/backend/.env):
+
 ```bash
 cp apps/backend/.env.example apps/backend/.env
 ```
 
 4. **Set up the database**
+
 ```bash
 # Navigate to backend
 cd apps/backend
@@ -163,6 +174,7 @@ npm run prisma:seed
 ```
 
 5. **Start development servers**
+
 ```bash
 # From root directory
 npm run dev
@@ -247,11 +259,13 @@ npm run typecheck
 ## 🧪 Testing
 
 ### Run All Tests
+
 ```bash
 npm run test
 ```
 
 ### Frontend Tests
+
 ```bash
 cd apps/frontend
 npm run test         # Watch mode
@@ -259,6 +273,7 @@ npm run test:ci      # CI mode with coverage
 ```
 
 ### Backend Tests
+
 ```bash
 cd apps/backend
 npm run test         # Watch mode
@@ -266,6 +281,7 @@ npm run test:ci      # CI mode with coverage
 ```
 
 ### E2E Tests (Playwright)
+
 ```bash
 cd apps/frontend
 npx playwright test
@@ -281,6 +297,7 @@ npx playwright test --ui    # Interactive UI mode
 3. Deploy automatically on push to main
 
 **Manual deployment:**
+
 ```bash
 cd apps/frontend
 npm run build
@@ -290,11 +307,13 @@ vercel --prod
 ### Backend (Railway / AWS ECS)
 
 **Railway:**
+
 1. Connect your GitHub repository
 2. Set environment variables
 3. Deploy automatically
 
 **Docker:**
+
 ```bash
 cd apps/backend
 docker build -t typemaster-backend .
@@ -308,15 +327,30 @@ cd apps/backend
 npm run prisma:migrate
 ```
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](docs/) folder:
+
+- **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Project Overview](docs/PROJECT_OVERVIEW.md)** - Complete project summary and architecture
+- **[Features Guide](docs/FEATURES.md)** - Detailed feature documentation and usage
+- **[Implementation Details](docs/IMPLEMENTATION.md)** - Technical implementation specifics
+- **[API Reference](docs/API.md)** - Complete REST API documentation
+- **[File Structure](docs/FILE_STRUCTURE.md)** - Project structure and organization
+
+See [docs/README.md](docs/README.md) for the complete documentation index.
+
 ## 📚 API Documentation
 
 ### Base URL
+
 - **Development:** `http://localhost:5000/api/v1`
 - **Production:** `https://api.typemaster.com/api/v1`
 
 ### Authentication Endpoints
 
 #### Register User
+
 ```http
 POST /auth/register
 Content-Type: application/json
@@ -329,6 +363,7 @@ Content-Type: application/json
 ```
 
 #### Login
+
 ```http
 POST /auth/login
 Content-Type: application/json
@@ -340,6 +375,7 @@ Content-Type: application/json
 ```
 
 #### Refresh Token
+
 ```http
 POST /auth/refresh
 Content-Type: application/json
@@ -352,6 +388,7 @@ Content-Type: application/json
 ### Test Endpoints (Protected)
 
 #### Create Test Result
+
 ```http
 POST /tests
 Authorization: Bearer {access_token}
@@ -368,12 +405,14 @@ Content-Type: application/json
 ```
 
 #### Get User Tests
+
 ```http
 GET /tests?page=1&limit=20&duration=60
 Authorization: Bearer {access_token}
 ```
 
 #### Get User Stats
+
 ```http
 GET /tests/stats?days=30&duration=60
 Authorization: Bearer {access_token}
@@ -382,12 +421,14 @@ Authorization: Bearer {access_token}
 ### User Endpoints (Protected)
 
 #### Get Profile
+
 ```http
 GET /users/profile
 Authorization: Bearer {access_token}
 ```
 
 #### Update Profile
+
 ```http
 PUT /users/profile
 Authorization: Bearer {access_token}
@@ -401,12 +442,14 @@ Content-Type: application/json
 ## 🔐 Environment Variables
 
 ### Frontend (.env)
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### Backend (.env)
+
 ```env
 # Server
 NODE_ENV=development
@@ -446,6 +489,7 @@ We welcome contributions! Please follow these steps:
 5. Open a Pull Request
 
 ### Coding Standards
+
 - Follow TypeScript strict mode
 - Write tests for new features
 - Follow existing code patterns
@@ -459,7 +503,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Authors
 
-- **Your Name** - *Initial work*
+- **Your Name** - _Initial work_
 
 ## 🙏 Acknowledgments
 
