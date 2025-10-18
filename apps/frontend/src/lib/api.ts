@@ -274,3 +274,6 @@ export const userAPI = {
     });
   },
 };
+
+// Named export for convenience
+export const getTest = testAPI.getTest;

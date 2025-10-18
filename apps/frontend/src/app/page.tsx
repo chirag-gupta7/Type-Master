@@ -1,5 +1,9 @@
-import { TypingTest } from '@/components/TypingTest';
+import TypingTest from '@/components/TypingTest';
 
-export default function HomePage() {
-  return <TypingTest />;
+export default function Home() {
+  return (
+    <main className="flex min-h-screen items-center justify-center">
+      <TypingTest />
+    </main>
+  );
 }
