@@ -33,9 +33,21 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<TestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // FIX (Issue #3): Removed duplicate nested useEffect - this was causing the component to break
+  // FIX: Check authentication status before fetching data
   useEffect(() => {
+    // Check if user has a token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+    if (!token) {
+      setIsAuthenticated(false);
+      setLoading(false);
+      return;
+    }
+
+    setIsAuthenticated(true);
+
     async function fetchDashboardData() {
       try {
         setLoading(true);
@@ -58,6 +70,29 @@ export default function DashboardPage() {
 
     fetchDashboardData();
   }, []);
+
+  // FIX: Show login message if user is not authenticated
+  if (!isAuthenticated && !loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              Please log in to view your dashboard
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Note: The typing test on the{' '}
+              <a href="/" className="text-primary hover:underline">
+                homepage
+              </a>{' '}
+              works without authentication!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
