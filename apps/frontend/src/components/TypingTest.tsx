@@ -86,7 +86,8 @@ const TypingTest: React.FC = () => {
       setActiveDuration(duration);
       setTimeLeft(duration);
       // Generate a large number of words client-side to act as an "infinite" paragraph
-      const newText = generateWords({ min: 350, max: 400 }).join(' ');
+      const wordsArray = generateWords({ min: 350, max: 400 });
+      const newText = Array.isArray(wordsArray) ? wordsArray.join(' ') : wordsArray;
       startTest(newText);
       setView('initial');
     },
