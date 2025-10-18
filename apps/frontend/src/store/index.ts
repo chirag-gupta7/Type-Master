@@ -90,56 +90,57 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   },
 
   setUserInput: (input: string) => {
-    const { textToType } = get();
+    const state = get();
+    const { textToType, status, startTime } = state;
 
-    // Don't allow input beyond the text length
     if (input.length > textToType.length) {
       return;
     }
 
-    // FIX: Pass the NEW input value directly to calculation, not read from stale state
-    const calculateWPMAndAccuracy = (newInput: string, state: TypingState) => {
-      // Do not calculate if the test is not in progress.
-      if (!state.startTime || state.status !== 'in-progress') {
-        return { wpm: 0, accuracy: 100, errors: 0 };
-      }
+    // FIX: Start the timer and mark the run as in-progress on the very first character.
+    let nextStartTime = startTime;
+    let nextStatus = status;
+    if (!nextStartTime && input.length > 0) {
+      nextStartTime = Date.now();
+      nextStatus = 'in-progress';
+    }
 
-      // Calculate elapsed time in minutes. This is the denominator for WPM.
-      const elapsed = (Date.now() - state.startTime) / 1000 / 60;
-      if (elapsed === 0) {
-        return { wpm: 0, accuracy: 100, errors: 0 }; // Avoid division by zero.
-      }
+    let wpm = 0;
+    let accuracy = 100;
+    let errors = 0;
 
-      // FIX: Use the NEW input parameter instead of state.userInput
-      const typedChars = newInput.length;
-      let correctChars = 0;
-      let errors = 0;
+    if (nextStartTime) {
+      const elapsedMinutes = (Date.now() - nextStartTime) / 1000 / 60;
+      const typedChars = input.length;
 
-      // Iterate only over the characters the user has typed so far.
-      for (let i = 0; i < typedChars; i++) {
-        // FIX: Compare newInput against textToType, not stale state.userInput
-        if (newInput[i] === state.textToType[i]) {
-          correctChars++;
-        } else {
-          errors++;
+      if (typedChars > 0) {
+        let correctChars = 0;
+        for (let i = 0; i < typedChars; i++) {
+          if (input[i] === textToType[i]) {
+            correctChars++;
+          }
+        }
+
+        errors = typedChars - correctChars;
+        accuracy = Math.max(0, Math.min(100, Math.round((correctChars / typedChars) * 100)));
+
+        if (elapsedMinutes > 0) {
+          // FIX: WPM should track gross speed (all characters typed) to avoid under-reporting.
+          const wordsPerMinute = typedChars / 5 / elapsedMinutes;
+          wpm = Math.max(0, Math.round(wordsPerMinute));
         }
       }
+    }
 
-      // WPM is calculated based on the standard of 5 characters per word.
-      // This is the Gross WPM, based on all correctly typed characters.
-      const wpm = Math.round(correctChars / 5 / elapsed);
+    set({
+      userInput: input,
+      startTime: nextStartTime,
+      status: nextStatus,
+      wpm,
+      accuracy,
+      errors,
+    });
 
-      // Accuracy is the percentage of correctly typed characters out of all typed characters.
-      const accuracy = typedChars > 0 ? Math.round((correctChars / typedChars) * 100) : 100;
-
-      return { wpm, accuracy, errors };
-    };
-
-    // FIX: Pass the NEW input as first parameter
-    const { wpm, accuracy, errors } = calculateWPMAndAccuracy(input, get());
-    set({ userInput: input, wpm, accuracy, errors });
-
-    // Auto-finish if user completes the text
     if (input.length === textToType.length) {
       get().endTest();
     }

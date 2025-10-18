@@ -47,9 +47,18 @@ const Word = React.memo(
           const isTyped = index < typedWord.length;
           const isCorrect = isTyped && typedWord[index] === char;
           const isCursor = index === typedWord.length;
+          const cursorPositionClass = isTyped ? 'left-full' : 'left-0 -translate-x-full';
 
           return (
             <span key={index} className="relative inline-block">
+              {isCursor && (
+                <span
+                  className={cn(
+                    'absolute top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full transform',
+                    cursorPositionClass
+                  )}
+                />
+              )}
               <span
                 className={cn(
                   isTyped && (isCorrect ? 'text-green-400' : 'text-red-500 underline'),
@@ -58,16 +67,13 @@ const Word = React.memo(
               >
                 {char}
               </span>
-              {isCursor && (
-                <span className="absolute left-full top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
-              )}
             </span>
           );
         })}
         {/* Cursor after the word when it's complete */}
         {typedWord.length === targetWord.length && (
           <span className="relative inline-block ml-0">
-            <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
+            <span className="absolute left-full top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
           </span>
         )}
         <span className="mr-2"> </span>
@@ -187,20 +193,18 @@ const TypingTest: React.FC = () => {
     // FIX: Focus the input immediately when test starts
     setTimeout(() => inputRef.current?.focus(), 100);
   };
-  const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-
-    // A guard to prevent the user's input from exceeding the length of the source text.
-    if (value.length > textToType.length) return;
-
-    // Starts the timer on the very first keypress.
-    if (status === 'waiting' && value.length > 0 && view === 'typing') {
-      useTypingStore.setState({ startTime: Date.now(), status: 'in-progress' });
-    }
-
-    if (status !== 'finished') {
+  const commitUserInput = useCallback(
+    (value: string) => {
+      if (status === 'finished') return;
+      if (value.length > textToType.length) return;
       setUserInput(value);
-    }
+    },
+    [status, textToType, setUserInput]
+  );
+
+  const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // FIX: Delegate to commitUserInput so all pathways (change & space key) share the same logic.
+    commitUserInput(e.target.value);
   };
   // FIX: Add handler to refocus input when clicking the text container
   const handleContainerClick = () => {
@@ -323,9 +327,10 @@ const TypingTest: React.FC = () => {
               value={userInput}
               onChange={handleUserInput}
               onKeyDown={(e) => {
-                // Prevent the default browser action for the spacebar (scrolling).
-                if (e.key === ' ') {
+                if (e.key === ' ' && status !== 'finished') {
+                  // FIX: Manually append a space so input continues to track progression while still preventing body scroll.
                   e.preventDefault();
+                  commitUserInput(`${userInput} `);
                 }
               }}
               disabled={status === 'finished'}
