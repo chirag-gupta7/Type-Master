@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { lessonAPI } from '@/lib/api';
-import { Star, Lock, CheckCircle } from 'lucide-react';
+import { useMemo } from 'react';
+import { Star, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { HandPositionGuide } from '@/components/HandPositionGuide';
 
 interface Lesson {
   id: string;
@@ -14,6 +16,9 @@ interface Lesson {
   difficulty: string;
   targetWpm: number;
   minAccuracy: number;
+  keys?: string[];
+  exerciseType?: 'guided' | 'timed';
+  content?: string;
   userProgress?: Array<{
     completed: boolean;
     bestWpm: number;
@@ -33,22 +38,157 @@ interface LearningStats {
   averageAccuracy: number;
 }
 
+const FALLBACK_LESSONS: Lesson[] = [
+  {
+    id: 'home-row-basics',
+    level: 1,
+    order: 1,
+    title: 'Home Row Basics',
+    description: 'Learn the foundation keys ASDF and JKL;',
+    difficulty: 'Beginner',
+    targetWpm: 20,
+    minAccuracy: 92,
+    keys: ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'],
+    exerciseType: 'guided',
+    content: 'asdf jkl; asdf jkl; as dj fk la sj dk fj la; asdfg jkl;',
+    userProgress: [],
+  },
+  {
+    id: 'index-finger-reach',
+    level: 1,
+    order: 2,
+    title: 'Index Finger Reach',
+    description: 'Add G, H, and basic punctuation to your home row flow.',
+    difficulty: 'Beginner',
+    targetWpm: 22,
+    minAccuracy: 93,
+    keys: ['G', 'H', 'Space'],
+    exerciseType: 'guided',
+    content: 'fg hj fg hj gh gh fg hj fg hj ;g ;h fg hj',
+    userProgress: [],
+  },
+  {
+    id: 'top-row-intro',
+    level: 1,
+    order: 3,
+    title: 'Top Row Intro',
+    description: 'Stretch to QWERT and YUIOP while staying anchored.',
+    difficulty: 'Beginner',
+    targetWpm: 24,
+    minAccuracy: 94,
+    keys: ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    exerciseType: 'guided',
+    content: 'qwer tyui opyu tyqw reop qwerty uiop',
+    userProgress: [],
+  },
+  {
+    id: 'bottom-row-basics',
+    level: 2,
+    order: 1,
+    title: 'Bottom Row Basics',
+    description: 'Introduce the ZXCV and BNM keys with smooth transitions.',
+    difficulty: 'Intermediate',
+    targetWpm: 26,
+    minAccuracy: 94,
+    keys: ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
+    exerciseType: 'guided',
+    content: 'zx cv bn mzx cnb vm zxnb cvmz xcvb nm',
+    userProgress: [],
+  },
+  {
+    id: 'mixed-practice',
+    level: 2,
+    order: 2,
+    title: 'Mixed Practice Drill',
+    description: 'Blend all learned keys with rhythmic repetitions.',
+    difficulty: 'Intermediate',
+    targetWpm: 28,
+    minAccuracy: 95,
+    keys: ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';', 'G', 'H', 'R', 'U'],
+    exerciseType: 'timed',
+    content: 'rush ugh jar fad shrug jar flask flash guard',
+    userProgress: [],
+  },
+  {
+    id: 'numbers-row',
+    level: 3,
+    order: 1,
+    title: 'Numbers Row Warm-up',
+    description: 'Practice the 12345 and 67890 reaches with precision.',
+    difficulty: 'Advanced',
+    targetWpm: 30,
+    minAccuracy: 96,
+    keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'],
+    exerciseType: 'guided',
+    content: '12345 54321 67890 09876 13579 24680',
+    userProgress: [],
+  },
+];
+
+const buildFallbackStats = (lessonCount: number): LearningStats => ({
+  totalLessons: lessonCount,
+  completedLessons: 0,
+  completionPercentage: 0,
+  totalStars: 0,
+  maxStars: lessonCount * 3,
+  averageWpm: 0,
+  averageAccuracy: 0,
+});
+
+const isExerciseType = (value: unknown): value is NonNullable<Lesson['exerciseType']> =>
+  value === 'guided' || value === 'timed';
+
 export default function LearnPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
+        const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+
+        if (!hasToken) {
+          setLessons(FALLBACK_LESSONS);
+          setStats(buildFallbackStats(FALLBACK_LESSONS.length));
+          setUsingFallback(true);
+          setError("You're viewing the sample lesson plan. Sign in to sync your progress.");
+          return;
+        }
+
         const [lessonsData, statsData] = await Promise.all([
           lessonAPI.getAllLessons(),
-          lessonAPI.getLearningStats().catch(() => null),
+          lessonAPI.getLearningStats(),
         ]);
-        setLessons(lessonsData.lessons);
-        if (statsData) setStats(statsData.stats);
+
+        const normalizedLessons: Lesson[] = (lessonsData?.lessons ?? []).map((lesson) => {
+          const exerciseType = isExerciseType(lesson.exerciseType)
+            ? lesson.exerciseType
+            : undefined;
+
+          return {
+            ...lesson,
+            exerciseType,
+          };
+        });
+
+        setLessons(normalizedLessons);
+        setStats(statsData?.stats ?? null);
+        setUsingFallback(false);
+        setError(null);
       } catch (err) {
         console.error('Failed to load lessons:', err);
+        setLessons(FALLBACK_LESSONS);
+        setStats(buildFallbackStats(FALLBACK_LESSONS.length));
+        setUsingFallback(true);
+
+        const message =
+          err instanceof Error && err.message.includes('token')
+            ? 'We could not verify your session. Showing offline lessons instead.'
+            : 'We could not reach the learning service. Showing offline lessons instead.';
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -66,14 +206,16 @@ export default function LearnPage() {
   }
 
   // Group lessons by level
-  const lessonsByLevel = lessons.reduce(
-    (acc, lesson) => {
-      if (!acc[lesson.level]) acc[lesson.level] = [];
-      acc[lesson.level].push(lesson);
-      return acc;
-    },
-    {} as Record<number, Lesson[]>
-  );
+  const lessonsByLevel = useMemo(() => {
+    return lessons.reduce(
+      (acc, lesson) => {
+        if (!acc[lesson.level]) acc[lesson.level] = [];
+        acc[lesson.level].push(lesson);
+        return acc;
+      },
+      {} as Record<number, Lesson[]>
+    );
+  }, [lessons]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -81,6 +223,18 @@ export default function LearnPage() {
       <p className="text-muted-foreground mb-8">
         Master typing through structured lessons from basic to advanced
       </p>
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Heads up</p>
+              <p>{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Overview */}
       {stats && (
@@ -168,6 +322,27 @@ export default function LearnPage() {
           </div>
         </div>
       ))}
+
+      {lessons.length === 0 && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          <p>No lessons to show yet. Check back later or try refreshing.</p>
+        </div>
+      )}
+
+      <div className="mt-12">
+        <HandPositionGuide
+          className="mx-auto max-w-3xl"
+          compact
+          showArrow={false}
+          showKeyClusters
+          showFingerLabels
+        />
+        {usingFallback && (
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Tip: Start the backend services and database, then refresh to see your live progress.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

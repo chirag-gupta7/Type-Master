@@ -1,13 +1,30 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, ComponentType } from 'react';
 import { useTypingStore } from '@/store';
 import { lessonAPI } from '@/lib/api';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
+import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, CheckCircle2, Trophy, Target, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import dynamic from 'next/dynamic';
 
+// Lazy-load react-confetti with a small typed interface to avoid using `any`
+// NOTE: ambient module declarations must live in a .d.ts file (e.g. src/types/react-confetti.d.ts).
+// If you need a local declaration, create that .d.ts file with the `declare module 'react-confetti' { ... }`
+// and remove any in-file declaration to avoid "Invalid module name in augmentation" errors.
+
+interface ReactConfettiProps {
+  width?: number;
+  height?: number;
+  recycle?: boolean;
+  numberOfPieces?: number;
+  gravity?: number;
+}
+const Confetti: ComponentType<ReactConfettiProps> = dynamic(() => import('react-confetti'), {
+  ssr: false,
+}) as unknown as ComponentType<ReactConfettiProps>;
 interface Lesson {
   id: string;
   level: number;
@@ -67,6 +84,24 @@ export function LessonTypingInterface({
   const [isSaving, setIsSaving] = useState(false);
   const [savedProgress, setSavedProgress] = useState(false);
   const [stars, setStars] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setViewport({ width: Math.round(rect.width), height: Math.round(rect.height) });
+      } else if (typeof window !== 'undefined') {
+        setViewport({ width: window.innerWidth, height: window.innerHeight });
+      }
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   // Initialize the test with lesson content
   useEffect(() => {
@@ -118,6 +153,7 @@ export function LessonTypingInterface({
             completed: earnedStars > 0,
           });
           setSavedProgress(true);
+          setShowConfetti(earnedStars > 0);
 
           // Call onComplete callback if provided
           if (onComplete) {
@@ -133,6 +169,12 @@ export function LessonTypingInterface({
       saveProgress();
     }
   }, [status, savedProgress, isSaving, wpm, accuracy, lesson.id, calculateStars, onComplete]);
+
+  useEffect(() => {
+    if (!showConfetti) return;
+    const timer = setTimeout(() => setShowConfetti(false), 4500);
+    return () => clearTimeout(timer);
+  }, [showConfetti]);
 
   // Handle keyboard input
   useEffect(() => {
@@ -201,6 +243,7 @@ export function LessonTypingInterface({
     if (onTryAgain) {
       onTryAgain();
     }
+    setShowConfetti(false);
   };
 
   // Calculate progress percentage
@@ -215,7 +258,19 @@ export function LessonTypingInterface({
   const isPassed = stars > 0;
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div ref={containerRef} className={cn('relative space-y-6', className)}>
+      {showConfetti && viewport.width > 0 && viewport.height > 0 && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <Confetti
+            width={viewport.width}
+            height={viewport.height}
+            recycle={false}
+            numberOfPieces={220}
+            gravity={0.4}
+          />
+        </div>
+      )}
+
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* WPM */}
@@ -365,6 +420,10 @@ export function LessonTypingInterface({
                 </Button>
               )}
             </div>
+
+            <div className="mx-auto max-w-2xl border-t border-border/60 pt-6">
+              <HandPositionGuide compact showArrow={false} showKeyClusters className="mx-auto" />
+            </div>
           </div>
         ) : (
           // Typing View
@@ -419,6 +478,15 @@ export function LessonTypingInterface({
                 />
               </div>
             )}
+
+            <div className="border-t border-border pt-6">
+              <HandPositionGuide
+                targetKey={targetChar}
+                compact
+                showArrow
+                showFingerLabels={false}
+              />
+            </div>
 
             {/* Instructions */}
             {status === 'waiting' && (

@@ -129,10 +129,28 @@ const KEY_MAPPINGS: KeyMapping[] = [
   { key: 'Space', finger: 'thumb', hand: 'right', row: 4, position: 0 },
 ];
 
+const FINGER_KEY_CLUSTERS: Record<FingerType, string[]> = KEY_MAPPINGS.reduce(
+  (acc, mapping) => {
+    const keyLabel = mapping.key === ' ' ? 'Space' : mapping.key;
+    if (!acc[mapping.finger].includes(keyLabel)) {
+      acc[mapping.finger].push(keyLabel);
+    }
+    return acc;
+  },
+  {
+    pinky: [],
+    ring: [],
+    middle: [],
+    index: [],
+    thumb: [],
+  } as Record<FingerType, string[]>
+);
+
 interface HandPositionGuideProps {
   targetKey?: string;
   showArrow?: boolean;
   showFingerLabels?: boolean;
+  showKeyClusters?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -147,6 +165,7 @@ export function HandPositionGuide({
   targetKey,
   showArrow = true,
   showFingerLabels = true,
+  showKeyClusters = true,
   compact = false,
   className,
 }: HandPositionGuideProps) {
@@ -233,6 +252,48 @@ export function HandPositionGuide({
               <span className={cn('text-sm font-medium', colors.color)}>{colors.name}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {showKeyClusters && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {(Object.entries(FINGER_KEY_CLUSTERS) as Array<[FingerType, string[]]>).map(
+            ([finger, keys]) => {
+              const colors = FINGER_COLORS[finger];
+              const isActive = targetFinger === finger;
+
+              return (
+                <div
+                  key={finger}
+                  className={cn(
+                    'rounded-lg border p-4 transition-colors',
+                    colors.bgColor,
+                    colors.borderColor,
+                    isActive && 'ring-2 ring-offset-2'
+                  )}
+                >
+                  <p className={cn('mb-2 text-sm font-semibold capitalize', colors.color)}>
+                    {colors.name} Finger
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {keys.map((k) => (
+                      <span
+                        key={`${finger}-${k}`}
+                        className={cn(
+                          'rounded-md border px-2 py-1 text-xs font-medium uppercase',
+                          isActive
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'bg-card/70 text-foreground/80'
+                        )}
+                      >
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+          )}
         </div>
       )}
 

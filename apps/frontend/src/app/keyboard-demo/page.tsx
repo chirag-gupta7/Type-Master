@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { Button } from '@/components/ui/button';
+import { HandPositionGuide } from '@/components/HandPositionGuide';
 
 const DEMO_PHRASES = [
   'The quick brown fox jumps over the lazy dog',
@@ -19,32 +20,73 @@ export default function KeyboardDemoPage() {
   const [isCorrect, setIsCorrect] = useState<boolean | undefined>(undefined);
   const [showHomeRow, setShowHomeRow] = useState(true);
   const [compact, setCompact] = useState(false);
+  const [mistakes, setMistakes] = useState(0);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  const currentPhrase = DEMO_PHRASES[phraseIndex];
-  const targetChar = currentPhrase[currentIndex];
+  const currentPhrase = useMemo(() => DEMO_PHRASES[phraseIndex], [phraseIndex]);
+  const targetChar = currentPhrase[currentIndex] ?? '';
+
+  const normalizeKey = useCallback((key: string) => {
+    if (key === ' ') return ' ';
+    if (key === 'Space') return ' ';
+    if (key === 'Enter') return '\n';
+    return key.length === 1 ? key : key.toLowerCase();
+  }, []);
+
+  const nextPhrase = useCallback(() => {
+    setPhraseIndex((prev) => (prev + 1) % DEMO_PHRASES.length);
+    setCurrentIndex(0);
+    setLastKey('');
+    setIsCorrect(undefined);
+    setMistakes(0);
+    setFeedback(null);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore modifier keys
       if (['Control', 'Alt', 'Meta', 'Shift'].includes(e.key)) return;
 
+      if (!currentPhrase) return;
+
       const pressed = e.key;
       setLastKey(pressed);
 
-      // Check if correct
-      const correct = pressed === targetChar;
+      const normalizedPressed = normalizeKey(pressed);
+      const normalizedTarget = normalizeKey(targetChar);
+
+      if (!normalizedTarget) {
+        setIsCorrect(undefined);
+        return;
+      }
+
+      // Check if correct (case-insensitive for letters)
+      const correct =
+        normalizedPressed === normalizedTarget ||
+        (normalizedPressed.length === 1 &&
+          normalizedTarget.length === 1 &&
+          normalizedPressed.toLowerCase() === normalizedTarget.toLowerCase());
       setIsCorrect(correct);
 
       // Move to next character if correct
       if (correct) {
-        if (currentIndex < currentPhrase.length - 1) {
-          setCurrentIndex((prev) => prev + 1);
-        } else {
-          // Phrase completed
-          setTimeout(() => {
-            nextPhrase();
-          }, 1000);
-        }
+        setCurrentIndex((prev) => {
+          const nextIndex = prev + 1;
+          if (nextIndex >= currentPhrase.length) {
+            setTimeout(() => {
+              nextPhrase();
+            }, 800);
+          }
+          return nextIndex;
+        });
+        setFeedback(null);
+      }
+      // Track mistakes when incorrect
+      if (!correct) {
+        setMistakes((prev) => prev + 1);
+        const expectedLabel = targetChar === ' ' ? 'Space' : targetChar || '—';
+        const receivedLabel = pressed === ' ' ? 'Space' : pressed;
+        setFeedback(`Expected "${expectedLabel}" but received "${receivedLabel}"`);
       }
 
       // Reset feedback after animation
@@ -56,20 +98,21 @@ export default function KeyboardDemoPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [targetChar, currentIndex, currentPhrase.length]);
+  }, [currentPhrase, targetChar, nextPhrase, normalizeKey]);
 
-  const nextPhrase = () => {
-    setPhraseIndex((prev) => (prev + 1) % DEMO_PHRASES.length);
+  const resetDemo = useCallback(() => {
     setCurrentIndex(0);
     setLastKey('');
     setIsCorrect(undefined);
-  };
+    setMistakes(0);
+    setFeedback(null);
+  }, []);
 
-  const resetDemo = () => {
-    setCurrentIndex(0);
-    setLastKey('');
-    setIsCorrect(undefined);
-  };
+  const progressPercentage = useMemo(() => {
+    if (!currentPhrase.length) return 0;
+    const completed = Math.min(currentIndex, currentPhrase.length);
+    return Math.round((completed / currentPhrase.length) * 100);
+  }, [currentIndex, currentPhrase.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted p-8">
@@ -107,7 +150,7 @@ export default function KeyboardDemoPage() {
             <div
               className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{
-                width: `${((currentIndex / currentPhrase.length) * 100).toFixed(0)}%`,
+                width: `${progressPercentage}%`,
               }}
             />
           </div>
@@ -134,6 +177,38 @@ export default function KeyboardDemoPage() {
             showHomeRowMarkers={showHomeRow}
             compact={compact}
           />
+
+          <div className="mt-8 grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-card/60 p-4 text-sm">
+              <p className="font-semibold text-foreground">Session Stats</p>
+              <div className="mt-2 flex items-center justify-between text-muted-foreground">
+                <span>Characters completed</span>
+                <span>
+                  {Math.min(currentIndex, currentPhrase.length)} / {currentPhrase.length}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-muted-foreground">
+                <span>Mistakes made</span>
+                <span className={mistakes ? 'text-red-500' : ''}>{mistakes}</span>
+              </div>
+              {feedback && (
+                <div className="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
+                  {feedback}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border/60 bg-card/60 p-4">
+              <p className="mb-2 text-sm font-semibold text-foreground">Finger Guidance</p>
+              <HandPositionGuide
+                targetKey={targetChar}
+                compact
+                showArrow
+                showFingerLabels={false}
+                className="mx-auto"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Instructions */}
