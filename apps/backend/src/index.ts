@@ -8,6 +8,8 @@ import { logger } from './utils/logger';
 import authRoutes from './routes/auth.routes';
 import testRoutes from './routes/test.routes';
 import userRoutes from './routes/user.routes';
+import lessonRoutes from './routes/lesson.routes';
+import achievementRoutes from './routes/achievement.routes';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +39,8 @@ app.get('/health', (_req, res) => {
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/tests`, testRoutes);
 app.use(`/api/${API_VERSION}/users`, userRoutes);
+app.use(`/api/${API_VERSION}/lessons`, lessonRoutes);
+app.use(`/api/${API_VERSION}/achievements`, achievementRoutes);
 
 // 404 handler
 app.use((req, res) => {

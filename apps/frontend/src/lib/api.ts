@@ -275,5 +275,254 @@ export const userAPI = {
   },
 };
 
+/**
+ * Lesson API
+ */
+export const lessonAPI = {
+  /**
+   * Get all lessons with user progress
+   */
+  getAllLessons: async () => {
+    return fetchAPI<{
+      lessons: Array<{
+        id: string;
+        level: number;
+        order: number;
+        title: string;
+        description: string;
+        keys: string[];
+        difficulty: string;
+        targetWpm: number;
+        minAccuracy: number;
+        exerciseType: string;
+        content: string;
+        userProgress?: Array<{
+          completed: boolean;
+          bestWpm: number;
+          bestAccuracy: number;
+          stars: number;
+          attempts: number;
+        }>;
+      }>;
+    }>('/lessons');
+  },
+
+  /**
+   * Get single lesson by ID
+   */
+  getLessonById: async (id: string) => {
+    return fetchAPI<{
+      lesson: {
+        id: string;
+        level: number;
+        order: number;
+        title: string;
+        description: string;
+        keys: string[];
+        difficulty: string;
+        targetWpm: number;
+        minAccuracy: number;
+        exerciseType: string;
+        content: string;
+        userProgress?: Array<{
+          completed: boolean;
+          bestWpm: number;
+          bestAccuracy: number;
+          stars: number;
+          attempts: number;
+        }>;
+      };
+    }>(`/lessons/${id}`);
+  },
+
+  /**
+   * Save lesson progress
+   */
+  saveLessonProgress: async (data: {
+    lessonId: string;
+    wpm: number;
+    accuracy: number;
+    completed: boolean;
+  }) => {
+    return fetchAPI<{
+      message: string;
+      progress: {
+        id: string;
+        completed: boolean;
+        bestWpm: number;
+        bestAccuracy: number;
+        stars: number;
+        attempts: number;
+      };
+    }>('/lessons/progress', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Get user's learning statistics
+   */
+  getLearningStats: async () => {
+    return fetchAPI<{
+      stats: {
+        totalLessons: number;
+        completedLessons: number;
+        completionPercentage: number;
+        totalStars: number;
+        maxStars: number;
+        averageWpm: number;
+        averageAccuracy: number;
+      };
+    }>('/lessons/progress/stats');
+  },
+
+  /**
+   * Get detailed progress data for visualizations
+   */
+  getProgressVisualization: async () => {
+    return fetchAPI<{
+      completionByLevel: Array<{
+        level: string;
+        name: string;
+        percentage: number;
+        completed: number;
+        total: number;
+        stars: number;
+        maxStars: number;
+      }>;
+      wpmByLesson: Array<{
+        lessonId: string;
+        lessonTitle: string;
+        level: number;
+        data: Array<{
+          date: string;
+          wpm: number;
+          accuracy: number;
+        }>;
+      }>;
+      practiceFrequency: Array<{
+        date: string;
+        count: number;
+      }>;
+      skillTree: Array<{
+        id: string;
+        title: string;
+        level: number;
+        order: number;
+        difficulty: string;
+        targetWpm: number;
+        completed: boolean;
+        stars: number;
+        bestWpm: number;
+        attempts: number;
+        locked: boolean;
+        prerequisites: string[];
+      }>;
+    }>('/lessons/progress/visualization');
+  },
+};
+
+/**
+ * Achievement API
+ */
+export const achievementAPI = {
+  /**
+   * Get all achievements with user's unlock status
+   */
+  getAllAchievements: async () => {
+    return fetchAPI<{
+      achievements: Array<{
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        points: number;
+        requirement: string;
+        unlocked: boolean;
+        unlockedAt: string | null;
+      }>;
+      totalAchievements: number;
+      unlockedCount: number;
+      totalPoints: number;
+      earnedPoints: number;
+    }>('/achievements');
+  },
+
+  /**
+   * Check and award new achievements
+   */
+  checkAchievements: async () => {
+    return fetchAPI<{
+      message: string;
+      newlyUnlocked: Array<{
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        points: number;
+        unlockedAt: string;
+      }>;
+      totalChecked: number;
+    }>('/achievements/check', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Get achievement statistics
+   */
+  getAchievementStats: async () => {
+    return fetchAPI<{
+      stats: {
+        totalAchievements: number;
+        unlockedCount: number;
+        lockedCount: number;
+        completionPercentage: number;
+        totalPoints: number;
+        earnedPoints: number;
+        pointsPercentage: number;
+      };
+      recentUnlocks: Array<{
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        points: number;
+        unlockedAt: string;
+      }>;
+    }>('/achievements/stats');
+  },
+
+  /**
+   * Get achievement progress for multi-step achievements
+   */
+  getAchievementProgress: async () => {
+    return fetchAPI<{
+      progress: {
+        dedicated: number;
+        committed: number;
+        unstoppable: number;
+        speedDemon: number;
+        lightningFast: number;
+        typingMaster: number;
+        sharpshooter: number;
+        student: number;
+        scholar: number;
+        graduateTypist: number;
+        weekWarrior: number;
+      };
+      stats: {
+        testCount: number;
+        highAccuracyTests: number;
+        completedLessons: number;
+        totalLessons: number;
+        bestWpm: number;
+        uniqueDaysThisWeek: number;
+      };
+    }>('/achievements/progress');
+  },
+};
+
 // Named export for convenience
 export const getTest = testAPI.getTest;

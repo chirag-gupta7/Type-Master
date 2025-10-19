@@ -15,7 +15,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  testResults TestResult[]
+  testResults      TestResult[]
+  lessonProgress   UserLessonProgress[]
+  achievements     UserAchievement[]
 
   @@index([email])
   @@index([username])
@@ -45,4 +47,90 @@ enum TestMode {
   WORDS
   TIME
   QUOTE
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum ExerciseType {
+  KEYS          // Practice specific keys
+  WORDS         // Type words
+  SENTENCES     // Type sentences
+  PARAGRAPHS    // Type paragraphs
+  CODE          // Code snippets
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  level       Int      // 1, 2, 3, etc.
+  title       String   // "Home Row - ASDF"
+  description String
+  keys        String[] // ["a", "s", "d", "f"]
+  difficulty  Difficulty @default(BEGINNER)
+  targetWpm   Int      @default(20)
+  minAccuracy Int      @default(90) // Minimum accuracy to pass
+  order       Int      // Display order
+  exerciseType ExerciseType @default(KEYS)
+  content     String   // Exercise text or pattern
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userProgress UserLessonProgress[]
+
+  @@index([level, order])
+  @@map("lessons")
+}
+
+model UserLessonProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  lessonId    String
+  completed   Boolean  @default(false)
+  bestWpm     Float    @default(0)
+  bestAccuracy Float   @default(0)
+  attempts    Int      @default(0)
+  stars       Int      @default(0) // 0-3 stars based on performance
+  lastAttempt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("user_lesson_progress")
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  icon        String   // Icon identifier
+  requirement String   // JSON string with requirements
+  points      Int      @default(10)
+  createdAt   DateTime @default(now())
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
 }

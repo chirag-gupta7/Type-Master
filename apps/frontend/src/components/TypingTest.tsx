@@ -47,15 +47,14 @@ const Word = React.memo(
           const isTyped = index < typedWord.length;
           const isCorrect = isTyped && typedWord[index] === char;
           const isCursor = index === typedWord.length;
-          const cursorPositionClass = isTyped ? 'left-full' : 'left-0 -translate-x-full';
 
           return (
             <span key={index} className="relative inline-block">
               {isCursor && (
                 <span
                   className={cn(
-                    'absolute top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full transform',
-                    cursorPositionClass
+                    'absolute top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full',
+                    'left-0 -translate-x-full'
                   )}
                 />
               )}

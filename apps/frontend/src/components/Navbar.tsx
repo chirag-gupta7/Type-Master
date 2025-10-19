@@ -10,6 +10,11 @@ import { useEffect, useState } from 'react';
 
 const navLinks = [
   { href: '/', label: 'Home' },
+  { href: '/learn', label: 'Learn' },
+  { href: '/keyboard-demo', label: 'Keyboard' },
+  { href: '/hand-position-demo', label: 'Hand Guide' },
+  { href: '/achievements', label: 'Achievements' },
+  { href: '/progress', label: 'Progress' },
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/history', label: 'History' },
   { href: '/settings', label: 'Settings' },

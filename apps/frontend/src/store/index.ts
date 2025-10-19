@@ -93,14 +93,18 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     const state = get();
     const { textToType, status, startTime } = state;
 
-    if (input.length > textToType.length) {
+    // Sanitize input: replace newlines with spaces and collapse multiple spaces
+    const sanitizedInput = input.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ');
+
+    // Prevent input from exceeding the text length
+    if (sanitizedInput.length > textToType.length) {
       return;
     }
 
-    // FIX: Start the timer and mark the run as in-progress on the very first character.
+    // Start the timer on the very first character typed
     let nextStartTime = startTime;
     let nextStatus = status;
-    if (!nextStartTime && input.length > 0) {
+    if (!nextStartTime && sanitizedInput.length > 0) {
       nextStartTime = Date.now();
       nextStatus = 'in-progress';
     }
@@ -109,31 +113,36 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     let accuracy = 100;
     let errors = 0;
 
-    if (nextStartTime) {
+    // Calculate real-time metrics if test has started
+    if (nextStartTime && sanitizedInput.length > 0) {
       const elapsedMinutes = (Date.now() - nextStartTime) / 1000 / 60;
-      const typedChars = input.length;
+      const typedChars = sanitizedInput.length;
 
-      if (typedChars > 0) {
-        let correctChars = 0;
-        for (let i = 0; i < typedChars; i++) {
-          if (input[i] === textToType[i]) {
-            correctChars++;
-          }
+      // Calculate character-by-character accuracy
+      let correctChars = 0;
+      for (let i = 0; i < typedChars; i++) {
+        if (sanitizedInput[i] === textToType[i]) {
+          correctChars++;
         }
+      }
 
-        errors = typedChars - correctChars;
-        accuracy = Math.max(0, Math.min(100, Math.round((correctChars / typedChars) * 100)));
+      // Calculate errors and accuracy
+      errors = typedChars - correctChars;
+      accuracy = Math.round((correctChars / typedChars) * 100);
+      accuracy = Math.max(0, Math.min(100, accuracy));
 
-        if (elapsedMinutes > 0) {
-          // FIX: WPM should track gross speed (all characters typed) to avoid under-reporting.
-          const wordsPerMinute = typedChars / 5 / elapsedMinutes;
-          wpm = Math.max(0, Math.round(wordsPerMinute));
-        }
+      // Calculate WPM using industry-standard formula
+      // Gross WPM = (total characters typed / 5) / time in minutes
+      if (elapsedMinutes > 0) {
+        const grossWPM = typedChars / 5 / elapsedMinutes;
+        // Net WPM = Gross WPM - (errors / time in minutes)
+        const netWPM = grossWPM - errors / elapsedMinutes;
+        wpm = Math.max(0, Math.round(netWPM));
       }
     }
 
     set({
-      userInput: input,
+      userInput: sanitizedInput,
       startTime: nextStartTime,
       status: nextStatus,
       wpm,
@@ -141,7 +150,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errors,
     });
 
-    if (input.length === textToType.length) {
+    // Auto-complete test when full text is typed
+    if (sanitizedInput.length === textToType.length) {
       get().endTest();
     }
   },
