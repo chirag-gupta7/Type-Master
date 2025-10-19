@@ -30,10 +30,12 @@ interface LessonData {
 }
 
 export default function LessonPracticePage() {
+  // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const params = useParams();
   const router = useRouter();
   const lessonId = params.id as string;
 
+  // All useState hooks
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
@@ -44,6 +46,7 @@ export default function LessonPracticePage() {
   // Typing state from Zustand store
   const { userInput, wpm, accuracy, status, startTest, resetTest, setUserInput } = useTypingStore();
 
+  // All useEffect hooks
   useEffect(() => {
     async function fetchLesson() {
       try {
@@ -66,6 +69,7 @@ export default function LessonPracticePage() {
     }
   }, [status, view]);
 
+  // All event handlers and calculations (after hooks, before conditional returns)
   const handleStart = () => {
     resetTest();
     startTest(lesson?.content || '');
@@ -103,6 +107,21 @@ export default function LessonPracticePage() {
     resetTest();
   };
 
+  // Calculate stars for current attempt
+  const calculateStars = () => {
+    if (!lesson) return 0;
+    if (accuracy < lesson.minAccuracy || wpm < lesson.targetWpm) return 0;
+    if (wpm >= lesson.targetWpm * 1.5 && accuracy >= 98) return 3;
+    if (wpm >= lesson.targetWpm * 1.2 && accuracy >= 95) return 2;
+    return 1;
+  };
+
+  const progress = lesson?.userProgress?.[0];
+  const stars = progress?.stars || 0;
+  const currentStars = view === 'results' ? calculateStars() : 0;
+  const completed = lesson ? accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm : false;
+
+  // NOW handle conditional returns AFTER all hooks
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -121,20 +140,6 @@ export default function LessonPracticePage() {
       </div>
     );
   }
-
-  const progress = lesson.userProgress?.[0];
-  const stars = progress?.stars || 0;
-
-  // Calculate stars for current attempt
-  const calculateStars = () => {
-    if (accuracy < lesson.minAccuracy || wpm < lesson.targetWpm) return 0;
-    if (wpm >= lesson.targetWpm * 1.5 && accuracy >= 98) return 3;
-    if (wpm >= lesson.targetWpm * 1.2 && accuracy >= 95) return 2;
-    return 1;
-  };
-
-  const currentStars = view === 'results' ? calculateStars() : 0;
-  const completed = accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
