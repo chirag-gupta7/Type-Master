@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { lessonAPI } from '@/lib/api';
-import { useMemo } from 'react';
-import { Star, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Lock, Star } from 'lucide-react';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
+import { lessonAPI } from '@/lib/api';
 
 interface Lesson {
   id: string;
@@ -146,15 +145,19 @@ export default function LearnPage() {
   const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchData() {
       try {
         const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
 
         if (!hasToken) {
-          setLessons(FALLBACK_LESSONS);
-          setStats(buildFallbackStats(FALLBACK_LESSONS.length));
-          setUsingFallback(true);
-          setError("You're viewing the sample lesson plan. Sign in to sync your progress.");
+          if (isMounted) {
+            setLessons(FALLBACK_LESSONS);
+            setStats(buildFallbackStats(FALLBACK_LESSONS.length));
+            setUsingFallback(true);
+            setError("You're viewing the sample lesson plan. Sign in to sync your progress.");
+          }
           return;
         }
 
@@ -174,28 +177,49 @@ export default function LearnPage() {
           };
         });
 
-        setLessons(normalizedLessons);
-        setStats(statsData?.stats ?? null);
-        setUsingFallback(false);
-        setError(null);
+        if (isMounted) {
+          setLessons(normalizedLessons);
+          setStats(statsData?.stats ?? null);
+          setUsingFallback(false);
+          setError(null);
+        }
       } catch (err) {
         console.error('Failed to load lessons:', err);
-        setLessons(FALLBACK_LESSONS);
-        setStats(buildFallbackStats(FALLBACK_LESSONS.length));
-        setUsingFallback(true);
 
-        const message =
-          err instanceof Error && err.message.includes('token')
-            ? 'We could not verify your session. Showing offline lessons instead.'
-            : 'We could not reach the learning service. Showing offline lessons instead.';
-        setError(message);
+        if (isMounted) {
+          setLessons(FALLBACK_LESSONS);
+          setStats(buildFallbackStats(FALLBACK_LESSONS.length));
+          setUsingFallback(true);
+
+          const message =
+            err instanceof Error && err.message.includes('token')
+              ? 'We could not verify your session. Showing offline lessons instead.'
+              : 'We could not reach the learning service. Showing offline lessons instead.';
+          setError(message);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const lessonsByLevel = useMemo(() => {
+    return lessons.reduce<Record<number, Lesson[]>>((acc, lesson) => {
+      if (!acc[lesson.level]) {
+        acc[lesson.level] = [];
+      }
+      acc[lesson.level].push(lesson);
+      return acc;
+    }, {});
+  }, [lessons]);
 
   if (loading) {
     return (
@@ -204,18 +228,6 @@ export default function LearnPage() {
       </div>
     );
   }
-
-  // Group lessons by level
-  const lessonsByLevel = useMemo(() => {
-    return lessons.reduce(
-      (acc, lesson) => {
-        if (!acc[lesson.level]) acc[lesson.level] = [];
-        acc[lesson.level].push(lesson);
-        return acc;
-      },
-      {} as Record<number, Lesson[]>
-    );
-  }, [lessons]);
 
   return (
     <div className="container mx-auto px-4 py-8">
