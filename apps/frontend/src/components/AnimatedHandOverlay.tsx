@@ -72,7 +72,7 @@ const getFingerZone = (key: string) => {
 export function AnimatedHandOverlay({
   targetKey,
   pressedKey,
-  isCorrect,
+  isCorrect: _isCorrect,
   className = '',
 }: AnimatedHandOverlayProps) {
   const targetZone = useMemo(() => (targetKey ? getFingerZone(targetKey) : null), [targetKey]);
@@ -217,7 +217,10 @@ export function AnimatedHandOverlay({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            {targetZone.zone.replace('left', '').replace(/([A-Z])/g, ' $1').trim()}
+            {targetZone.zone
+              .replace('left', '')
+              .replace(/([A-Z])/g, ' $1')
+              .trim()}
           </motion.div>
         )}
       </motion.div>
@@ -346,7 +349,10 @@ export function AnimatedHandOverlay({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            {targetZone.zone.replace('right', '').replace(/([A-Z])/g, ' $1').trim()}
+            {targetZone.zone
+              .replace('right', '')
+              .replace(/([A-Z])/g, ' $1')
+              .trim()}
           </motion.div>
         )}
       </motion.div>
