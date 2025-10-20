@@ -7,27 +7,7 @@ import { Star, ArrowLeft, Trophy, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { useTypingStore } from '@/store';
-
-interface LessonData {
-  id: string;
-  level: number;
-  order: number;
-  title: string;
-  description: string;
-  keys: string[];
-  difficulty: string;
-  targetWpm: number;
-  minAccuracy: number;
-  exerciseType: string;
-  content: string;
-  userProgress?: Array<{
-    completed: boolean;
-    bestWpm: number;
-    bestAccuracy: number;
-    stars: number;
-    attempts: number;
-  }>;
-}
+import { Lesson, getFallbackLessonById } from '@/lib/fallback-lessons';
 
 export default function LessonPracticePage() {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
@@ -36,12 +16,13 @@ export default function LessonPracticePage() {
   const lessonId = params.id as string;
 
   // All useState hooks
-  const [lesson, setLesson] = useState<LessonData | null>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
-  const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [lastPressedKey, setLastPressedKey] = useState<string>('');
   const [isCorrectKey, setIsCorrectKey] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   // Typing state from Zustand store
   const { userInput, wpm, accuracy, status, startTest, resetTest, setUserInput } = useTypingStore();
@@ -51,9 +32,22 @@ export default function LessonPracticePage() {
     async function fetchLesson() {
       try {
         const data = await lessonAPI.getLessonById(lessonId);
-        setLesson(data.lesson);
+        const normalizedLesson: Lesson = {
+          ...data.lesson,
+          exerciseType:
+            data.lesson.exerciseType === 'guided' || data.lesson.exerciseType === 'timed'
+              ? data.lesson.exerciseType
+              : undefined,
+        };
+        setLesson(normalizedLesson);
+        setUsingFallback(false);
       } catch (err) {
         console.error('Failed to load lesson:', err);
+        const fallbackLesson = getFallbackLessonById(lessonId);
+        if (fallbackLesson) {
+          setLesson(fallbackLesson);
+          setUsingFallback(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -79,7 +73,12 @@ export default function LessonPracticePage() {
   const handleSaveProgress = async () => {
     if (!lesson) return;
 
-    setSaving(true);
+    if (usingFallback) {
+      alert('Save progress is unavailable while using offline lessons.');
+      return;
+    }
+
+    setIsSaving(true);
     const completed = accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm;
 
     try {
@@ -98,7 +97,7 @@ export default function LessonPracticePage() {
       console.error('Failed to save progress:', err);
       alert('Failed to save progress. Please try again.');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -120,6 +119,7 @@ export default function LessonPracticePage() {
   const stars = progress?.stars || 0;
   const currentStars = view === 'results' ? calculateStars() : 0;
   const completed = lesson ? accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm : false;
+  const lessonContent = lesson?.content ?? '';
 
   // NOW handle conditional returns AFTER all hooks
   if (loading) {
@@ -147,6 +147,13 @@ export default function LessonPracticePage() {
         <ArrowLeft className="mr-2" size={16} />
         Back to Lessons
       </Button>
+
+      {usingFallback && (
+        <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200">
+          You&apos;re viewing the offline sample lesson. Start the backend services and database to
+          see your personalized progress.
+        </div>
+      )}
 
       {/* Initial View */}
       {view === 'initial' && (
@@ -209,7 +216,7 @@ export default function LessonPracticePage() {
 
           {/* Lesson Preview */}
           <div className="bg-card border rounded-lg p-6">
-            <h3 className="font-semibold mb-3">Lesson Content</h3>
+            <p className="font-mono text-lg text-muted-foreground">{lessonContent}</p>
             <p className="font-mono text-lg text-muted-foreground">{lesson.content}</p>
           </div>
 
@@ -241,10 +248,9 @@ export default function LessonPracticePage() {
             </div>
           </div>
 
-          {/* Typing Interface - Reuse TypingTest component logic */}
           <div className="bg-card border rounded-lg p-8">
             <div className="font-mono text-2xl leading-relaxed mb-6">
-              {lesson.content.split(' ').map((word, wordIndex) => {
+              {lessonContent.split(' ').map((word, wordIndex) => {
                 const typedWords = userInput.split(' ');
                 const isCurrentWord = wordIndex === typedWords.length - 1;
                 const isTyped = wordIndex < typedWords.length - 1;
@@ -291,26 +297,22 @@ export default function LessonPracticePage() {
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={(e) => {
                 setLastPressedKey(e.key);
-                const nextChar = lesson.content[userInput.length];
+                const nextChar = lessonContent[userInput.length];
                 setIsCorrectKey(e.key === nextChar);
                 setTimeout(() => setLastPressedKey(''), 200);
               }}
-              className="w-full p-3 border rounded bg-background"
               placeholder="Start typing here..."
               autoFocus
             />
           </div>
 
           {/* Visual Keyboard */}
-          <div className="flex justify-center">
-            <VisualKeyboard
-              targetKey={lesson.content[userInput.length]}
-              pressedKey={lastPressedKey}
-              isCorrect={isCorrectKey}
-              showHomeRowMarkers={true}
-            />
-          </div>
-
+          <VisualKeyboard
+            targetKey={lessonContent[userInput.length]}
+            pressedKey={lastPressedKey}
+            isCorrect={isCorrectKey}
+            showHomeRowMarkers={true}
+          />
           {/* Instructions */}
           <div className="text-center text-sm text-muted-foreground space-y-2">
             <p>Watch the keyboard below to see which key to press next (highlighted in yellow)</p>
@@ -374,11 +376,11 @@ export default function LessonPracticePage() {
 
           {/* Actions */}
           <div className="flex gap-4 justify-center">
-            <Button variant="outline" onClick={handleTryAgain} disabled={saving}>
+            <Button variant="outline" onClick={handleTryAgain} disabled={isSaving}>
               Try Again
             </Button>
-            <Button onClick={handleSaveProgress} disabled={saving}>
-              {saving ? 'Saving...' : 'Save & Continue'}
+            <Button onClick={handleSaveProgress} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save & Continue'}
             </Button>
           </div>
         </div>

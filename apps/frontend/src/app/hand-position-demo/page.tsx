@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HandPositionGuide, getFingerForKey } from '@/components/HandPositionGuide';
+import { getFingerForKey } from '@/components/HandPositionGuide';
 import { HandModel3D } from '@/components/HandModel3D';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,10 +56,10 @@ const HOME_ROW_KEYS = ['A', 'S', 'D', 'F', 'J', 'K', 'L', ';'];
 export default function HandPositionDemo() {
   const [currentKey, setCurrentKey] = useState<string>('');
   const [autoPlay, setAutoPlay] = useState(false);
-  const [showArrow, setShowArrow] = useState(true);
-  const [showLabels, setShowLabels] = useState(true);
-  const [compact, setCompact] = useState(false);
   const [keySequence, setKeySequence] = useState<string[]>(HOME_ROW_KEYS);
+  // Legacy 2D guide removed; these toggles now tune the 3D presentation instead.
+  const [showPressureIndicators, setShowPressureIndicators] = useState(true);
+  const [showWristGuides, setShowWristGuides] = useState(true);
   const [showTips, setShowTips] = useState(false);
 
   // Auto-play demonstration
@@ -189,7 +189,7 @@ export default function HandPositionDemo() {
             Interactive 3D Hand Models
           </h2>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="max-w-5xl mx-auto space-y-8">
             {/* Left Hand */}
             <motion.div
               className="bg-gradient-to-br from-[#1a1a1a]/90 to-[#0f0f0f]/90 backdrop-blur-xl rounded-2xl border border-white/10 p-6 md:p-8"
@@ -198,6 +198,9 @@ export default function HandPositionDemo() {
                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
               }}
             >
+              <p className="text-sm uppercase tracking-widest text-cyan-400 mb-4 text-center">
+                Left Hand Focus
+              </p>
               <HandModel3D
                 hand="left"
                 activeFinger={
@@ -205,8 +208,8 @@ export default function HandPositionDemo() {
                     ? getFingerForKey(currentKey)?.color.name
                     : undefined
                 }
-                showPressureIndicators={true}
-                showWristGuide={true}
+                showPressureIndicators={showPressureIndicators}
+                showWristGuide={showWristGuides}
               />
             </motion.div>
 
@@ -218,6 +221,9 @@ export default function HandPositionDemo() {
                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
               }}
             >
+              <p className="text-sm uppercase tracking-widest text-cyan-400 mb-4 text-center">
+                Right Hand Focus
+              </p>
               <HandModel3D
                 hand="right"
                 activeFinger={
@@ -225,30 +231,10 @@ export default function HandPositionDemo() {
                     ? getFingerForKey(currentKey)?.color.name
                     : undefined
                 }
-                showPressureIndicators={true}
-                showWristGuide={true}
+                showPressureIndicators={showPressureIndicators}
+                showWristGuide={showWristGuides}
               />
             </motion.div>
-          </div>
-        </motion.div>
-
-        {/* Enhanced Hand Position Guide */}
-        <motion.div
-          className="bg-gradient-to-br from-[#1a1a1a]/90 to-[#0f0f0f]/90 backdrop-blur-xl rounded-2xl border border-white/10 p-8 md:p-12"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          style={{
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-          }}
-        >
-          <div className="scale-110 md:scale-125 lg:scale-150 origin-center py-8 md:py-12">
-            <HandPositionGuide
-              targetKey={currentKey || undefined}
-              showArrow={showArrow}
-              showFingerLabels={showLabels}
-              compact={compact}
-            />
           </div>
         </motion.div>
 
@@ -406,36 +392,24 @@ export default function HandPositionDemo() {
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
-                      checked={showArrow}
-                      onChange={(e) => setShowArrow(e.target.checked)}
+                      checked={showPressureIndicators}
+                      onChange={(e) => setShowPressureIndicators(e.target.checked)}
                       className="w-4 h-4 rounded border-white/20 bg-black/40 checked:bg-cyan-500"
                     />
                     <span className="text-sm text-gray-300 group-hover:text-cyan-400 transition-colors">
-                      Show Arrow Indicators
+                      Show Pressure Indicators
                     </span>
                   </label>
 
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
-                      checked={showLabels}
-                      onChange={(e) => setShowLabels(e.target.checked)}
+                      checked={showWristGuides}
+                      onChange={(e) => setShowWristGuides(e.target.checked)}
                       className="w-4 h-4 rounded border-white/20 bg-black/40 checked:bg-cyan-500"
                     />
                     <span className="text-sm text-gray-300 group-hover:text-cyan-400 transition-colors">
-                      Show Finger Labels
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={compact}
-                      onChange={(e) => setCompact(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/20 bg-black/40 checked:bg-cyan-500"
-                    />
-                    <span className="text-sm text-gray-300 group-hover:text-cyan-400 transition-colors">
-                      Compact View Mode
+                      Show Wrist Guides
                     </span>
                   </label>
                 </div>
