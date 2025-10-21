@@ -18,6 +18,7 @@ model User {
   testResults      TestResult[]
   lessonProgress   UserLessonProgress[]
   achievements     UserAchievement[]
+  gameScores       GameScore[]
 
   @@index([email])
   @@index([username])
@@ -133,4 +134,29 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId])
   @@map("user_achievements")
+}
+
+enum GameType {
+  WORD_BLITZ
+  ACCURACY_CHALLENGE
+  SPEED_RACE
+}
+
+model GameScore {
+  id        String   @id @default(uuid())
+  userId    String
+  gameType  GameType
+  score     Int
+  wpm       Float?   // For speed-race
+  accuracy  Float?   // For accuracy-challenge
+  duration  Int?     // Duration in seconds
+  metadata  String?  // JSON string for additional game-specific data
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, gameType])
+  @@index([gameType, score(sort: Desc)])
+  @@index([createdAt])
+  @@map("game_scores")
 }

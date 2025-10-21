@@ -23,6 +23,11 @@
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
     --radius: 0.5rem;
+
+    /* Dynamic theme colors (set by ThemeSelector) */
+    --theme-primary: #06b6d4;
+    --theme-secondary: #3b82f6;
+    --theme-accent: #22d3ee;
   }
   .dark {
     --background: 240 10% 3.9%;

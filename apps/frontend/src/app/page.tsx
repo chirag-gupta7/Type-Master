@@ -1,9 +1,11 @@
-import TypingTest from '@/components/TypingTest';
+import { LandingHero } from '@/components/LandingHero';
+import { FeatureCards } from '@/components/FeatureCards';
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <TypingTest />
+    <main className="min-h-screen">
+      <LandingHero />
+      <FeatureCards />
     </main>
   );
 }

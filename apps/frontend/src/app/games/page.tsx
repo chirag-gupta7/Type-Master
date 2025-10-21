@@ -1,0 +1,219 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+import { motion } from 'framer-motion';
+import { Zap, Target, Trophy, Lock, Play } from 'lucide-react';
+import { useState } from 'react';
+import { useGameStore } from '@/store/games';
+
+// Lazy load game components
+const WordBlitz = dynamic(() => import('@/components/games/WordBlitz'), {
+  loading: () => <GameLoading />,
+  ssr: false,
+});
+
+const AccuracyChallenge = dynamic(() => import('@/components/games/AccuracyChallenge'), {
+  loading: () => <GameLoading />,
+  ssr: false,
+});
+
+const SpeedRace = dynamic(() => import('@/components/games/SpeedRace'), {
+  loading: () => <GameLoading />,
+  ssr: false,
+});
+
+function GameLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-lg text-muted-foreground">Loading game...</div>
+    </div>
+  );
+}
+
+const GAMES = [
+  {
+    id: 'word-blitz' as const,
+    title: 'Word Blitz',
+    description: 'Type words before they fall! Fast-paced action in 30 seconds.',
+    icon: Zap,
+    gradient: 'from-cyan-500 to-blue-500',
+    difficulty: 'Easy',
+  },
+  {
+    id: 'accuracy-challenge' as const,
+    title: 'Accuracy Challenge',
+    description: '100% accuracy required. One mistake and you restart!',
+    icon: Target,
+    gradient: 'from-purple-500 to-pink-500',
+    difficulty: 'Hard',
+  },
+  {
+    id: 'speed-race' as const,
+    title: 'Speed Race',
+    description: 'Beat your personal best WPM record!',
+    icon: Trophy,
+    gradient: 'from-orange-500 to-red-500',
+    difficulty: 'Medium',
+  },
+];
+
+export default function GamesPage() {
+  const { currentGame, setCurrentGame, gamesPlayed, isGuest } = useGameStore();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const handleGameSelect = (gameId: (typeof GAMES)[number]['id']) => {
+    // Guest users can only play 1 game
+    if (isGuest && gamesPlayed >= 1) {
+      setShowLoginModal(true);
+      return;
+    }
+    setCurrentGame(gameId);
+  };
+
+  // If a game is selected, render it
+  if (currentGame === 'word-blitz') return <WordBlitz />;
+  if (currentGame === 'accuracy-challenge') return <AccuracyChallenge />;
+  if (currentGame === 'speed-race') return <SpeedRace />;
+
+  // Otherwise, show game selection
+  return (
+    <div className="min-h-screen pt-20 pb-12">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <div className="inline-flex items-center gap-2 bg-[var(--theme-primary)]/10 px-4 py-2 rounded-full mb-4">
+            <Play className="w-5 h-5 text-[var(--theme-primary)]" />
+            <span className="text-sm font-medium text-[var(--theme-primary)]">Typing Games</span>
+          </div>
+
+          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] bg-clip-text text-transparent">
+            Make Practice Fun
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Challenge yourself with engaging typing games designed to improve speed and accuracy
+          </p>
+
+          {isGuest && (
+            <p className="mt-4 text-sm text-yellow-400">
+              ⚡ Guest mode: You can play 1 game. Login for unlimited access!
+            </p>
+          )}
+        </motion.div>
+
+        {/* Game Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {GAMES.map((game, index) => {
+            const Icon = game.icon;
+            const isLocked = isGuest && gamesPlayed >= 1;
+
+            return (
+              <motion.div
+                key={game.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+                whileHover={{ scale: isLocked ? 1 : 1.05, y: isLocked ? 0 : -8 }}
+                whileTap={{ scale: isLocked ? 1 : 0.98 }}
+              >
+                <button
+                  onClick={() => handleGameSelect(game.id)}
+                  disabled={isLocked}
+                  className="w-full h-full bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-2xl disabled:opacity-60 disabled:cursor-not-allowed relative overflow-hidden group"
+                >
+                  {/* Gradient background on hover */}
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${game.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+                  />
+
+                  <div className="relative z-10">
+                    {/* Icon */}
+                    <div
+                      className={`w-16 h-16 rounded-xl bg-gradient-to-br ${game.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
+                    >
+                      {isLocked ? (
+                        <Lock className="w-8 h-8 text-white" />
+                      ) : (
+                        <Icon className="w-8 h-8 text-white" />
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-2xl font-bold mb-2 text-foreground">{game.title}</h3>
+
+                    {/* Description */}
+                    <p className="text-muted-foreground text-sm mb-4">{game.description}</p>
+
+                    {/* Difficulty Badge */}
+                    <span className="inline-block px-3 py-1 bg-background/50 rounded-full text-xs font-medium">
+                      {game.difficulty}
+                    </span>
+
+                    {isLocked && (
+                      <div className="mt-4 text-xs text-yellow-400">🔒 Login to unlock</div>
+                    )}
+                  </div>
+                </button>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Stats Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6"
+        >
+          <h2 className="text-xl font-bold mb-4">Your Stats</h2>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-[var(--theme-primary)]">{gamesPlayed}</div>
+              <div className="text-sm text-muted-foreground">Games Played</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-[var(--theme-secondary)]">0</div>
+              <div className="text-sm text-muted-foreground">High Scores</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-[var(--theme-accent)]">-</div>
+              <div className="text-sm text-muted-foreground">Rank</div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border rounded-2xl p-8 max-w-md mx-4 text-center"
+          >
+            <Lock className="w-16 h-16 mx-auto mb-4 text-yellow-400" />
+            <h2 className="text-2xl font-bold mb-2">Unlock Unlimited Games</h2>
+            <p className="text-muted-foreground mb-6">
+              You've played your free game! Login to unlock unlimited access to all typing games.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowLoginModal(false)}
+                className="flex-1 px-6 py-3 bg-background/50 border border-border rounded-xl hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button className="flex-1 px-6 py-3 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white rounded-xl hover:shadow-lg transition-shadow">
+                Login
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}

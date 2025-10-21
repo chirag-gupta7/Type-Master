@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import { generateTestText } from '@/lib/textGenerator';
+
+// Re-export theme store
+export * from './theme';
 
 interface TypingState {
   status: 'waiting' | 'in-progress' | 'finished';
@@ -10,6 +14,7 @@ interface TypingState {
   wpm: number;
   accuracy: number;
   startTest: (text: string) => void;
+  generateAndStartTest: (duration: 30 | 60 | 180, category?: string) => void;
   startTimer: () => void;
   setUserInput: (input: string) => void;
   endTest: () => void;
@@ -80,6 +85,14 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       wpm: 0,
       accuracy: 100,
     });
+  },
+
+  generateAndStartTest: (duration: 30 | 60 | 180, category?: string) => {
+    const text = generateTestText(
+      duration,
+      category as 'tech' | 'literature' | 'general' | 'business' | 'science' | undefined
+    );
+    get().startTest(text);
   },
 
   startTimer: () => {

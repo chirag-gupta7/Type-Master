@@ -32,6 +32,14 @@ A modern, production-ready typing speed improvement web application built with c
 - ✅ **Test History** - Complete test history with filtering
 - ✅ **Dark/Light Mode** - Full theme support with system preference detection
 - ✅ **Responsive Design** - Mobile-first, works on all devices
+- ✨ **10 Theme Colors** - Neon Cyan, Purple, Green, Orange, Pink, Blue, Lime, Ruby, Golden, Mint
+- ✨ **Dynamic Text Generator** - 580+ sentences across 5 categories (tech, literature, general, business, science)
+- ✨ **TypeRacer Horizontal Display** - Horizontal scrolling mode with centered current word
+- ✨ **MonkeyType Results** - Animated WPM counter, accuracy ring, detailed stats, personal best tracking
+- ✨ **3 Typing Games** - Word Blitz, Accuracy Challenge, Speed Race with leaderboards
+- ✨ **Keyboard Shortcuts** - Ctrl+1-8 for quick navigation across all pages
+- ✨ **Mobile Menu** - Hamburger menu with smooth animations for mobile devices
+- ✨ **Guest Access** - Play 1 demo game before login required
 
 ### Technical Features
 
@@ -41,6 +49,7 @@ A modern, production-ready typing speed improvement web application built with c
 - 🧪 **Well Tested** - Comprehensive unit, integration, and E2E tests
 - 📊 **Type Safe** - Full TypeScript coverage with strict mode
 - 🔄 **State Management** - Zustand for global state, React Query for server state
+- 🎮 **Game Backend** - Complete game scoring API with leaderboards and statistics
 
 ## 🛠️ Tech Stack
 
