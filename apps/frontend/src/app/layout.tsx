@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 import { Navbar } from '@/components/Navbar';
 import { ThemeSelector } from '@/components/ThemeSelector';
+import { ThemeApplicator } from '@/components/ThemeApplicator';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
+          <ThemeApplicator />
           <Navbar />
           <ThemeSelector />
           <main>{children}</main>

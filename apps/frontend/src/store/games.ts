@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-export type GameType = 'word-blitz' | 'accuracy-challenge' | 'sentence-sprint';
+export type GameType = 'word-blitz' | 'prompt-dash' | 'story-chain';
 
 export interface GameHistoryEntry {
   id: string;
@@ -15,6 +15,7 @@ interface GameState {
   currentGame: GameType | null;
   score: number;
   highScore: number;
+  highScores: Record<string, number>;
   isPlaying: boolean;
   gamesPlayed: number;
   isGuest: boolean;
@@ -26,14 +27,15 @@ interface GameState {
   startGame: () => void;
   endGame: () => void;
   resetGame: () => void;
-  setHighScore: (score: number) => void;
-  incrementGamesPlayed: () => void;
+  setHighScore: (gameId: string, score: number) => void;
+  incrementGamesPlayed: (gameId: string) => void;
 }
 
 const INITIAL_STATE = {
   currentGame: null,
   score: 0,
   highScore: 0,
+  highScores: {} as Record<string, number>,
   isPlaying: false,
   gamesPlayed: 0,
   isGuest: true,
@@ -107,13 +109,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  setHighScore: (score) => {
+  setHighScore: (gameId, score) => {
     set((state) => ({
-      highScore: Math.max(state.highScore, score),
+      highScores: {
+        ...state.highScores,
+        [gameId]: Math.max(state.highScores[gameId] || 0, score),
+      },
     }));
   },
 
-  incrementGamesPlayed: () => {
+  incrementGamesPlayed: (_gameId) => {
     set((state) => ({ gamesPlayed: state.gamesPlayed + 1 }));
   },
 }));

@@ -2,25 +2,34 @@
 
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { Zap, Target, Trophy, Lock, Play } from 'lucide-react';
+import { Zap, Feather, Link2, Lock, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useGameStore } from '@/store/games';
 
 // Lazy load game components
-const WordBlitz = dynamic(() => import('@/components/games/WordBlitz'), {
-  loading: () => <GameLoading />,
-  ssr: false,
-});
+const WordBlitz = dynamic(
+  () => import('@/components/games/WordBlitz').then((mod) => ({ default: mod.WordBlitz })),
+  {
+    loading: () => <GameLoading />,
+    ssr: false,
+  }
+);
 
-const AccuracyChallenge = dynamic(() => import('@/components/games/AccuracyChallenge'), {
-  loading: () => <GameLoading />,
-  ssr: false,
-});
+const PromptDash = dynamic(
+  () => import('@/components/games/PromptDash').then((mod) => ({ default: mod.PromptDash })),
+  {
+    loading: () => <GameLoading />,
+    ssr: false,
+  }
+);
 
-const SentenceSprint = dynamic(() => import('@/components/games/SentenceSprint'), {
-  loading: () => <GameLoading />,
-  ssr: false,
-});
+const StoryChain = dynamic(
+  () => import('@/components/games/StoryChain').then((mod) => ({ default: mod.StoryChain })),
+  {
+    loading: () => <GameLoading />,
+    ssr: false,
+  }
+);
 
 function GameLoading() {
   return (
@@ -34,26 +43,29 @@ const GAMES = [
   {
     id: 'word-blitz' as const,
     title: 'Word Blitz',
-    description: 'Type words before they fall! Fast-paced action in 30 seconds.',
+    description:
+      'Type the falling words as fast as you can to score points. A classic test of speed.',
     icon: Zap,
-    gradient: 'from-cyan-500 to-blue-500',
+    gradient: 'from-blue-500 to-cyan-400',
     difficulty: 'Easy',
   },
   {
-    id: 'accuracy-challenge' as const,
-    title: 'Accuracy Challenge',
-    description: '100% accuracy required. One mistake and you restart!',
-    icon: Target,
+    id: 'prompt-dash' as const,
+    title: 'Prompt Dash',
+    description:
+      'A 60-second creative sprint. Write as much as you can based on a random prompt. Score is your WPM.',
+    icon: Feather,
     gradient: 'from-purple-500 to-pink-500',
-    difficulty: 'Hard',
+    difficulty: 'Medium',
   },
   {
-    id: 'sentence-sprint' as const,
-    title: 'Sentence Sprint',
-    description: 'Type as many sentences as you can in 60 seconds!',
-    icon: Trophy,
-    gradient: 'from-green-500 to-emerald-500',
-    difficulty: 'Medium',
+    id: 'story-chain' as const,
+    title: 'Story Chain',
+    description:
+      'Build a story with an AI, one sentence at a time. How many sentences can you add in 90 seconds?',
+    icon: Link2,
+    gradient: 'from-green-500 to-lime-400',
+    difficulty: 'Hard',
   },
 ];
 
@@ -72,8 +84,8 @@ export default function GamesPage() {
 
   // If a game is selected, render it
   if (currentGame === 'word-blitz') return <WordBlitz />;
-  if (currentGame === 'accuracy-challenge') return <AccuracyChallenge />;
-  if (currentGame === 'sentence-sprint') return <SentenceSprint />;
+  if (currentGame === 'prompt-dash') return <PromptDash />;
+  if (currentGame === 'story-chain') return <StoryChain />;
 
   // Otherwise, show game selection
   return (

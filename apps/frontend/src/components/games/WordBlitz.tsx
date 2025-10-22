@@ -1,239 +1,260 @@
-'use client';
-
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Zap } from 'lucide-react';
+﻿'use client';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/store/games';
-import { generate as generateWords } from 'random-words';
-
-interface FallingWord {
+import { Button } from '@/components/ui/button';
+import { Timer, ArrowLeft } from 'lucide-react';
+const WORDS = [
+  'the',
+  'be',
+  'to',
+  'of',
+  'and',
+  'a',
+  'in',
+  'that',
+  'have',
+  'I',
+  'it',
+  'for',
+  'not',
+  'on',
+  'with',
+  'he',
+  'as',
+  'you',
+  'do',
+  'at',
+  'this',
+  'but',
+  'his',
+  'by',
+  'from',
+  'they',
+  'we',
+  'say',
+  'her',
+  'she',
+  'or',
+  'an',
+  'will',
+  'my',
+  'one',
+  'all',
+  'would',
+  'there',
+  'their',
+  'what',
+  'so',
+  'up',
+  'out',
+  'if',
+  'about',
+  'who',
+  'get',
+  'which',
+  'go',
+  'me',
+  'when',
+  'make',
+  'can',
+  'like',
+  'time',
+  'no',
+  'just',
+  'him',
+  'know',
+  'take',
+  'people',
+  'into',
+  'year',
+  'your',
+  'good',
+  'some',
+  'could',
+  'them',
+  'see',
+  'other',
+  'than',
+  'then',
+  'now',
+  'look',
+  'only',
+  'come',
+  'its',
+  'over',
+  'think',
+  'also',
+  'back',
+  'after',
+  'use',
+  'two',
+  'how',
+  'our',
+  'work',
+  'first',
+  'well',
+  'way',
+  'even',
+  'new',
+  'want',
+  'because',
+  'any',
+  'these',
+  'give',
+  'day',
+  'most',
+  'us',
+];
+type Word = {
   id: number;
-  word: string;
+  text: string;
+  x: number;
   y: number;
-  x: number; // Horizontal position as percentage
-  typed: string;
-}
-
-export default function WordBlitz() {
-  const [words, setWords] = useState<FallingWord[]>([]);
+};
+export function WordBlitz() {
+  const [gameState, setGameState] = useState<'idle' | 'running' | 'finished'>('idle');
+  const [words, setWords] = useState<Word[]>([]);
+  const [inputValue, setInputValue] = useState('');
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [currentInput, setCurrentInput] = useState('');
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-
-  const { setGame, incrementGamesPlayed, setHighScore } = useGameStore();
-
-  const addWord = useCallback(() => {
-    const newWord = Array.isArray(generateWords(1)) ? generateWords(1)[0] : generateWords(1);
-
-    // Calculate non-overlapping horizontal position
-    let xPos = Math.random() * 80 + 10; // 10-90% to keep words on screen
-
-    // Check for overlap with existing words near the top (y < 20)
-    const nearTopWords = words.filter((w) => w.y < 20);
-    if (nearTopWords.length > 0) {
-      const minDistance = 15; // Minimum distance between words (percentage)
-      let attempts = 0;
-      let hasOverlap = true;
-
-      while (hasOverlap && attempts < 10) {
-        hasOverlap = nearTopWords.some((w) => Math.abs(w.x - xPos) < minDistance);
-        if (hasOverlap) {
-          xPos = Math.random() * 80 + 10;
-          attempts++;
-        }
-      }
-    }
-
-    const word: FallingWord = {
-      id: Date.now() + Math.random(), // Ensure unique IDs
-      word: newWord as string,
-      y: 0,
-      x: xPos,
-      typed: '',
-    };
-    setWords((prev) => [...prev, word]);
-  }, [words]);
-
-  const startGame = () => {
-    setGameStarted(true);
-    setScore(0);
-    setTimeLeft(30);
-    setWords([]);
-    setCurrentInput('');
-    setGameOver(false);
-    incrementGamesPlayed();
-    addWord();
+  const [timer, setTimer] = useState(60);
+  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const addInterval = useRef<NodeJS.Timeout | null>(null);
+  const fallInterval = useRef<NodeJS.Timeout | null>(null);
+  const { setHighScore, incrementGamesPlayed } = useGameStore();
+  const highScore = useGameStore((s) => s.highScores['word-blitz'] || 0);
+  const addWord = () => {
+    if (!gameAreaRef.current) return;
+    const gameWidth = gameAreaRef.current.offsetWidth;
+    const newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+    setWords((currentWords) => [
+      ...currentWords,
+      {
+        id: Date.now(),
+        text: newWord,
+        x: Math.random() * (gameWidth - 50),
+        y: 0,
+      },
+    ]);
   };
-
-  // Timer
-  useEffect(() => {
-    if (!gameStarted || gameOver) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setGameOver(true);
-          setHighScore(score);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [gameStarted, gameOver, score, setHighScore]);
-
-  // Fall words - Slower speed (50% longer visibility)
-  useEffect(() => {
-    if (!gameStarted || gameOver) return;
-
-    const fallInterval = setInterval(() => {
-      setWords((prev) =>
-        prev
-          .map((w) => ({ ...w, y: w.y + 1.3 })) // Reduced from 2 to 1.3 for ~35% slower fall
-          .filter((w) => w.y < 100)
+  const startGame = () => {
+    setGameState('running');
+    setWords([]);
+    setInputValue('');
+    setScore(0);
+    setTimer(60);
+    addInterval.current = setInterval(addWord, 1200);
+    fallInterval.current = setInterval(() => {
+      setWords((currentWords) =>
+        currentWords.map((w) => ({ ...w, y: w.y + 2 })).filter((w) => w.y < 400)
       );
     }, 50);
-
-    return () => clearInterval(fallInterval);
-  }, [gameStarted, gameOver]);
-
-  // Add new words
+    timerInterval.current = setInterval(() => {
+      setTimer((t) => {
+        if (t <= 1) {
+          stopGame();
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  };
+  const stopGame = () => {
+    setGameState('finished');
+    if (timerInterval.current) clearInterval(timerInterval.current);
+    if (addInterval.current) clearInterval(addInterval.current);
+    if (fallInterval.current) clearInterval(fallInterval.current);
+    if (score > highScore) {
+      setHighScore('word-blitz', score);
+    }
+    incrementGamesPlayed('word-blitz');
+  };
   useEffect(() => {
-    if (!gameStarted || gameOver) return;
-
-    const addInterval = setInterval(() => {
-      if (words.length < 5) {
-        addWord();
-      }
-    }, 2000);
-
-    return () => clearInterval(addInterval);
-  }, [gameStarted, gameOver, words.length, addWord]);
-
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    return () => {
+      if (timerInterval.current) clearInterval(timerInterval.current);
+      if (addInterval.current) clearInterval(addInterval.current);
+      if (fallInterval.current) clearInterval(fallInterval.current);
+    };
+  }, []);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setCurrentInput(value);
-
-    // Check if any word matches
-    const matchedWord = words.find((w) => w.word === value);
-    if (matchedWord) {
-      setScore((prev) => prev + matchedWord.word.length * 10);
-      setWords((prev) => prev.filter((w) => w.id !== matchedWord.id));
-      setCurrentInput('');
-      addWord();
+    setInputValue(value);
+    if (value.endsWith(' ')) {
+      const typedWord = value.trim();
+      const wordIndex = words.findIndex((w) => w.text === typedWord);
+      if (wordIndex !== -1) {
+        setWords((currentWords) => currentWords.filter((_, i) => i !== wordIndex));
+        setScore((s) => s + typedWord.length);
+        setInputValue('');
+      }
     }
   };
-
-  return (
-    <div className="min-h-screen pt-20 pb-12">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <button
-          onClick={() => setGame(null)}
-          className="mb-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Games
-        </button>
-
-        <div className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Zap className="w-8 h-8 text-cyan-400" />
-              Word Blitz
-            </h1>
-            <div className="flex items-center gap-6 text-xl">
-              <div>
-                Score: <span className="font-bold text-cyan-400">{score}</span>
-              </div>
-              <div>
-                Time: <span className="font-bold text-yellow-400">{timeLeft}s</span>
-              </div>
-            </div>
-          </div>
-
-          {!gameStarted && !gameOver && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-12"
-            >
-              <p className="text-lg text-muted-foreground mb-6">
-                Type words before they fall to the bottom! Each letter is worth 10 points.
-              </p>
-              <button
-                onClick={startGame}
-                className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-xl rounded-xl hover:shadow-lg transition-all transform hover:scale-105"
-              >
-                Start Game
-              </button>
-            </motion.div>
-          )}
-
-          {gameStarted && !gameOver && (
-            <>
-              {/* Falling words area */}
-              <div className="relative h-64 bg-background/50 rounded-xl mb-6 overflow-hidden">
-                <AnimatePresence>
-                  {words.map((word) => (
-                    <motion.div
-                      key={word.id}
-                      initial={{ y: 0, opacity: 0 }}
-                      animate={{ y: `${word.y}%`, opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute text-2xl font-bold"
-                      style={{
-                        left: `${word.x}%`,
-                        transform: 'translateX(-50%)',
-                        color: word.y > 80 ? '#ef4444' : word.y > 60 ? '#f59e0b' : '#06b6d4',
-                      }}
-                    >
-                      {word.word}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-
-              {/* Input */}
-              <input
-                type="text"
-                value={currentInput}
-                onChange={handleInput}
-                autoFocus
-                className="w-full px-6 py-4 bg-background border-2 border-cyan-500/50 rounded-xl text-2xl text-center font-bold focus:outline-none focus:border-cyan-500"
-                placeholder="Type words here..."
-              />
-            </>
-          )}
-
-          {gameOver && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-12"
-            >
-              <h2 className="text-4xl font-bold text-cyan-400 mb-4">Game Over!</h2>
-              <p className="text-3xl font-bold mb-6">Final Score: {score}</p>
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={startGame}
-                  className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl hover:shadow-lg transition-all"
-                >
-                  Play Again
-                </button>
-                <button
-                  onClick={() => setGame(null)}
-                  className="px-6 py-3 bg-background/50 border border-border rounded-xl hover:bg-muted transition-colors"
-                >
-                  Exit
-                </button>
-              </div>
-            </motion.div>
-          )}
+  if (gameState === 'finished') {
+    return (
+      <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg w-full max-w-2xl mx-auto">
+        <h2 className="text-3xl font-bold mb-6">Game Over!</h2>
+        <div className="text-center mb-8">
+          <p className="text-muted-foreground mb-2">Final Score</p>
+          <p className="text-5xl font-bold text-primary mb-4">{score}</p>
+          <p className="text-sm text-muted-foreground">High Score: {highScore}</p>
+        </div>
+        <div className="flex gap-4">
+          <Button onClick={startGame} size="lg">
+            Play Again
+          </Button>
+          <Button onClick={() => window.history.back()} variant="outline" size="lg">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
         </div>
       </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg w-full max-w-2xl mx-auto">
+      {gameState === 'idle' ? (
+        <>
+          <h2 className="text-2xl font-bold mb-4">Word Blitz</h2>
+          <p className="text-muted-foreground mb-6 text-center">
+            Type the falling words before they hit the bottom. Type a word and press space to score.
+          </p>
+          <Button onClick={startGame} size="lg">
+            Start Game
+          </Button>
+        </>
+      ) : (
+        <>
+          <div className="flex justify-between items-center w-full mb-4">
+            <div className="flex items-center gap-2 text-xl font-bold text-primary">
+              <Timer />
+              <span>{timer}s</span>
+            </div>
+            <div className="text-xl font-bold">Score: {score}</div>
+          </div>
+          <div
+            ref={gameAreaRef}
+            className="w-full h-[400px] bg-background/50 rounded-md border relative overflow-hidden mb-4"
+          >
+            {words.map((word) => (
+              <span
+                key={word.id}
+                className="absolute text-foreground font-medium p-1 rounded"
+                style={{ left: word.x, top: word.y }}
+              >
+                {word.text}
+              </span>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            className="w-full p-3 text-lg rounded-md border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="Type words here..."
+            autoFocus
+          />
+        </>
+      )}
     </div>
   );
 }

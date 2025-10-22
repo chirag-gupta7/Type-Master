@@ -37,7 +37,7 @@ describe('Game Store', () => {
       const { result } = renderHook(() => useGameStore());
 
       act(() => {
-        result.current.setCurrentGame('accuracy-challenge');
+        result.current.setCurrentGame('prompt-dash');
         result.current.setCurrentGame(null);
       });
 
@@ -126,7 +126,7 @@ describe('Game Store', () => {
       const { result } = renderHook(() => useGameStore());
 
       act(() => {
-        result.current.setCurrentGame('sentence-sprint');
+        result.current.setCurrentGame('story-chain');
         result.current.startGame();
         result.current.updateScore(300);
         result.current.endGame();
@@ -150,7 +150,7 @@ describe('Game Store', () => {
         result.current.startGame();
         result.current.endGame();
 
-        result.current.setCurrentGame('accuracy-challenge');
+        result.current.setCurrentGame('prompt-dash');
         result.current.startGame();
         result.current.endGame();
       });

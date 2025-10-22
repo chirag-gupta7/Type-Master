@@ -84,117 +84,127 @@ export default function DashboardPage() {
     }));
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+    <div className="min-h-screen bg-background/80">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-4xl font-semibold mb-8 text-foreground">Typing Test</h1>
 
-      {/* Typing Test Section - Always visible */}
-      <div className="mb-12">
-        <TypingTest />
+        {/* Main Typing Test Container */}
+        <div className="bg-card rounded-lg shadow-lg p-8 mb-12">
+          <TypingTest />
+        </div>
+
+        {/* Stats Section - Only for authenticated users */}
+        {!isAuthenticated ? (
+          <div className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4 text-foreground">Track Your Progress</h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              Log in or sign up to track your stats and progress over time.
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button className="px-6 py-3 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white font-semibold rounded-xl hover:shadow-lg transition-all">
+                Sign Up
+              </button>
+              <button className="px-6 py-3 bg-background/50 border border-border rounded-xl hover:bg-muted transition-colors">
+                Log In
+              </button>
+            </div>
+          </div>
+        ) : loading ? (
+          <div className="bg-card rounded-lg shadow-lg p-8">
+            <div className="flex items-center justify-center min-h-[200px]">
+              <p className="text-lg text-muted-foreground">Loading your stats...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-card border rounded-lg shadow-lg p-8 text-center">
+            <p className="text-lg text-destructive mb-2">Error loading stats</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-background/50 backdrop-blur-sm rounded-md shadow-md p-4 border border-border">
+                <p className="text-sm text-muted-foreground mb-2">Average WPM</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {stats?.averageWpm.toFixed(1) || 0}
+                </p>
+              </div>
+
+              <div className="bg-background/50 backdrop-blur-sm rounded-md shadow-md p-4 border border-border">
+                <p className="text-sm text-muted-foreground mb-2">Best WPM</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {stats?.bestWpm.toFixed(1) || 0}
+                </p>
+              </div>
+
+              <div className="bg-background/50 backdrop-blur-sm rounded-md shadow-md p-4 border border-border">
+                <p className="text-sm text-muted-foreground mb-2">Total Tests</p>
+                <p className="text-3xl font-bold text-foreground">{stats?.totalTests || 0}</p>
+              </div>
+
+              <div className="bg-background/50 backdrop-blur-sm rounded-md shadow-md p-4 border border-border">
+                <p className="text-sm text-muted-foreground mb-2">Average Accuracy</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {stats?.averageAccuracy.toFixed(1) || 0}%
+                </p>
+              </div>
+            </div>
+
+            {/* Progress Chart */}
+            {chartData.length > 0 ? (
+              <div className="bg-card border rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-semibold mb-4 text-foreground">Progress Over Time</h2>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="test" />
+                    <YAxis
+                      yAxisId="left"
+                      label={{ value: 'WPM', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{ value: 'Accuracy (%)', angle: 90, position: 'insideRight' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="WPM"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="Accuracy"
+                      stroke="hsl(var(--chart-2))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-2))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="bg-card border rounded-lg shadow-lg p-6">
+                <p className="text-center text-muted-foreground">
+                  No test history available. Take your first typing test!
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      {/* Stats Section - Only for authenticated users */}
-      {!isAuthenticated ? (
-        <div className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Track Your Progress</h2>
-          <p className="text-lg text-muted-foreground mb-6">
-            Log in or sign up to track your stats and progress over time.
-          </p>
-          <div className="flex gap-4 justify-center">
-            <button className="px-6 py-3 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white font-semibold rounded-xl hover:shadow-lg transition-all">
-              Sign Up
-            </button>
-            <button className="px-6 py-3 bg-background/50 border border-border rounded-xl hover:bg-muted transition-colors">
-              Log In
-            </button>
-          </div>
-        </div>
-      ) : loading ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <p className="text-lg text-muted-foreground">Loading your stats...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-card border rounded-lg p-6 text-center">
-          <p className="text-lg text-destructive mb-2">Error loading stats</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-        </div>
-      ) : (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-card border rounded-lg p-6">
-              <p className="text-sm text-muted-foreground mb-1">Average WPM</p>
-              <p className="text-3xl font-bold">{stats?.averageWpm.toFixed(1) || 0}</p>
-            </div>
-
-            <div className="bg-card border rounded-lg p-6">
-              <p className="text-sm text-muted-foreground mb-1">Best WPM</p>
-              <p className="text-3xl font-bold">{stats?.bestWpm.toFixed(1) || 0}</p>
-            </div>
-
-            <div className="bg-card border rounded-lg p-6">
-              <p className="text-sm text-muted-foreground mb-1">Total Tests</p>
-              <p className="text-3xl font-bold">{stats?.totalTests || 0}</p>
-            </div>
-
-            <div className="bg-card border rounded-lg p-6">
-              <p className="text-sm text-muted-foreground mb-1">Average Accuracy</p>
-              <p className="text-3xl font-bold">{stats?.averageAccuracy.toFixed(1) || 0}%</p>
-            </div>
-          </div>
-
-          {/* Progress Chart */}
-          {chartData.length > 0 ? (
-            <div className="bg-card border rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Progress Over Time</h2>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="test" />
-                  <YAxis
-                    yAxisId="left"
-                    label={{ value: 'WPM', angle: -90, position: 'insideLeft' }}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    label={{ value: 'Accuracy (%)', angle: 90, position: 'insideRight' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="WPM"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="Accuracy"
-                    stroke="hsl(var(--chart-2))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--chart-2))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="bg-card border rounded-lg p-6">
-              <p className="text-center text-muted-foreground">
-                No test history available. Take your first typing test!
-              </p>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }
