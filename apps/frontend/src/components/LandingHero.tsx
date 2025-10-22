@@ -10,6 +10,19 @@ const SAMPLE_TEXT = 'The quick brown fox jumps over the lazy dog';
 export function LandingHero() {
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [particles, setParticles] = useState<Array<{ x: number; y: number; id: number }>>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  // Initialize particles on client side
+  useEffect(() => {
+    setIsClient(true);
+    const initialParticles = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+    }));
+    setParticles(initialParticles);
+  }, []);
 
   // Animated typing effect in hero
   useEffect(() => {
@@ -34,28 +47,30 @@ export function LandingHero() {
       {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-[var(--theme-primary)]/10 via-background to-[var(--theme-secondary)]/10 animate-gradient" />
 
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 rounded-full bg-[var(--theme-accent)]/30"
-            initial={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            transition={{
-              duration: Math.random() * 10 + 10,
-              repeat: Infinity,
-              repeatType: 'reverse',
-            }}
-          />
-        ))}
-      </div>
+      {/* Floating particles - only render on client */}
+      {isClient && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {particles.map((particle) => (
+            <motion.div
+              key={particle.id}
+              className="absolute w-2 h-2 rounded-full bg-[var(--theme-accent)]/30"
+              initial={{
+                x: particle.x,
+                y: particle.y,
+              }}
+              animate={{
+                x: [particle.x, Math.random() * window.innerWidth],
+                y: [particle.y, Math.random() * window.innerHeight],
+              }}
+              transition={{
+                duration: Math.random() * 10 + 10,
+                repeat: Infinity,
+                repeatType: 'reverse',
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="container relative z-10 px-4 py-20">
         <div className="max-w-5xl mx-auto text-center space-y-8">

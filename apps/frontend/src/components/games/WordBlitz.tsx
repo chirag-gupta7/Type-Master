@@ -10,6 +10,7 @@ interface FallingWord {
   id: number;
   word: string;
   y: number;
+  x: number; // Horizontal position as percentage
   typed: string;
 }
 
@@ -20,19 +21,40 @@ export default function WordBlitz() {
   const [currentInput, setCurrentInput] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
-  
+
   const { setGame, incrementGamesPlayed, setHighScore } = useGameStore();
 
   const addWord = useCallback(() => {
     const newWord = Array.isArray(generateWords(1)) ? generateWords(1)[0] : generateWords(1);
+
+    // Calculate non-overlapping horizontal position
+    let xPos = Math.random() * 80 + 10; // 10-90% to keep words on screen
+
+    // Check for overlap with existing words near the top (y < 20)
+    const nearTopWords = words.filter((w) => w.y < 20);
+    if (nearTopWords.length > 0) {
+      const minDistance = 15; // Minimum distance between words (percentage)
+      let attempts = 0;
+      let hasOverlap = true;
+
+      while (hasOverlap && attempts < 10) {
+        hasOverlap = nearTopWords.some((w) => Math.abs(w.x - xPos) < minDistance);
+        if (hasOverlap) {
+          xPos = Math.random() * 80 + 10;
+          attempts++;
+        }
+      }
+    }
+
     const word: FallingWord = {
-      id: Date.now(),
+      id: Date.now() + Math.random(), // Ensure unique IDs
       word: newWord as string,
       y: 0,
+      x: xPos,
       typed: '',
     };
     setWords((prev) => [...prev, word]);
-  }, []);
+  }, [words]);
 
   const startGame = () => {
     setGameStarted(true);
@@ -63,14 +85,14 @@ export default function WordBlitz() {
     return () => clearInterval(timer);
   }, [gameStarted, gameOver, score, setHighScore]);
 
-  // Fall words
+  // Fall words - Slower speed (50% longer visibility)
   useEffect(() => {
     if (!gameStarted || gameOver) return;
 
     const fallInterval = setInterval(() => {
       setWords((prev) =>
         prev
-          .map((w) => ({ ...w, y: w.y + 2 }))
+          .map((w) => ({ ...w, y: w.y + 1.3 })) // Reduced from 2 to 1.3 for ~35% slower fall
           .filter((w) => w.y < 100)
       );
     }, 50);
@@ -123,8 +145,12 @@ export default function WordBlitz() {
               Word Blitz
             </h1>
             <div className="flex items-center gap-6 text-xl">
-              <div>Score: <span className="font-bold text-cyan-400">{score}</span></div>
-              <div>Time: <span className="font-bold text-yellow-400">{timeLeft}s</span></div>
+              <div>
+                Score: <span className="font-bold text-cyan-400">{score}</span>
+              </div>
+              <div>
+                Time: <span className="font-bold text-yellow-400">{timeLeft}s</span>
+              </div>
             </div>
           </div>
 
@@ -157,8 +183,10 @@ export default function WordBlitz() {
                       initial={{ y: 0, opacity: 0 }}
                       animate={{ y: `${word.y}%`, opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute left-1/2 transform -translate-x-1/2 text-2xl font-bold"
+                      className="absolute text-2xl font-bold"
                       style={{
+                        left: `${word.x}%`,
+                        transform: 'translateX(-50%)',
                         color: word.y > 80 ? '#ef4444' : word.y > 60 ? '#f59e0b' : '#06b6d4',
                       }}
                     >

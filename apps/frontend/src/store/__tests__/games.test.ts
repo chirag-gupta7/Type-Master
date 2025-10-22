@@ -126,7 +126,7 @@ describe('Game Store', () => {
       const { result } = renderHook(() => useGameStore());
 
       act(() => {
-        result.current.setCurrentGame('speed-race');
+        result.current.setCurrentGame('sentence-sprint');
         result.current.startGame();
         result.current.updateScore(300);
         result.current.endGame();

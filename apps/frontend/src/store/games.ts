@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-export type GameType = 'word-blitz' | 'accuracy-challenge' | 'speed-race';
+export type GameType = 'word-blitz' | 'accuracy-challenge' | 'sentence-sprint';
 
 export interface GameHistoryEntry {
   id: string;

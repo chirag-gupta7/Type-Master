@@ -17,7 +17,7 @@ const AccuracyChallenge = dynamic(() => import('@/components/games/AccuracyChall
   ssr: false,
 });
 
-const SpeedRace = dynamic(() => import('@/components/games/SpeedRace'), {
+const SentenceSprint = dynamic(() => import('@/components/games/SentenceSprint'), {
   loading: () => <GameLoading />,
   ssr: false,
 });
@@ -48,11 +48,11 @@ const GAMES = [
     difficulty: 'Hard',
   },
   {
-    id: 'speed-race' as const,
-    title: 'Speed Race',
-    description: 'Beat your personal best WPM record!',
+    id: 'sentence-sprint' as const,
+    title: 'Sentence Sprint',
+    description: 'Type as many sentences as you can in 60 seconds!',
     icon: Trophy,
-    gradient: 'from-orange-500 to-red-500',
+    gradient: 'from-green-500 to-emerald-500',
     difficulty: 'Medium',
   },
 ];
@@ -73,7 +73,7 @@ export default function GamesPage() {
   // If a game is selected, render it
   if (currentGame === 'word-blitz') return <WordBlitz />;
   if (currentGame === 'accuracy-challenge') return <AccuracyChallenge />;
-  if (currentGame === 'speed-race') return <SpeedRace />;
+  if (currentGame === 'sentence-sprint') return <SentenceSprint />;
 
   // Otherwise, show game selection
   return (

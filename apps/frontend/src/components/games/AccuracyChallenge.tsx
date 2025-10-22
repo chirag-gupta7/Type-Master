@@ -120,8 +120,14 @@ export default function AccuracyChallenge() {
 
           {gameStarted && !gameOver && (
             <div>
-              {/* Text display */}
-              <div className="bg-background/50 rounded-xl p-6 mb-6 text-2xl font-mono leading-relaxed min-h-[200px]">
+              {/* Text display with cursor - Click to focus */}
+              <div
+                className="bg-background/50 rounded-xl p-6 text-2xl font-mono leading-relaxed min-h-[200px] cursor-text relative"
+                onClick={() => {
+                  // Focus on hidden input when text area is clicked
+                  document.getElementById('hidden-accuracy-input')?.focus();
+                }}
+              >
                 {text.split('').map((char, idx) => {
                   const isTyped = idx < userInput.length;
                   const isCorrect = isTyped && userInput[idx] === char;
@@ -130,26 +136,36 @@ export default function AccuracyChallenge() {
                   return (
                     <span
                       key={idx}
-                      className={`${isCurrent ? 'bg-purple-500/30' : ''} ${
+                      className={`relative ${isCurrent ? 'bg-purple-500/30' : ''} ${
                         isTyped && isCorrect ? 'text-green-400' : ''
-                      } ${isTyped && !isCorrect ? 'text-red-500' : ''} ${
+                      } ${isTyped && !isCorrect ? 'text-red-500 underline decoration-2' : ''} ${
                         !isTyped ? 'text-muted-foreground' : ''
                       }`}
                     >
+                      {/* Visual cursor */}
+                      {isCurrent && (
+                        <span className="absolute -left-0.5 top-0 bottom-0 w-0.5 bg-purple-400 animate-pulse" />
+                      )}
                       {char}
                     </span>
                   );
                 })}
               </div>
 
+              {/* Hidden input for capturing keystrokes */}
               <input
+                id="hidden-accuracy-input"
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 autoFocus
-                className="w-full px-6 py-4 bg-background border-2 border-purple-500/50 rounded-xl text-xl font-mono focus:outline-none focus:border-purple-500"
-                placeholder="Start typing..."
+                className="sr-only"
+                aria-label="Type the text above"
               />
+
+              <p className="text-sm text-muted-foreground text-center mt-4">
+                Click on the text area to start typing
+              </p>
             </div>
           )}
 
