@@ -100,6 +100,8 @@ const TypingTest: React.FC = () => {
   const [activeDuration, setActiveDuration] = useState<30 | 60 | 180>(60);
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
   const [displayMode, setDisplayMode] = useState<'vertical' | 'horizontal'>('horizontal');
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // FIX: Add ref for the hidden input to programmatically focus it
@@ -157,6 +159,71 @@ const TypingTest: React.FC = () => {
     }
   }, [view, status]);
 
+  // AI Feedback Function
+  const getAiTypingFeedback = useCallback(async () => {
+    setIsFeedbackLoading(true);
+    setAiFeedback(null);
+
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+
+    if (!apiKey) {
+      console.error(
+        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
+      );
+      setIsFeedbackLoading(false);
+      return;
+    }
+
+    try {
+      const systemPrompt =
+        "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
+      const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${activeDuration} seconds\n\nProvide helpful feedback.`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `${systemPrompt}\n\n${userQuery}`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 200,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI feedback');
+      }
+
+      const data = await response.json();
+      const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+      if (feedback) {
+        setAiFeedback(feedback);
+      } else {
+        setAiFeedback('Could not load AI feedback at this time.');
+      }
+    } catch (error) {
+      console.error('Error getting AI feedback:', error);
+      setAiFeedback('Could not load AI feedback. Please try again later.');
+    } finally {
+      setIsFeedbackLoading(false);
+    }
+  }, [wpm, accuracy, errors, activeDuration]);
+
   // Main timer logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -168,6 +235,7 @@ const TypingTest: React.FC = () => {
           setTimeLeft(0);
           endTest();
           setView('results');
+          getAiTypingFeedback();
           clearInterval(timer);
         } else {
           setTimeLeft(remaining);
@@ -175,7 +243,7 @@ const TypingTest: React.FC = () => {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [view, status, startTime, activeDuration, endTest]);
+  }, [view, status, startTime, activeDuration, endTest, getAiTypingFeedback]);
   // This crucial effect handles scrolling the active word into the center of the viewbox.
   useEffect(() => {
     if (activeWordRef.current && containerRef.current) {
@@ -428,6 +496,8 @@ const TypingTest: React.FC = () => {
             accuracy={accuracy}
             errors={errors}
             duration={activeDuration}
+            aiFeedback={aiFeedback}
+            isFeedbackLoading={isFeedbackLoading}
             footer={
               <>
                 <button

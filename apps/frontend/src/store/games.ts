@@ -20,6 +20,7 @@ interface GameState {
   gamesPlayed: number;
   isGuest: boolean;
   gameHistory: GameHistoryEntry[];
+  lastWritingFeedback: Record<GameType, string | null>;
 
   setCurrentGame: (game: GameType | null) => void;
   setGame: (game: GameType | null) => void;
@@ -29,6 +30,7 @@ interface GameState {
   resetGame: () => void;
   setHighScore: (gameId: string, score: number) => void;
   incrementGamesPlayed: (gameId: string) => void;
+  setWritingFeedback: (gameId: GameType, feedback: string | null) => void;
 }
 
 const INITIAL_STATE = {
@@ -40,6 +42,11 @@ const INITIAL_STATE = {
   gamesPlayed: 0,
   isGuest: true,
   gameHistory: [] as GameHistoryEntry[],
+  lastWritingFeedback: {
+    'word-blitz': null,
+    'prompt-dash': null,
+    'story-chain': null,
+  } as Record<GameType, string | null>,
 };
 
 const createHistoryId = (): string => {
@@ -120,5 +127,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   incrementGamesPlayed: (_gameId) => {
     set((state) => ({ gamesPlayed: state.gamesPlayed + 1 }));
+  },
+
+  setWritingFeedback: (gameId, feedback) => {
+    set((state) => ({
+      lastWritingFeedback: {
+        ...state.lastWritingFeedback,
+        [gameId]: feedback,
+      },
+    }));
   },
 }));

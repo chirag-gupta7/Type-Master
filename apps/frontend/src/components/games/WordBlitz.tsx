@@ -121,7 +121,9 @@ export function WordBlitz() {
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const addInterval = useRef<NodeJS.Timeout | null>(null);
   const fallInterval = useRef<NodeJS.Timeout | null>(null);
-  const { setHighScore, incrementGamesPlayed } = useGameStore();
+  const setHighScore = useGameStore((s) => s.setHighScore);
+  const incrementGamesPlayed = useGameStore((s) => s.incrementGamesPlayed);
+  const setCurrentGame = useGameStore((s) => s.setCurrentGame);
   const highScore = useGameStore((s) => s.highScores['word-blitz'] || 0);
   const addWord = () => {
     if (!gameAreaRef.current) return;
@@ -202,9 +204,9 @@ export function WordBlitz() {
           <Button onClick={startGame} size="lg">
             Play Again
           </Button>
-          <Button onClick={() => window.history.back()} variant="outline" size="lg">
+          <Button onClick={() => setCurrentGame(null)} variant="outline" size="lg">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Go Back to Games
           </Button>
         </div>
       </div>

@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
-import { Timer, ArrowLeft } from 'lucide-react';
+import { Timer, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 
-const PROMPTS = [
+const FALLBACK_PROMPTS = [
   'Describe a city hidden in the clouds.',
   'The ancient artifact began to glow...',
   'My pet suddenly started talking. It said...',
@@ -19,17 +19,177 @@ export function PromptDash() {
   const [text, setText] = useState('');
   const [timer, setTimer] = useState(60);
   const [score, setScore] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
-  const { setHighScore, incrementGamesPlayed } = useGameStore();
+  const setHighScore = useGameStore((s) => s.setHighScore);
+  const incrementGamesPlayed = useGameStore((s) => s.incrementGamesPlayed);
+  const setCurrentGame = useGameStore((s) => s.setCurrentGame);
+  const previousFeedback = useGameStore((s) => s.lastWritingFeedback['prompt-dash'] || null);
+  const setWritingFeedback = useGameStore((s) => s.setWritingFeedback);
   const highScore = useGameStore((s) => s.highScores['prompt-dash'] || 0);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  const startGame = () => {
-    setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
+  const generateWritingFeedback = useCallback(
+    async (writtenText: string, priorFeedback: string | null) => {
+      const cleaned = writtenText.trim();
+      if (!cleaned) {
+        setAiFeedback('Add more writing next time to unlock personalized feedback.');
+        setWritingFeedback('prompt-dash', null);
+        return;
+      }
+
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+      if (!apiKey) {
+        console.error(
+          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
+        );
+        setAiFeedback(
+          'Could not connect to the AI coach. Add an API key to receive writing guidance.'
+        );
+        setWritingFeedback('prompt-dash', null);
+        return;
+      }
+
+      setIsFeedbackLoading(true);
+
+      try {
+        const systemPrompt = `You are a supportive creative-writing coach for a typing practice game. Offer precise, encouraging feedback (2-3 sentences) about the user's writing style, tone, vocabulary, and clarity.
+If prior feedback is provided, compare the current writing to that guidance and highlight any progress or areas that still need work.`;
+
+        const userQuery = priorFeedback
+          ? `Previous feedback you (the coach) gave:
+${priorFeedback}
+
+Current writing sample:
+${cleaned}
+
+Provide updated feedback that references progress relative to the earlier guidance.`
+          : `Current writing sample:
+${cleaned}
+
+Provide fresh feedback focused on writing style, tone, word choice, and narrative clarity.`;
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `${systemPrompt}\n\n${userQuery}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 220,
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch writing feedback');
+        }
+
+        const data = await response.json();
+        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (feedback) {
+          setAiFeedback(feedback);
+          setWritingFeedback('prompt-dash', feedback);
+        } else {
+          setAiFeedback('The AI coach could not generate feedback this round. Try another prompt.');
+          setWritingFeedback('prompt-dash', null);
+        }
+      } catch (error) {
+        console.error('Error generating writing feedback:', error);
+        setAiFeedback('Something went wrong while generating feedback. Please try again later.');
+      } finally {
+        setIsFeedbackLoading(false);
+      }
+    },
+    [setWritingFeedback]
+  );
+
+  const generateNewPrompt = async () => {
+    setIsLoading(true);
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+
+    if (!apiKey) {
+      console.error(
+        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
+      );
+      // Use fallback prompt
+      setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: 'Generate a single creative writing prompt for a typing speed game. The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.',
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.9,
+              maxOutputTokens: 100,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate prompt');
+      }
+
+      const data = await response.json();
+      const generatedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+      if (generatedPrompt) {
+        setPrompt(generatedPrompt);
+      } else {
+        // Fallback if no prompt generated
+        setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
+      }
+    } catch (error) {
+      console.error('Error generating prompt:', error);
+      // Use fallback on error
+      setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startGame = async () => {
+    await generateNewPrompt();
     setText('');
     setTimer(60);
     setScore(0);
     setGameState('running');
+    setAiFeedback(null);
+    setIsFeedbackLoading(false);
     textAreaRef.current?.focus();
   };
 
@@ -43,6 +203,7 @@ export function PromptDash() {
       setHighScore('prompt-dash', wpm);
     }
     incrementGamesPlayed('prompt-dash');
+    generateWritingFeedback(text, previousFeedback);
   };
 
   useEffect(() => {
@@ -73,13 +234,29 @@ export function PromptDash() {
           <p className="text-5xl font-bold text-primary mb-4">{score}</p>
           <p className="text-sm text-muted-foreground">High Score: {highScore} WPM</p>
         </div>
+        {(isFeedbackLoading || aiFeedback) && (
+          <div className="w-full mb-8 bg-background/40 border border-border rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-[var(--theme-primary)]" />
+              <span className="font-semibold">AI Writing Coach</span>
+            </div>
+            {isFeedbackLoading ? (
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Reviewing your writing...</span>
+              </div>
+            ) : aiFeedback ? (
+              <p className="text-sm leading-relaxed text-foreground">{aiFeedback}</p>
+            ) : null}
+          </div>
+        )}
         <div className="flex gap-4">
           <Button onClick={startGame} size="lg">
             Play Again
           </Button>
-          <Button onClick={() => window.history.back()} variant="outline" size="lg">
+          <Button onClick={() => setCurrentGame(null)} variant="outline" size="lg">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Go Back to Games
           </Button>
         </div>
       </div>
@@ -95,8 +272,15 @@ export function PromptDash() {
             You have 60 seconds to write as much as you can based on a creative prompt. Your score
             is your final WPM.
           </p>
-          <Button onClick={startGame} size="lg">
-            Start Game
+          <Button onClick={startGame} size="lg" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating Prompt...
+              </>
+            ) : (
+              'Start Game'
+            )}
           </Button>
         </>
       ) : (

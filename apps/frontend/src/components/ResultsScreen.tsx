@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Loader2, Sparkles } from 'lucide-react';
 
 interface ResultsScreenProps {
   wpm: number;
@@ -10,6 +11,8 @@ interface ResultsScreenProps {
   errors: number;
   duration: number;
   footer?: ReactNode;
+  aiFeedback?: string | null;
+  isFeedbackLoading?: boolean;
 }
 
 export default function ResultsScreen({
@@ -18,6 +21,8 @@ export default function ResultsScreen({
   errors,
   duration,
   footer,
+  aiFeedback,
+  isFeedbackLoading,
 }: ResultsScreenProps) {
   // Calculate additional stats
   const rawWpm = Math.round(wpm * (100 / Math.max(accuracy, 1)));
@@ -173,6 +178,29 @@ export default function ResultsScreen({
           </div>
         </div>
       </motion.div>
+
+      {/* AI Feedback Section */}
+      {(isFeedbackLoading || aiFeedback) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.75 }}
+          className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6 mb-8"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-[var(--theme-primary)]" />
+            <h3 className="text-lg font-semibold">AI Feedback</h3>
+          </div>
+          {isFeedbackLoading ? (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Analyzing your performance...</span>
+            </div>
+          ) : aiFeedback ? (
+            <p className="text-foreground leading-relaxed">{aiFeedback}</p>
+          ) : null}
+        </motion.div>
+      )}
 
       {footer && (
         <motion.div
