@@ -29,8 +29,9 @@ interface GameState {
   endGame: () => void;
   resetGame: () => void;
   setHighScore: (gameId: string, score: number) => void;
-  incrementGamesPlayed: (gameId: string) => void;
+  incrementGamesPlayed: (gameId?: string) => void;
   setWritingFeedback: (gameId: GameType, feedback: string | null) => void;
+  setGuestMode: (isGuest: boolean) => void;
 }
 
 const INITIAL_STATE = {
@@ -136,5 +137,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         [gameId]: feedback,
       },
     }));
+  },
+
+  setGuestMode: (isGuest) => {
+    set({ isGuest });
   },
 }));

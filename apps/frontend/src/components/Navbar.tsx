@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { authAPI } from '@/lib/api';
 
 const navLinks = [
   { href: '/', label: 'Home', shortcut: '1' },
@@ -20,9 +22,17 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: session, status } = useSession();
+
+  const isAuthenticated = status === 'authenticated';
+  const displayName = useMemo(
+    () => session?.user?.username ?? session?.user?.name ?? session?.user?.email ?? 'Typer',
+    [session]
+  );
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -48,6 +58,11 @@ export function Navbar() {
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleSignOut = async () => {
+    authAPI.logout();
+    await signOut({ callbackUrl: '/' });
   };
 
   return (
@@ -84,6 +99,36 @@ export function Navbar() {
                 </Link>
               );
             })}
+
+            <div className="ml-4 flex items-center gap-3">
+              {status === 'loading' && (
+                <span className="text-sm text-muted-foreground">Checking session...</span>
+              )}
+              {status !== 'loading' &&
+                (isAuthenticated ? (
+                  <>
+                    <span className="text-sm text-muted-foreground">Hi, {displayName}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSignOut}
+                      className="flex items-center gap-2"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={() => router.push('/login')}>
+                      Sign in
+                    </Button>
+                    <Button size="sm" onClick={() => router.push('/register')}>
+                      Sign up
+                    </Button>
+                  </>
+                ))}
+            </div>
 
             {/* Theme Toggle */}
             {mounted && (
@@ -142,6 +187,47 @@ export function Navbar() {
                 </Link>
               );
             })}
+
+            <div className="mt-4 flex flex-col gap-2 px-4">
+              {status === 'loading' && (
+                <span className="text-sm text-muted-foreground">Checking session...</span>
+              )}
+              {status !== 'loading' &&
+                (isAuthenticated ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                  >
+                    Sign out
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push('/login');
+                      }}
+                    >
+                      Sign in
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push('/register');
+                      }}
+                    >
+                      Create account
+                    </Button>
+                  </>
+                ))}
+            </div>
           </div>
         )}
       </div>
