@@ -3,9 +3,10 @@
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { Zap, Feather, Link2, Lock, Play } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/games';
-import { signIn } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 // Lazy load game components
 const WordBlitz = dynamic(
@@ -71,19 +72,35 @@ const GAMES = [
 ];
 
 export default function GamesClient() {
-  const { currentGame, setCurrentGame, gamesPlayed, isGuest } = useGameStore();
+  const router = useRouter();
+  const { status } = useSession();
+  const { currentGame, setCurrentGame, gamesPlayed, isGuest, incrementGamesPlayed } =
+    useGameStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const setGuestMode = useGameStore((s) => s.setGuestMode);
 
+  const callbackUrl = useMemo(() => '/games', []);
+
   useEffect(() => {
-    setGuestMode(false);
-  }, [setGuestMode]);
+    if (status === 'authenticated') {
+      setGuestMode(false);
+    }
+
+    if (status === 'unauthenticated') {
+      setGuestMode(true);
+    }
+  }, [setGuestMode, status]);
 
   const handleGameSelect = (gameId: (typeof GAMES)[number]['id']) => {
     if (isGuest && gamesPlayed >= 1) {
       setShowLoginModal(true);
       return;
     }
+
+    if (isGuest) {
+      incrementGamesPlayed();
+    }
+
     setCurrentGame(gameId);
   };
 
@@ -207,7 +224,7 @@ export default function GamesClient() {
             <p className="text-muted-foreground mb-6">
               You've played your free game! Login to unlock unlimited access to all typing games.
             </p>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowLoginModal(false)}
                 className="flex-1 px-6 py-3 bg-background/50 border border-border rounded-xl hover:bg-muted transition-colors"
@@ -215,10 +232,22 @@ export default function GamesClient() {
                 Cancel
               </button>
               <button
-                onClick={() => signIn(undefined, { callbackUrl: '/games' })}
+                onClick={() => {
+                  setShowLoginModal(false);
+                  router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+                }}
                 className="flex-1 px-6 py-3 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white rounded-xl hover:shadow-lg transition-shadow"
               >
                 Login
+              </button>
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  router.push(`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+                }}
+                className="flex-1 px-6 py-3 bg-card/40 border border-border rounded-xl hover:bg-muted transition-shadow"
+              >
+                Sign Up
               </button>
             </div>
           </motion.div>

@@ -127,7 +127,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   incrementGamesPlayed: (_gameId) => {
-    set((state) => ({ gamesPlayed: state.gamesPlayed + 1 }));
+    set((state) => {
+      if (!state.isGuest) {
+        return {};
+      }
+
+      return { gamesPlayed: state.gamesPlayed + 1 };
+    });
   },
 
   setWritingFeedback: (gameId, feedback) => {
@@ -140,6 +146,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setGuestMode: (isGuest) => {
-    set({ isGuest });
+    set((state) => {
+      if (state.isGuest === isGuest) {
+        return {};
+      }
+
+      return {
+        isGuest,
+        gamesPlayed: isGuest ? 0 : state.gamesPlayed,
+      };
+    });
   },
 }));

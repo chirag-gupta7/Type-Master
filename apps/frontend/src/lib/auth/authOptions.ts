@@ -2,13 +2,20 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import type { NextAuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { prisma } from '@/lib/auth/prisma';
 
 const authSecret = process.env.NEXTAUTH_SECRET;
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 if (!authSecret) {
   throw new Error('NEXTAUTH_SECRET environment variable is not set.');
+}
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error('Google OAuth credentials are not configured.');
 }
 
 export const authOptions: NextAuthOptions = {
@@ -18,6 +25,10 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   providers: [
+    GoogleProvider({
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -65,6 +76,7 @@ export const authOptions: NextAuthOptions = {
           email: string;
           name: string | null;
           username: string | null;
+          image: string | null;
         };
       };
 
@@ -74,6 +86,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email ?? '',
           name: user.name ?? null,
           username: (user as { username?: string }).username ?? null,
+          image: (user as { image?: string | null }).image ?? null,
         };
       }
 
@@ -86,6 +99,7 @@ export const authOptions: NextAuthOptions = {
           email: string;
           name: string | null;
           username: string | null;
+          image: string | null;
         };
       };
 
@@ -94,6 +108,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = authToken.user.email;
         session.user.name = authToken.user.name;
         session.user.username = authToken.user.username;
+        session.user.image = authToken.user.image ?? session.user.image ?? null;
       }
 
       return session;

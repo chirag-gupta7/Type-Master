@@ -16,6 +16,10 @@ export default function LoginPage() {
 
   const callbackUrl = params.get('callbackUrl') ?? '/';
 
+  const handleGoogleSignIn = () => {
+    void signIn('google', { callbackUrl });
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -68,6 +72,24 @@ export default function LoginPage() {
           </div>
         )}
 
+        <div className="space-y-4 mb-8">
+          <button
+            type="button"
+            onClick={() => signIn('google', { callbackUrl })}
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-white/90 px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-white"
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white">
+              <span className="text-sm font-bold text-[#4285F4]">G</span>
+            </span>
+            Continue with Google
+          </button>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="flex-1 border-t border-border" aria-hidden="true" />
+            <span>or use your email</span>
+            <span className="flex-1 border-t border-border" aria-hidden="true" />
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-muted-foreground">
@@ -108,6 +130,16 @@ export default function LoginPage() {
             Sign In
           </button>
         </form>
+
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 font-semibold transition-colors hover:bg-muted"
+          >
+            Continue with Google
+          </button>
+        </div>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}

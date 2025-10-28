@@ -137,7 +137,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       where: { email },
     });
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new AppError(401, 'Invalid email or password');
     }
 
