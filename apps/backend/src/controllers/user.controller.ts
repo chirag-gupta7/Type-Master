@@ -11,7 +11,9 @@ const updateProfileSchema = z.object({
     .min(3, 'Username must be at least 3 characters')
     .max(20, 'Username must not exceed 20 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
+  image: z.string().url('Must be a valid URL').optional().or(z.literal('')),
 });
 
 /**
@@ -31,6 +33,7 @@ export const getProfile = async (req: Request, res: Response, next: NextFunction
         id: true,
         email: true,
         username: true,
+        image: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -84,11 +87,15 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     // Update user
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data,
+      data: {
+        username: data.username,
+        image: data.image,
+      },
       select: {
         id: true,
         email: true,
         username: true,
+        image: true,
         createdAt: true,
         updatedAt: true,
       },

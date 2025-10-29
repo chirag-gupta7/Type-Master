@@ -8,6 +8,7 @@ import { userAPI } from '@/lib/api';
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [username, setUsername] = useState('');
+  const [image, setImage] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -22,7 +23,8 @@ export default function SettingsPage() {
     async function loadProfile() {
       try {
         const data = await userAPI.getProfile();
-        setUsername(data.user.username);
+        setUsername(data.user.username || '');
+        setImage(data.user.image || '');
       } catch (err) {
         console.error('Failed to load profile:', err);
       }
@@ -31,18 +33,18 @@ export default function SettingsPage() {
     loadProfile();
   }, []);
 
-  const handleUsernameUpdate = async (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
     try {
-      await userAPI.updateUserProfile({ username });
-      setMessage({ type: 'success', text: 'Username updated successfully!' });
+      await userAPI.updateUserProfile({ username, image });
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
     } catch (err) {
       setMessage({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to update username',
+        text: err instanceof Error ? err.message : 'Failed to update profile',
       });
     } finally {
       setLoading(false);
@@ -60,7 +62,20 @@ export default function SettingsPage() {
       {/* Profile Settings */}
       <div className="bg-card border rounded-lg p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Profile</h2>
-        <form onSubmit={handleUsernameUpdate}>
+        <form onSubmit={handleProfileUpdate}>
+          <div className="mb-4">
+            <label htmlFor="image" className="block text-sm font-medium text-muted-foreground">
+              Profile Photo URL
+            </label>
+            <input
+              id="image"
+              type="url"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+              placeholder="[https://example.com/your-image.png](https://example.com/your-image.png)"
+            />
+          </div>
           <div className="mb-4">
             <label htmlFor="username" className="block text-sm font-medium mb-2">
               Username
@@ -72,7 +87,6 @@ export default function SettingsPage() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Enter your username"
-              required
             />
           </div>
 
@@ -89,7 +103,7 @@ export default function SettingsPage() {
           )}
 
           <Button type="submit" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Username'}
+            {loading ? 'Updating...' : 'Update Profile'}
           </Button>
         </form>
       </div>

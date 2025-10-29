@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Zap, Trophy, Target, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useThemeStore } from '@/store/theme';
 
 const SAMPLE_TEXT = 'The quick brown fox jumps over the lazy dog';
 
@@ -12,6 +13,7 @@ export function LandingHero() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [particles, setParticles] = useState<Array<{ x: number; y: number; id: number }>>([]);
   const [isClient, setIsClient] = useState(false);
+  const { currentTheme } = useThemeStore();
 
   // Initialize particles on client side
   useEffect(() => {
@@ -96,7 +98,7 @@ export function LandingHero() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="bg-card/50 backdrop-blur-xl border border-[var(--theme-primary)]/30 rounded-2xl p-8 shadow-2xl"
             style={{
-              boxShadow: `0 0 40px ${getComputedStyle(document.documentElement).getPropertyValue('--theme-primary')}20`,
+              boxShadow: `0 0 40px ${currentTheme.primary}20`,
             }}
           >
             <div className="text-3xl font-mono text-muted-foreground mb-4">

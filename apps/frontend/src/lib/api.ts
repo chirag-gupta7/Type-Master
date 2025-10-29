@@ -246,6 +246,7 @@ export const userAPI = {
         id: string;
         email: string;
         username: string;
+        image: string | null;
         createdAt: string;
         updatedAt: string;
         _count: {
@@ -258,13 +259,14 @@ export const userAPI = {
   /**
    * Update user profile
    */
-  updateUserProfile: async (data: { username?: string }) => {
+  updateUserProfile: async (data: { username?: string; image?: string }) => {
     return fetchAPI<{
       message: string;
       user: {
         id: string;
         email: string;
         username: string;
+        image: string | null;
         createdAt: string;
         updatedAt: string;
       };
