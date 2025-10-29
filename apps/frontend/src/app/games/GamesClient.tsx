@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Zap, Feather, Link2, Lock, Play } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/games';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 // Lazy load game components
@@ -73,32 +72,31 @@ const GAMES = [
 
 export default function GamesClient() {
   const router = useRouter();
-  const { status } = useSession();
-  const { currentGame, setCurrentGame, gamesPlayed, isGuest, incrementGamesPlayed } =
-    useGameStore();
+  const { currentGame, setCurrentGame, gamesPlayed, isGuest } = useGameStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const setGuestMode = useGameStore((s) => s.setGuestMode);
 
   const callbackUrl = useMemo(() => '/games', []);
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      setGuestMode(false);
+    if (typeof window === 'undefined') {
+      return;
     }
 
-    if (status === 'unauthenticated') {
-      setGuestMode(true);
-    }
-  }, [setGuestMode, status]);
+    const determineMode = () => {
+      const hasToken = Boolean(localStorage.getItem('accessToken'));
+      setGuestMode(!hasToken);
+    };
+
+    determineMode();
+    window.addEventListener('storage', determineMode);
+    return () => window.removeEventListener('storage', determineMode);
+  }, [setGuestMode]);
 
   const handleGameSelect = (gameId: (typeof GAMES)[number]['id']) => {
     if (isGuest && gamesPlayed >= 1) {
       setShowLoginModal(true);
       return;
-    }
-
-    if (isGuest) {
-      incrementGamesPlayed();
     }
 
     setCurrentGame(gameId);
