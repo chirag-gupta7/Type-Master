@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { AchievementUnlockModal } from '@/components/AchievementUnlockModal';
 import { AchievementToast } from '@/components/AchievementToast';
 import { MilestoneCelebration } from '@/components/MilestoneCelebration';
@@ -28,6 +28,8 @@ interface AchievementContextType {
 }
 
 const AchievementContext = createContext<AchievementContextType | undefined>(undefined);
+
+const ACHIEVEMENT_MODAL_CLOSE_EVENT = 'achievement-modal-close';
 
 export function AchievementProvider({ children }: { children: ReactNode }) {
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
@@ -58,6 +60,23 @@ export function AchievementProvider({ children }: { children: ReactNode }) {
     setShowMilestoneModal(false);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleModalClose = () => {
+      setShowModal(false);
+      setCurrentAchievement(null);
+    };
+
+    window.addEventListener(ACHIEVEMENT_MODAL_CLOSE_EVENT, handleModalClose);
+
+    return () => {
+      window.removeEventListener(ACHIEVEMENT_MODAL_CLOSE_EVENT, handleModalClose);
+    };
+  }, []);
+
   return (
     <AchievementContext.Provider
       value={{
@@ -72,17 +91,11 @@ export function AchievementProvider({ children }: { children: ReactNode }) {
       <AchievementUnlockModal
         achievement={currentAchievement}
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setCurrentAchievement(null);
-        }}
+        closeEvent={ACHIEVEMENT_MODAL_CLOSE_EVENT}
       />
 
       {/* Achievement Toast */}
-      <AchievementToast
-        achievement={toastAchievement}
-        onClose={() => setToastAchievement(null)}
-      />
+      <AchievementToast achievement={toastAchievement} onClose={() => setToastAchievement(null)} />
 
       {/* Milestone Celebration */}
       <MilestoneCelebration

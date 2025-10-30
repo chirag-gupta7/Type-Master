@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { PrismaClient, Difficulty, ExerciseType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { section1Lessons, section2Lessons, section3Lessons } from './comprehensive-seed';
 import { section4Lessons, section5Lessons, section6Lessons } from './seed-sections-4-6';
 

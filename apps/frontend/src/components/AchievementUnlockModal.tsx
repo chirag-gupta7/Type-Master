@@ -18,16 +18,23 @@ interface Achievement {
 interface AchievementUnlockModalProps {
   achievement: Achievement | null;
   isOpen: boolean;
-  onClose: () => void;
+  closeEvent?: string;
 }
 
 export function AchievementUnlockModal({
   achievement,
   isOpen,
-  onClose,
+  closeEvent = 'achievement-modal-close',
 }: AchievementUnlockModalProps) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+
+  const emitCloseEvent = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent(closeEvent));
+  };
 
   useEffect(() => {
     if (!isOpen || !achievement) return;
@@ -96,7 +103,7 @@ export function AchievementUnlockModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={emitCloseEvent}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
             {/* Modal */}
@@ -110,7 +117,7 @@ export function AchievementUnlockModal({
             >
               {/* Close Button */}
               <button
-                onClick={onClose}
+                onClick={emitCloseEvent}
                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
               >
                 <X className="w-5 h-5" />
@@ -209,7 +216,7 @@ export function AchievementUnlockModal({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.7 }}
                 >
-                  <Button onClick={onClose} size="lg" className="w-full">
+                  <Button onClick={emitCloseEvent} size="lg" className="w-full">
                     Awesome! 🚀
                   </Button>
                 </motion.div>
