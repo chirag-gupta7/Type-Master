@@ -30,20 +30,20 @@ export function AchievementUnlockModal({
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    if (isOpen && achievement) {
-      setShowConfetti(true);
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+    if (!isOpen || !achievement) return;
 
-      // Stop confetti after 5 seconds
-      const timer = setTimeout(() => {
-        setShowConfetti(false);
-      }, 5000);
+    setShowConfetti(true);
+    setWindowSize({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
 
-      return () => clearTimeout(timer);
-    }
+    // Stop confetti after 5 seconds
+    const timer = setTimeout(() => {
+      setShowConfetti(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
   }, [isOpen, achievement]);
 
   if (!achievement) return null;
