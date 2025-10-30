@@ -1,84 +1,449 @@
 # TypeMaster 🚀
 
-A modern, production-ready typing speed improvement web application built with cutting-edge technologies.
+A comprehensive typing improvement platform with 100 progressive lessons, intelligent placement tests, and gamified achievement system.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-brightgreen)
 
 ## 📋 Table of Contents
 
 - [Features](#features)
+- [What's New in 2.0](#whats-new-in-20)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Development](#development)
-- [Testing](#testing)
-- [Deployment](#deployment)
+- [Quick Start](#quick-start)
 - [Documentation](#documentation)
-- [API Documentation](#api-documentation)
-- [Environment Variables](#environment-variables)
+- [Testing](#testing)
 - [Contributing](#contributing)
 
 ## ✨ Features
 
-### Core Features
+### 🎓 Learning System (100 Lessons)
 
-- ✅ **User Authentication** - JWT-based authentication with HTTP-only cookies
-- ✅ **Typing Test Engine** - Multiple test modes (30s, 1min, 3min)
-- ✅ **Real-time Metrics** - Live WPM and accuracy calculation
-- ✅ **User Dashboard** - Comprehensive analytics and progress tracking
-- ✅ **Test History** - Complete test history with filtering
-- ✅ **Dark/Light Mode** - Full theme support with system preference detection
-- ✅ **Responsive Design** - Mobile-first, works on all devices
-- ✨ **10 Theme Colors** - Neon Cyan, Purple, Green, Orange, Pink, Blue, Lime, Ruby, Golden, Mint
-- ✨ **Dynamic Text Generator** - 580+ sentences across 5 categories (tech, literature, general, business, science)
-- ✨ **TypeRacer Horizontal Display** - Horizontal scrolling mode with centered current word
-- ✨ **MonkeyType Results** - Animated WPM counter, accuracy ring, detailed stats, personal best tracking
-- ✨ **3 Typing Games** - Word Blitz, Accuracy Challenge, Speed Race with leaderboards
-- ✨ **Keyboard Shortcuts** - Ctrl+1-8 for quick navigation across all pages
-- ✨ **Mobile Menu** - Hamburger menu with smooth animations for mobile devices
-- ✨ **Guest Access** - Play 1 demo game before login required
+- **Progressive Curriculum** - 100 lessons from beginner (15 WPM) to expert (75+ WPM)
+- **6 Sections** - Foundation, Skill Building, Advanced, Speed & Fluency, Mastery, Programming
+- **Placement Test** - Intelligent skill assessment recommends your starting point
+- **Checkpoint System** - Milestone lessons every 5-20 levels validate progress
+- **Diverse Content** - Literature, business, technical text, and code snippets
+- **Targeted Practice** - Finger-specific exercises and hand-alternation training
 
-### Technical Features
+### 🎮 Gamification & Achievements
 
-- 🔒 **Security First** - Input validation, rate limiting, CORS, Helmet
-- ⚡ **Performance** - Optimized with caching, code splitting, lazy loading
-- 🎨 **Modern UI** - Built with shadcn/ui and Tailwind CSS
-- 🧪 **Well Tested** - Comprehensive unit, integration, and E2E tests
-- 📊 **Type Safe** - Full TypeScript coverage with strict mode
-- 🔄 **State Management** - Zustand for global state, React Query for server state
-- 🎮 **Game Backend** - Complete game scoring API with leaderboards and statistics
+- **Achievement System** - 8 base achievements with 250 XP maximum
+  - Speed: Century Club (100 WPM), Speed Demon (120 WPM), Lightning Fingers (150 WPM)
+  - Accuracy: Near Perfect (98%), Precision Master (99%), Perfectionist (100%)
+  - Stars: Triple Star (3 stars), Lesson Completed
+- **Milestone Celebrations** - Full-screen celebrations at 10, 25, 50, 100 lessons
+- **Confetti Effects** - 500-piece confetti burst on achievements
+- **Toast Notifications** - Stacked notifications for multiple achievements
+- **Points System** - 10-250 XP per achievement
+
+### 📊 Mistake Tracking & Analysis
+
+- **Real-time Tracking** - Captures every typing error during practice
+- **Weak Key Analysis** - Identifies problematic keys with error counts
+- **Personalized Practice** - Generates custom text targeting your weak areas
+- **Improvement Trends** - Track error reduction over time
+- **Finger Mapping** - Shows which finger should be used for each key
+
+### 🎯 Core Typing Features
+
+- **Typing Test Engine** - Multiple test modes (30s, 1min, 3min)
+- **Real-time Metrics** - Live WPM and accuracy calculation
+- **Visual Keyboard** - Interactive keyboard with highlighting
+- **Character Feedback** - Color-coded correct/incorrect characters
+- **Test History** - Complete history with filtering and stats
+
+### 🎨 User Experience
+
+- **Dark/Light Mode** - Full theme support with system detection
+- **10 Theme Colors** - Neon Cyan, Purple, Green, Orange, Pink, Blue, Lime, Ruby, Golden, Mint
+- **Responsive Design** - Mobile-first, works on all devices
+- **Smooth Animations** - Framer Motion for delightful interactions
+- **Keyboard Shortcuts** - Quick navigation (Ctrl+1-8)
+- **Progress Dashboard** - 4 visualizations with analytics
+
+### 🔒 Technical Features
+
+- **Security First** - JWT auth, input validation, rate limiting, CORS, Helmet
+- **Performance** - Optimized with caching, code splitting, lazy loading
+- **Type Safe** - Full TypeScript with strict mode
+- **Well Tested** - Manual testing tools and comprehensive guides
+- **RESTful API** - 27 endpoints with consistent error handling
+
+---
+
+## 🎉 What's New in 2.0
+
+### Version 2.0.0 - Comprehensive Learning System
+
+**Released:** October 30, 2025
+
+#### Major Features
+
+✨ **100-Lesson Curriculum**
+
+- Expanded from 14 to 100 progressive lessons
+- Organized into 6 themed sections
+- Progressive difficulty from 15 WPM to 75+ WPM
+- 5 lesson types: Keys, Words, Sentences, Paragraphs, Code
+
+✨ **Placement Test System**
+
+- 3-stage assessment flow
+- Finger-specific speed analysis
+- Personalized starting level recommendations
+- Skill level determination (Beginner → Expert)
+
+✨ **Achievement Celebrations**
+
+- Full-screen modals with confetti effects
+- Auto-dismissing toast notifications
+- Milestone celebrations with particles
+- Staggered display for multiple achievements
+- Points/XP tracking (10-250 XP)
+
+✨ **Mistake Tracking & Analysis**
+
+- Real-time error capture during typing
+- Weak key identification and scoring
+- Personalized practice text generation
+- Improvement trend tracking
+- Tri-severity classification (Critical/Moderate/Minor)
+
+#### Technical Improvements
+
+🔧 **Backend API**
+
+- 12 new endpoints (15 → 27 total)
+- 3 new database models (TypingMistake, UserWeakKeys, UserSkillAssessment)
+- Enhanced Lesson model with sections and prerequisites
+- Assessment and mistake controllers
+
+🎨 **Frontend Components**
+
+- 11 new pages and components
+- Achievement system (5 components)
+- Section-based lesson organization
+- Enhanced practice interface (4 views)
+- Manual testing tools
+
+📚 **Documentation**
+
+- Comprehensive achievement system guide
+- Updated development phases
+- Testing checklists and guides
+- Architecture diagrams
+- API reference updates
+
+#### Dependencies
+
+- Added `react-confetti` for celebration effects
+- Updated Framer Motion to 11.2.10
+- Enhanced TypeScript interfaces
+
+**See [CHANGELOG.md](./CHANGELOG.md) for detailed changes.**
+
+---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
 
 - **Framework:** Next.js 14 (App Router)
-- **Language:** TypeScript
+- **Language:** TypeScript 5.3
 - **Styling:** Tailwind CSS
-- **UI Components:** shadcn/ui (Radix UI primitives)
-- **State Management:** Zustand
-- **Data Fetching:** TanStack React Query
-- **Validation:** Zod
-- **Testing:** Jest, React Testing Library, Playwright
+- **UI Components:** shadcn/ui (40+ components)
+- **Animations:** Framer Motion 11.2.10
+- **Effects:** react-confetti
+- **State:** Zustand + React Context
+- **Charts:** Recharts
+- **Icons:** Lucide React
 
 ### Backend
 
 - **Runtime:** Node.js 18+
 - **Framework:** Express.js
 - **Language:** TypeScript
-- **Database:** PostgreSQL
+- **Database:** PostgreSQL 15+
 - **ORM:** Prisma
-- **Caching:** Redis
-- **Authentication:** JWT (jsonwebtoken)
-- **Security:** Helmet, CORS, bcrypt
+- **Authentication:** JWT
+- **Security:** Helmet, CORS, bcrypt, rate-limit
 - **Logging:** Winston
-- **Validation:** Zod
-- **Testing:** Jest, Supertest
 
 ### DevOps
+
+- **Version Control:** Git, GitHub
+- **Containerization:** Docker, Docker Compose
+- **Deployment:** Vercel (Frontend), Railway (Backend)
+- **CI/CD:** GitHub Actions
+
+---
+
+## 📁 Project Structure
+
+```
+typemaster/
+├── apps/
+│   ├── frontend/          # Next.js 14 application
+│   │   ├── src/
+│   │   │   ├── app/       # App Router pages
+│   │   │   ├── components/# React components (65+)
+│   │   │   ├── context/   # React Context providers
+│   │   │   ├── hooks/     # Custom React hooks
+│   │   │   ├── lib/       # Utilities and API client
+│   │   │   ├── store/     # Zustand stores
+│   │   │   └── types/     # TypeScript types
+│   │   └── public/        # Static assets
+│   │
+│   └── backend/           # Express.js API
+│       ├── prisma/        # Database schema & migrations
+│       │   ├── schema.prisma
+│       │   ├── seed.ts    # 100 lessons + achievements
+│       │   └── migrations/
+│       └── src/
+│           ├── controllers/# Request handlers (8)
+│           ├── routes/    # API routes (8)
+│           ├── middleware/# Auth, errors, rate limit
+│           └── utils/     # Helpers & logger
+│
+├── docs/                  # Comprehensive documentation
+│   ├── ACHIEVEMENT_SYSTEM.md  # Achievement guide
+│   ├── DEVELOPMENT_PHASES.md  # Dev history
+│   ├── API.md                 # API reference
+│   ├── QUICKSTART.md          # Setup guide
+│   └── ...                    # More docs
+│
+├── CHANGELOG.md           # Version history
+├── README.md              # This file
+└── CONTRIBUTING.md        # Contribution guide
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ and npm 9+
+- PostgreSQL 15+
+- Git
+
+### Installation (5 minutes)
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/chirag-gupta7/Type-Master.git
+   cd typemaster
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+
+   **Backend** (`apps/backend/.env`):
+
+   ```env
+   DATABASE_URL="postgresql://user:password@localhost:5432/typemaster"
+   JWT_SECRET="your-secret-key-here"
+   PORT=5000
+   NODE_ENV=development
+   ```
+
+   **Frontend** (`apps/frontend/.env.local`):
+
+   ```env
+   NEXT_PUBLIC_API_URL=http://localhost:5000
+   ```
+
+4. **Set up database**
+
+   ```bash
+   cd apps/backend
+   npx prisma migrate dev
+   npx prisma generate
+   npm run seed  # Seeds 100 lessons + 14 achievements
+   ```
+
+5. **Start development servers**
+
+   **Terminal 1 - Backend:**
+
+   ```bash
+   cd apps/backend
+   npm run dev  # Runs on http://localhost:5000
+   ```
+
+   **Terminal 2 - Frontend:**
+
+   ```bash
+   cd apps/frontend
+   npm run dev  # Runs on http://localhost:3000
+   ```
+
+6. **Open your browser**
+   ```
+   http://localhost:3000
+   ```
+
+### First Steps
+
+1. **Take the Placement Test** - Visit `/learn/assessment` to find your skill level
+2. **Start Your First Lesson** - Go to `/learn` and begin with your recommended level
+3. **Complete a Lesson** - Type the text and watch achievements unlock! 🎉
+4. **Test the Achievement System** - Visit `/test-achievements` to see all celebration animations
+
+### Testing the Achievement System
+
+Want to see achievements without completing lessons?
+
+```bash
+# Visit the testing page
+http://localhost:3000/test-achievements
+```
+
+Click any achievement button to trigger celebrations instantly!
+
+---
+
+## 📚 Documentation
+
+Comprehensive guides available in `/docs`:
+
+- **[QUICKSTART.md](./docs/QUICKSTART.md)** - Detailed setup guide
+- **[ACHIEVEMENT_SYSTEM.md](./docs/ACHIEVEMENT_SYSTEM.md)** - Achievement documentation
+- **[DEVELOPMENT_PHASES.md](./docs/DEVELOPMENT_PHASES.md)** - Complete development history
+- **[API.md](./docs/API.md)** - API endpoint reference
+- **[FEATURES.md](./docs/FEATURES.md)** - Feature specifications
+- **[TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)** - Testing instructions
+- **[FILE_STRUCTURE.md](./docs/FILE_STRUCTURE.md)** - Codebase organization
+
+---
+
+## 🧪 Testing
+
+### Manual Testing
+
+**Achievement System:**
+
+```bash
+cd apps/frontend
+npm run dev
+# Visit: http://localhost:3000/test-achievements
+```
+
+**Placement Test:**
+
+```bash
+# Visit: http://localhost:3000/learn/assessment
+```
+
+**Lesson Practice:**
+
+```bash
+# Visit: http://localhost:3000/learn
+# Click any lesson to start
+```
+
+### Testing Tools
+
+- `/test-achievements` - Manual achievement triggers
+- Prisma Studio - Database inspection: `npx prisma studio`
+- Browser DevTools - Check console and network
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Branch Strategy
+
+- `main` - Production-ready code
+- `feature/*` - New features
+- `bugfix/*` - Bug fixes
+- `hotfix/*` - Critical production fixes
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **shadcn/ui** - Beautiful UI components
+- **Framer Motion** - Smooth animations
+- **Prisma** - Type-safe database ORM
+- **Next.js** - React framework
+- **Community** - All contributors and testers
+
+---
+
+## 📞 Support
+
+- **Issues:** [GitHub Issues](https://github.com/chirag-gupta7/Type-Master/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/chirag-gupta7/Type-Master/discussions)
+- **Documentation:** `/docs` folder
+
+---
+
+## 🗺️ Roadmap
+
+### Phase 9: Authentication & Persistence (Next)
+
+- [ ] NextAuth.js integration
+- [ ] Social login (Google, GitHub)
+- [ ] Persistent user stats
+- [ ] Achievement history page
+
+### Phase 10: Social Features
+
+- [ ] Multiplayer typing races
+- [ ] Global leaderboards
+- [ ] Friend system
+- [ ] Daily challenges
+
+### Phase 11: AI Integration
+
+- [ ] Personalized recommendations
+- [ ] Adaptive difficulty
+- [ ] Smart practice generation
+- [ ] Performance predictions
+
+### Phase 12: Mobile Apps
+
+- [ ] React Native apps
+- [ ] iOS & Android support
+- [ ] Offline mode
+
+---
+
+**Built with ❤️ by the TypeMaster Team**
+
+**Version:** 2.0.0 | **Last Updated:** October 30, 2025
+
+---
+
+⭐ **Star this repo if you find it helpful!**
 
 - **Version Control:** Git
 - **Package Manager:** npm
