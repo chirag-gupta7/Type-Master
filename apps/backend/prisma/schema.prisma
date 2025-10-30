@@ -18,12 +18,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  testResults      TestResult[]
-  lessonProgress   UserLessonProgress[]
-  achievements     UserAchievement[]
-  gameScores       GameScore[]
-  accounts         Account[]
-  sessions         Session[]
+  testResults         TestResult[]
+  lessonProgress      UserLessonProgress[]
+  achievements        UserAchievement[]
+  gameScores          GameScore[]
+  accounts            Account[]
+  sessions            Session[]
+  typingMistakes      TypingMistake[]
+  weakKeys            UserWeakKeys[]
+  skillAssessments    UserSkillAssessment[]
 
   @@index([email])
   @@index([username])
@@ -117,23 +120,29 @@ enum ExerciseType {
 }
 
 model Lesson {
-  id          String   @id @default(uuid())
-  level       Int      // 1, 2, 3, etc.
-  title       String   // "Home Row - ASDF"
-  description String
-  keys        String[] // ["a", "s", "d", "f"]
-  difficulty  Difficulty @default(BEGINNER)
-  targetWpm   Int      @default(20)
-  minAccuracy Int      @default(90) // Minimum accuracy to pass
-  order       Int      // Display order
-  exerciseType ExerciseType @default(KEYS)
-  content     String   // Exercise text or pattern
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  level           Int      // 1, 2, 3, etc.
+  title           String   // "Home Row - ASDF"
+  description     String
+  keys            String[] // ["a", "s", "d", "f"]
+  difficulty      Difficulty @default(BEGINNER)
+  targetWpm       Int      @default(20)
+  minAccuracy     Int      @default(90) // Minimum accuracy to pass
+  order           Int      // Display order
+  exerciseType    ExerciseType @default(KEYS)
+  content         String   // Exercise text or pattern
+  section         Int      @default(1) // Section number (1-6)
+  isCheckpoint    Boolean  @default(false) // Is this a checkpoint lesson?
+  targetFingers   String[] // Fingers to practice: ["pinky-left", "ring-right", etc.]
+  unlockAfter     String[] // Lesson IDs that must be completed before this one
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  userProgress UserLessonProgress[]
+  userProgress    UserLessonProgress[]
+  typingMistakes  TypingMistake[]
 
   @@index([level, order])
+  @@index([section, order])
   @@map("lessons")
 }
 
@@ -210,4 +219,61 @@ model GameScore {
   @@index([gameType, score(sort: Desc)])
   @@index([createdAt])
   @@map("game_scores")
+}
+
+// NEW MODELS FOR COMPREHENSIVE LESSON SYSTEM
+
+model TypingMistake {
+  id          String   @id @default(uuid())
+  userId      String
+  lessonId    String
+  keyPressed  String   // What they typed
+  keyExpected String   // What they should have typed
+  timestamp   DateTime @default(now())
+  fingerUsed  String?  // Which finger should be used
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, keyExpected])
+  @@map("typing_mistakes")
+}
+
+model UserWeakKeys {
+  id          String   @id @default(uuid())
+  userId      String
+  keyChar     String   // The problematic key
+  errorCount  Int      @default(1)
+  lastError   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, keyChar])
+  @@index([userId, errorCount])
+  @@map("user_weak_keys")
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+model UserSkillAssessment {
+  id                  String      @id @default(uuid())
+  userId              String
+  assessmentDate      DateTime    @default(now())
+  overallWpm          Float
+  overallAccuracy     Float
+  recommendedLevel    SkillLevel
+  weakFingers         String[]    // Array of finger identifiers
+  problematicKeys     String[]    // Array of key characters
+  fingerWpmScores     String      // JSON string with finger-specific WPM scores
+  assessmentData      String      // JSON string with detailed assessment data
+  
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, assessmentDate])
+  @@map("user_skill_assessments")
 }
