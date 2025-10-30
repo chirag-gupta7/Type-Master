@@ -17,13 +17,11 @@ const completeAssessmentSchema = z.object({
   timeSpent: z.number().min(0),
 });
 
-type SkillLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
-
 /**
  * Start a new skill assessment (placement test)
  * POST /api/v1/assessment/start
  */
-export const startAssessment = async (req: Request, res: Response) => {
+export const startAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { userId } = startAssessmentSchema.parse(req.body);
 
@@ -48,7 +46,7 @@ export const startAssessment = async (req: Request, res: Response) => {
 
     logger.info(`Started skill assessment for user: ${userId}`);
 
-    res.json({
+    return res.json({
       message: 'Assessment started',
       content: assessmentLesson.content,
       instructions: 'Type the text below as accurately and quickly as you can.',
@@ -57,7 +55,7 @@ export const startAssessment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Error starting assessment:', error);
-    res.status(500).json({ error: 'Failed to start assessment' });
+    return res.status(500).json({ error: 'Failed to start assessment' });
   }
 };
 
@@ -65,7 +63,7 @@ export const startAssessment = async (req: Request, res: Response) => {
  * Complete assessment and get recommended starting lesson
  * POST /api/v1/assessment/complete
  */
-export const completeAssessment = async (req: Request, res: Response) => {
+export const completeAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { userId, wpm, accuracy, mistakesByKey, weakFingers, timeSpent } =
       completeAssessmentSchema.parse(req.body);
@@ -153,7 +151,7 @@ export const completeAssessment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Error completing assessment:', error);
-    res.status(500).json({ error: 'Failed to complete assessment' });
+    return res.status(500).json({ error: 'Failed to complete assessment' });
   }
 };
 
@@ -161,7 +159,7 @@ export const completeAssessment = async (req: Request, res: Response) => {
  * Get user's latest assessment results
  * GET /api/v1/assessment/latest/:userId
  */
-export const getLatestAssessment = async (req: Request, res: Response) => {
+export const getLatestAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { userId } = req.params;
 
@@ -197,7 +195,7 @@ export const getLatestAssessment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Error retrieving assessment:', error);
-    res.status(500).json({ error: 'Failed to retrieve assessment' });
+    return res.status(500).json({ error: 'Failed to retrieve assessment' });
   }
 };
 
