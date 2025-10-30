@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { authAPI } from '@/lib/api';
+import { useUiStore } from '../store/ui';
 
 const navLinks = [
   { href: '/', label: 'Home', shortcut: '1' },
@@ -27,6 +28,7 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session, status } = useSession();
+  const setLoading = useUiStore((state) => state.setLoading);
 
   const isAuthenticated = status === 'authenticated';
   const displayName = useMemo(
@@ -70,7 +72,15 @@ export function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link
+            href="/"
+            className="flex items-center space-x-2"
+            onClick={() => {
+              if (pathname !== '/') {
+                setLoading(true);
+              }
+            }}
+          >
             <span className="text-xl font-bold bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] bg-clip-text text-transparent">
               TypeMaster
             </span>
@@ -84,6 +94,11 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={() => {
+                    if (pathname !== link.href) {
+                      setLoading(true);
+                    }
+                  }}
                   className={cn(
                     'relative px-4 py-2 rounded-md text-sm font-medium transition-all duration-200',
                     isActive
@@ -171,7 +186,12 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    if (pathname !== link.href) {
+                      setLoading(true);
+                    }
+                    setMobileMenuOpen(false);
+                  }}
                   className={cn(
                     'block px-4 py-3 rounded-md text-base font-medium transition-colors touch-manipulation',
                     isActive

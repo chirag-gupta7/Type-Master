@@ -384,9 +384,6 @@ const TypingTest: React.FC = () => {
                     display: none;
                   }
                 `}</style>
-                {/* Center indicator box */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-16 border-2 border-yellow-400/30 rounded-lg z-10 pointer-events-none" />
-
                 <div className="whitespace-nowrap text-muted-foreground flex items-center h-full">
                   <span className="inline-block w-[50%]"></span> {/* Left padding for centering */}
                   {words.map((word, index) => {

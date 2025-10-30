@@ -5,6 +5,7 @@ import { Providers } from '@/components/providers';
 import { Navbar } from '@/components/Navbar';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { ThemeApplicator } from '@/components/ThemeApplicator';
+import { PageLoadingIndicator } from '@/components/PageLoadingIndicator';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <Providers>
           <ThemeApplicator />
+          <PageLoadingIndicator />
           <Navbar />
           <ThemeSelector />
           <main>{children}</main>
