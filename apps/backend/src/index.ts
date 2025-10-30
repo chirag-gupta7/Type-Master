@@ -11,6 +11,8 @@ import userRoutes from './routes/user.routes';
 import lessonRoutes from './routes/lesson.routes';
 import achievementRoutes from './routes/achievement.routes';
 import gameRoutes from './routes/game.routes';
+import assessmentRoutes from './routes/assessment.routes';
+import mistakeRoutes from './routes/mistake.routes';
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +45,8 @@ app.use(`/api/${API_VERSION}/users`, userRoutes);
 app.use(`/api/${API_VERSION}/lessons`, lessonRoutes);
 app.use(`/api/${API_VERSION}/achievements`, achievementRoutes);
 app.use(`/api/${API_VERSION}/games`, gameRoutes);
+app.use(`/api/${API_VERSION}/assessment`, assessmentRoutes);
+app.use(`/api/${API_VERSION}/mistakes`, mistakeRoutes);
 
 // 404 handler
 app.use((req, res) => {

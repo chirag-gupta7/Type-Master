@@ -422,3 +422,190 @@ export const getProgressVisualization = async (req: Request, res: Response, next
     next(error);
   }
 };
+
+/**
+ * @route   GET /api/v1/lessons/section/:sectionId
+ * @desc    Get all lessons for a specific section
+ * @access  Public
+ */
+export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sectionId } = req.params;
+    const userId = req.user?.userId;
+    const section = parseInt(sectionId);
+
+    if (isNaN(section) || section < 1 || section > 6) {
+      throw new AppError(400, 'Section must be between 1 and 6');
+    }
+
+    const lessons = await prisma.lesson.findMany({
+      where: { section },
+      orderBy: [{ order: 'asc' }],
+      include: userId
+        ? {
+            userProgress: {
+              where: { userId },
+              select: {
+                completed: true,
+                bestWpm: true,
+                bestAccuracy: true,
+                stars: true,
+                attempts: true,
+              },
+            },
+          }
+        : undefined,
+    });
+
+    // Calculate section progress
+    const totalLessons = lessons.length;
+    let completedLessons = 0;
+    if (userId) {
+      completedLessons = lessons.reduce((count, lesson) => {
+        if (
+          'userProgress' in lesson &&
+          Array.isArray(lesson.userProgress) &&
+          lesson.userProgress.length > 0
+        ) {
+          return count + (lesson.userProgress[0].completed ? 1 : 0);
+        }
+        return count;
+      }, 0);
+    }
+    const completionPercentage =
+      totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+    logger.info(`Retrieved ${lessons.length} lessons for section ${section}`);
+
+    res.json({
+      section: {
+        id: section,
+        name: getSectionName(section),
+        totalLessons,
+        completedLessons,
+        completionPercentage,
+      },
+      lessons,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/v1/lessons/checkpoints
+ * @desc    Get all checkpoint lessons
+ * @access  Public
+ */
+export const getCheckpointLessons = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.userId;
+
+    const checkpoints = await prisma.lesson.findMany({
+      where: { isCheckpoint: true },
+      orderBy: [{ section: 'asc' }, { level: 'asc' }],
+      include: userId
+        ? {
+            userProgress: {
+              where: { userId },
+              select: {
+                completed: true,
+                bestWpm: true,
+                bestAccuracy: true,
+                stars: true,
+              },
+            },
+          }
+        : undefined,
+    });
+
+    logger.info(`Retrieved ${checkpoints.length} checkpoint lessons`);
+
+    res.json({ checkpoints });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/v1/lessons/recommended
+ * @desc    Get next recommended lesson for the user
+ * @access  Private
+ */
+export const getRecommendedLesson = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new AppError(401, 'User not authenticated');
+    }
+
+    const userId = req.user.userId;
+
+    // Get user's latest assessment
+    const assessment = await prisma.userSkillAssessment.findFirst({
+      where: { userId },
+      orderBy: { assessmentDate: 'desc' },
+    });
+
+    // Get all user's completed lessons
+    const completedProgress = await prisma.userLessonProgress.findMany({
+      where: { userId, completed: true },
+      select: { lessonId: true },
+    });
+
+    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
+
+    // Determine starting section based on assessment or default to Section 1
+    let startSection = 1;
+    if (assessment) {
+      if (assessment.recommendedLevel === 'EXPERT') startSection = 4;
+      else if (assessment.recommendedLevel === 'ADVANCED') startSection = 3;
+      else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
+    }
+
+    // Find first incomplete lesson in the appropriate section
+    let recommendedLesson = await prisma.lesson.findFirst({
+      where: {
+        section: { gte: startSection },
+        id: { notIn: Array.from(completedLessonIds) },
+      },
+      orderBy: [{ section: 'asc' }, { order: 'asc' }],
+    });
+
+    // If no incomplete lesson found, get the first lesson
+    if (!recommendedLesson) {
+      recommendedLesson = await prisma.lesson.findFirst({
+        orderBy: [{ section: 'asc' }, { order: 'asc' }],
+      });
+    }
+
+    if (!recommendedLesson) {
+      throw new AppError(404, 'No lessons available');
+    }
+
+    logger.info(`Recommended lesson ${recommendedLesson.level} for user: ${userId}`);
+
+    res.json({
+      lesson: recommendedLesson,
+      reasoning: assessment
+        ? `Based on your ${assessment.recommendedLevel} skill level assessment`
+        : 'Starting with foundational lessons',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Helper: Get section name by ID
+ */
+function getSectionName(sectionId: number): string {
+  const sectionNames: Record<number, string> = {
+    1: 'Foundation',
+    2: 'Skill Building',
+    3: 'Advanced Techniques',
+    4: 'Speed & Fluency',
+    5: 'Mastery',
+    6: 'Programming',
+  };
+  return sectionNames[sectionId] || `Section ${sectionId}`;
+}

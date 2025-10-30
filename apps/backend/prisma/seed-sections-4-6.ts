@@ -40,7 +40,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.WORDS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'the and for are but not you all can her was one our out day get has him his how man new now old see two way who boy did its let put say she too use',
+    content:
+      'the and for are but not you all can her was one our out day get has him his how man new now old see two way who boy did its let put say she too use',
   },
   {
     level: 63,
@@ -55,7 +56,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Time flies. Work hard. Stay focused. Type fast. Practice daily. Build speed. Keep going. Never stop. Push forward. Reach higher.',
+    content:
+      'Time flies. Work hard. Stay focused. Type fast. Practice daily. Build speed. Keep going. Never stop. Push forward. Reach higher.',
   },
   {
     level: 64,
@@ -70,7 +72,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.WORDS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'when them make turn such both work form city name down town title iris visible authentic chairman',
+    content:
+      'when them make turn such both work form city name down town title iris visible authentic chairman',
   },
   {
     level: 65,
@@ -86,7 +89,8 @@ export const section4Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'The key to speed is rhythm and flow. Practice builds muscle memory. Type smoothly without hesitation. Keep your eyes on the text ahead.',
+    content:
+      'The key to speed is rhythm and flow. Practice builds muscle memory. Type smoothly without hesitation. Keep your eyes on the text ahead.',
   },
 
   // PARAGRAPH FLUENCY (Lessons 66-70) - Literature
@@ -103,7 +107,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity.',
+    content:
+      'It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity.',
   },
   {
     level: 67,
@@ -118,7 +123,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The morning sun cast long shadows across the empty street. A gentle breeze carried the scent of fresh coffee from the corner cafe. Sarah walked slowly, savoring these quiet moments before the city awakened to its usual chaos.',
+    content:
+      'The morning sun cast long shadows across the empty street. A gentle breeze carried the scent of fresh coffee from the corner cafe. Sarah walked slowly, savoring these quiet moments before the city awakened to its usual chaos.',
   },
   {
     level: 68,
@@ -133,7 +139,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Two roads diverged in a yellow wood, and sorry I could not travel both and be one traveler, long I stood and looked down one as far as I could to where it bent in the undergrowth.',
+    content:
+      'Two roads diverged in a yellow wood, and sorry I could not travel both and be one traveler, long I stood and looked down one as far as I could to where it bent in the undergrowth.',
   },
   {
     level: 69,
@@ -148,7 +155,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: '"Where are you going?" she asked. "To the store," he replied curtly. "Can you get some milk?" "I suppose so." The conversation ended as abruptly as it had begun.',
+    content:
+      '"Where are you going?" she asked. "To the store," he replied curtly. "Can you get some milk?" "I suppose so." The conversation ended as abruptly as it had begun.',
   },
   {
     level: 70,
@@ -164,7 +172,8 @@ export const section4Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Reading makes a full man, conference a ready man, and writing an exact man. Therefore, if a man write little, he had need have a great memory. If he confer little, he had need have a present wit. And if he read little, he had need have much cunning to seem to know that he does not.',
+    content:
+      'Reading makes a full man, conference a ready man, and writing an exact man. Therefore, if a man write little, he had need have a great memory. If he confer little, he had need have a present wit. And if he read little, he had need have much cunning to seem to know that he does not.',
   },
 
   // TECHNICAL VOCABULARY (Lessons 71-74)
@@ -181,7 +190,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.WORDS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'algorithm function variable array object method class interface database server client protocol encryption authentication binary recursion iteration parameter',
+    content:
+      'algorithm function variable array object method class interface database server client protocol encryption authentication binary recursion iteration parameter',
   },
   {
     level: 72,
@@ -196,7 +206,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.WORDS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'hypothesis experiment analysis molecule chromosome photosynthesis ecosystem biodiversity quantum thermodynamics catalyst oxidation synthesis metabolism',
+    content:
+      'hypothesis experiment analysis molecule chromosome photosynthesis ecosystem biodiversity quantum thermodynamics catalyst oxidation synthesis metabolism',
   },
   {
     level: 73,
@@ -211,7 +222,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.WORDS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'diagnosis treatment symptom prescription medication therapy patient diagnosis cardiovascular respiratory neurological endocrine immunology pathology',
+    content:
+      'diagnosis treatment symptom prescription medication therapy patient diagnosis cardiovascular respiratory neurological endocrine immunology pathology',
   },
   {
     level: 74,
@@ -227,7 +239,8 @@ export const section4Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'The algorithm analyzes molecular data using recursive functions to identify potential therapeutic interventions for cardiovascular disorders in the patient database system.',
+    content:
+      'The algorithm analyzes molecular data using recursive functions to identify potential therapeutic interventions for cardiovascular disorders in the patient database system.',
   },
 
   // BUSINESS WRITING (Lessons 75-78)
@@ -244,7 +257,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Dear Mr. Johnson, Thank you for your email regarding the quarterly report. I have reviewed the financial statements and attached my analysis. Please let me know if you have any questions. Best regards, Sarah Smith',
+    content:
+      'Dear Mr. Johnson, Thank you for your email regarding the quarterly report. I have reviewed the financial statements and attached my analysis. Please let me know if you have any questions. Best regards, Sarah Smith',
   },
   {
     level: 76,
@@ -259,7 +273,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'TO: All Staff FROM: Management DATE: October 30, 2025 RE: Office Policy Update. Effective immediately, all employees must complete the new training module by Friday. Please contact HR with questions.',
+    content:
+      'TO: All Staff FROM: Management DATE: October 30, 2025 RE: Office Policy Update. Effective immediately, all employees must complete the new training module by Friday. Please contact HR with questions.',
   },
   {
     level: 77,
@@ -274,7 +289,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Executive Summary: The third quarter results exceeded expectations with revenue growth of 15% year-over-year. Market share increased by 3 percentage points, and customer satisfaction scores reached an all-time high of 94%.',
+    content:
+      'Executive Summary: The third quarter results exceeded expectations with revenue growth of 15% year-over-year. Market share increased by 3 percentage points, and customer satisfaction scores reached an all-time high of 94%.',
   },
   {
     level: 78,
@@ -290,7 +306,8 @@ export const section4Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'We are pleased to announce that our Q3 performance has exceeded all projections. The strategic initiatives implemented in January have yielded significant returns, with customer acquisition costs decreasing by 22% while retention rates improved to 87%. The board has approved the expansion plan.',
+    content:
+      'We are pleased to announce that our Q3 performance has exceeded all projections. The strategic initiatives implemented in January have yielded significant returns, with customer acquisition costs decreasing by 22% while retention rates improved to 87%. The board has approved the expansion plan.',
   },
 
   // NEWS ARTICLES (Lessons 79-80)
@@ -307,7 +324,8 @@ export const section4Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Local officials announced today that the new community center will open next month. The facility includes a library, gymnasium, and computer lab. Mayor Johnson said the center will serve as a hub for educational and recreational activities for residents of all ages.',
+    content:
+      'Local officials announced today that the new community center will open next month. The facility includes a library, gymnasium, and computer lab. Mayor Johnson said the center will serve as a hub for educational and recreational activities for residents of all ages.',
   },
   {
     level: 80,
@@ -323,7 +341,8 @@ export const section4Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Breaking News: Scientists at the research institute have discovered a groundbreaking method for renewable energy storage. The technology could revolutionize the industry by reducing costs by up to 40% while increasing efficiency. Dr. Martinez stated that commercial applications could be available within two years, pending regulatory approval.',
+    content:
+      'Breaking News: Scientists at the research institute have discovered a groundbreaking method for renewable energy storage. The technology could revolutionize the industry by reducing costs by up to 40% while increasing efficiency. Dr. Martinez stated that commercial applications could be available within two years, pending regulatory approval.',
   },
 ];
 
@@ -346,7 +365,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The epistemological framework underlying contemporary cognitive psychology demonstrates a paradigm shift from behaviorist perspectives toward information-processing models that emphasize internal mental representations and computational mechanisms.',
+    content:
+      'The epistemological framework underlying contemporary cognitive psychology demonstrates a paradigm shift from behaviorist perspectives toward information-processing models that emphasize internal mental representations and computational mechanisms.',
   },
   {
     level: 82,
@@ -361,7 +381,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Methodology: Participants (N=127) were randomly assigned to experimental conditions in a double-blind, placebo-controlled trial. Statistical analysis using ANOVA revealed significant main effects (p<0.001) with large effect sizes (Cohen\'s d=0.89).',
+    content:
+      "Methodology: Participants (N=127) were randomly assigned to experimental conditions in a double-blind, placebo-controlled trial. Statistical analysis using ANOVA revealed significant main effects (p<0.001) with large effect sizes (Cohen's d=0.89).",
   },
   {
     level: 83,
@@ -376,7 +397,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The aforementioned party hereby agrees to indemnify and hold harmless the other party from any and all claims, damages, liabilities, costs, and expenses arising from or related to the breach of any representations or warranties contained herein.',
+    content:
+      'The aforementioned party hereby agrees to indemnify and hold harmless the other party from any and all claims, damages, liabilities, costs, and expenses arising from or related to the breach of any representations or warranties contained herein.',
   },
 
   // MIXED CONTENT (Lessons 84-86)
@@ -393,7 +415,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: '"The data doesn\'t lie," Dr. Chen insisted, pointing at the screen. The graphs showed a clear upward trend. Her colleague nodded thoughtfully. "But what about the outliers?" he asked. "We can\'t ignore them." The debate continued late into the night.',
+    content:
+      '"The data doesn\'t lie," Dr. Chen insisted, pointing at the screen. The graphs showed a clear upward trend. Her colleague nodded thoughtfully. "But what about the outliers?" he asked. "We can\'t ignore them." The debate continued late into the night.',
   },
   {
     level: 85,
@@ -408,7 +431,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The quantum computer hummed softly in the corner, its processors calculating probabilities at speeds that defied human comprehension. Each qubit existed in superposition, simultaneously representing zero and one until observation collapsed the wave function into definite states.',
+    content:
+      'The quantum computer hummed softly in the corner, its processors calculating probabilities at speeds that defied human comprehension. Each qubit existed in superposition, simultaneously representing zero and one until observation collapsed the wave function into definite states.',
   },
   {
     level: 86,
@@ -424,7 +448,8 @@ export const section5Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Recent studies (Johnson et al., 2024) indicate that sustained practice improves performance metrics significantly. "The results are remarkable," noted lead researcher Dr. Smith. Statistical analysis confirmed the hypothesis with confidence intervals of 95%. The implications for education are profound.',
+    content:
+      'Recent studies (Johnson et al., 2024) indicate that sustained practice improves performance metrics significantly. "The results are remarkable," noted lead researcher Dr. Smith. Statistical analysis confirmed the hypothesis with confidence intervals of 95%. The implications for education are profound.',
   },
 
   // SPEED CHALLENGES (Lessons 87-90)
@@ -441,7 +466,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Speed comes from rhythm and flow. Trust your muscle memory. Keep your eyes ahead. Type smoothly and steadily. Maintain your accuracy while pushing pace.',
+    content:
+      'Speed comes from rhythm and flow. Trust your muscle memory. Keep your eyes ahead. Type smoothly and steadily. Maintain your accuracy while pushing pace.',
   },
   {
     level: 88,
@@ -456,7 +482,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The key to blazing speed is consistency and confidence. Practice daily builds the neural pathways. Your fingers know where to go. Let them fly across the keys.',
+    content:
+      'The key to blazing speed is consistency and confidence. Practice daily builds the neural pathways. Your fingers know where to go. Let them fly across the keys.',
   },
   {
     level: 89,
@@ -471,7 +498,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Expert typists achieve remarkable speeds through dedicated practice and perfect technique. Every keystroke flows naturally from finger position. There is no hesitation, no looking down. The text appears on screen as quickly as thought itself.',
+    content:
+      'Expert typists achieve remarkable speeds through dedicated practice and perfect technique. Every keystroke flows naturally from finger position. There is no hesitation, no looking down. The text appears on screen as quickly as thought itself.',
   },
   {
     level: 90,
@@ -487,7 +515,8 @@ export const section5Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Mastery of touch typing represents countless hours of focused practice. Your fingers dance across the keyboard with precision and grace. Speed and accuracy combine in perfect harmony. You have achieved what few accomplish: true typing expertise.',
+    content:
+      'Mastery of touch typing represents countless hours of focused practice. Your fingers dance across the keyboard with precision and grace. Speed and accuracy combine in perfect harmony. You have achieved what few accomplish: true typing expertise.',
   },
 
   // ENDURANCE (Lessons 91-94)
@@ -504,7 +533,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'The journey to becoming an expert typist is both challenging and rewarding. It requires patience, dedication, and consistent practice. Many beginners feel frustrated when progress seems slow, but persistence always pays off. The human brain is remarkably adaptable, capable of forming new neural pathways through repetition and focus. As you practice, your fingers begin to move automatically to the correct keys without conscious thought. This phenomenon, known as muscle memory, is the foundation of touch typing mastery. With each passing day, your speed increases and your accuracy improves.',
+    content:
+      'The journey to becoming an expert typist is both challenging and rewarding. It requires patience, dedication, and consistent practice. Many beginners feel frustrated when progress seems slow, but persistence always pays off. The human brain is remarkably adaptable, capable of forming new neural pathways through repetition and focus. As you practice, your fingers begin to move automatically to the correct keys without conscious thought. This phenomenon, known as muscle memory, is the foundation of touch typing mastery. With each passing day, your speed increases and your accuracy improves.',
   },
   {
     level: 92,
@@ -519,7 +549,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Technology has transformed the way we communicate and work. The keyboard, once a mechanical typewriter, has evolved into an essential digital interface. Touch typing skills have become increasingly valuable in our modern world. From writing emails to coding software, proficient typing improves productivity across all domains. Students who master touch typing complete assignments faster and with less physical strain. Professionals save countless hours over their careers. The investment in learning proper typing technique pays dividends throughout one\'s life.',
+    content:
+      "Technology has transformed the way we communicate and work. The keyboard, once a mechanical typewriter, has evolved into an essential digital interface. Touch typing skills have become increasingly valuable in our modern world. From writing emails to coding software, proficient typing improves productivity across all domains. Students who master touch typing complete assignments faster and with less physical strain. Professionals save countless hours over their careers. The investment in learning proper typing technique pays dividends throughout one's life.",
   },
   {
     level: 93,
@@ -534,7 +565,8 @@ export const section5Lessons = [
     exerciseType: ExerciseType.PARAGRAPHS,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Effective communication requires clear, concise expression of ideas. Whether writing a research paper, business proposal, or creative fiction, the ability to type quickly and accurately enables better flow of thoughts from mind to page. Writers who can type without looking at the keyboard maintain their creative momentum without interruption. The physical act of typing becomes transparent, allowing full focus on content and style. This seamless connection between thought and text is the ultimate goal of touch typing mastery.',
+    content:
+      'Effective communication requires clear, concise expression of ideas. Whether writing a research paper, business proposal, or creative fiction, the ability to type quickly and accurately enables better flow of thoughts from mind to page. Writers who can type without looking at the keyboard maintain their creative momentum without interruption. The physical act of typing becomes transparent, allowing full focus on content and style. This seamless connection between thought and text is the ultimate goal of touch typing mastery.',
   },
   {
     level: 94,
@@ -550,7 +582,8 @@ export const section5Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Congratulations on reaching this advanced level of typing proficiency. You have demonstrated exceptional skill, dedication, and perseverance. Your ability to maintain high speed and accuracy over extended passages shows true mastery of touch typing. The techniques you have learned will serve you well throughout your academic and professional career. Remember that continued practice maintains and further refines your skills. Keep challenging yourself with diverse typing tasks and materials.',
+    content:
+      'Congratulations on reaching this advanced level of typing proficiency. You have demonstrated exceptional skill, dedication, and perseverance. Your ability to maintain high speed and accuracy over extended passages shows true mastery of touch typing. The techniques you have learned will serve you well throughout your academic and professional career. Remember that continued practice maintains and further refines your skills. Keep challenging yourself with diverse typing tasks and materials.',
   },
 
   // FINAL MASTERY TEST (Lesson 95)
@@ -568,7 +601,8 @@ export const section5Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'You have completed an extraordinary journey from beginner to expert typist. Through dedicated practice and unwavering commitment, you have mastered one of the most valuable skills in the digital age. Your fingers now move with speed, precision, and confidence across the keyboard. The countless hours spent perfecting your technique have transformed typing from a conscious effort into an automatic skill. This achievement represents not just improved typing ability, but also the development of focus, discipline, and perseverance that will benefit you in all areas of life. You are now among the elite few who have achieved true typing mastery.',
+    content:
+      'You have completed an extraordinary journey from beginner to expert typist. Through dedicated practice and unwavering commitment, you have mastered one of the most valuable skills in the digital age. Your fingers now move with speed, precision, and confidence across the keyboard. The countless hours spent perfecting your technique have transformed typing from a conscious effort into an automatic skill. This achievement represents not just improved typing ability, but also the development of focus, discipline, and perseverance that will benefit you in all areas of life. You are now among the elite few who have achieved true typing mastery.',
   },
 ];
 
@@ -591,7 +625,8 @@ export const section6Lessons = [
     exerciseType: ExerciseType.CODE,
     targetFingers: [],
     unlockAfter: [],
-    content: 'array[0] = {key: value}; function(param) { return <div></div>; } list[index] obj{prop}',
+    content:
+      'array[0] = {key: value}; function(param) { return <div></div>; } list[index] obj{prop}',
   },
 
   // OPERATORS (Lesson 97)
@@ -625,7 +660,8 @@ export const section6Lessons = [
     exerciseType: ExerciseType.CODE,
     targetFingers: [],
     unlockAfter: [],
-    content: 'import React from "react";\nconst MyComponent = () => {\n  return <div>Hello</div>;\n};\nexport default MyComponent;',
+    content:
+      'import React from "react";\nconst MyComponent = () => {\n  return <div>Hello</div>;\n};\nexport default MyComponent;',
   },
 
   // FULL CODE SNIPPETS (Lesson 99)
@@ -642,7 +678,8 @@ export const section6Lessons = [
     exerciseType: ExerciseType.CODE,
     targetFingers: [],
     unlockAfter: [],
-    content: 'function calculateWPM(chars, time) {\n  const minutes = time / 60;\n  const words = chars / 5;\n  return Math.round(words / minutes);\n}\n\nconst result = calculateWPM(250, 60);\nconsole.log(`WPM: ${result}`);',
+    content:
+      'function calculateWPM(chars, time) {\n  const minutes = time / 60;\n  const words = chars / 5;\n  return Math.round(words / minutes);\n}\n\nconst result = calculateWPM(250, 60);\nconsole.log(`WPM: ${result}`);',
   },
 
   // PROGRAMMING CHECKPOINT (Lesson 100)
@@ -660,7 +697,8 @@ export const section6Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'const analyzeTypingPerformance = (data) => {\n  const totalTests = data.length;\n  const avgWPM = data.reduce((sum, test) => sum + test.wpm, 0) / totalTests;\n  const avgAccuracy = data.reduce((sum, test) => sum + test.accuracy, 0) / totalTests;\n  \n  return {\n    totalTests,\n    averageWPM: Math.round(avgWPM),\n    averageAccuracy: Math.round(avgAccuracy * 10) / 10,\n    improvement: data[data.length - 1].wpm - data[0].wpm\n  };\n};',
+    content:
+      'const analyzeTypingPerformance = (data) => {\n  const totalTests = data.length;\n  const avgWPM = data.reduce((sum, test) => sum + test.wpm, 0) / totalTests;\n  const avgAccuracy = data.reduce((sum, test) => sum + test.accuracy, 0) / totalTests;\n  \n  return {\n    totalTests,\n    averageWPM: Math.round(avgWPM),\n    averageAccuracy: Math.round(avgAccuracy * 10) / 10,\n    improvement: data[data.length - 1].wpm - data[0].wpm\n  };\n};',
   },
 ];
 

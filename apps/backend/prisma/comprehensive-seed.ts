@@ -20,7 +20,16 @@ const section1Lessons = [
     targetWpm: 15,
     minAccuracy: 90,
     exerciseType: ExerciseType.KEYS,
-    targetFingers: ['pinky-left', 'ring-left', 'middle-left', 'index-left', 'index-right', 'middle-right', 'ring-right', 'pinky-right'],
+    targetFingers: [
+      'pinky-left',
+      'ring-left',
+      'middle-left',
+      'index-left',
+      'index-right',
+      'middle-right',
+      'ring-right',
+      'pinky-right',
+    ],
     unlockAfter: [],
     content: 'a a a s s s d d d f f f j j j k k k l l l ; ; ;',
   },
@@ -35,7 +44,16 @@ const section1Lessons = [
     targetWpm: 18,
     minAccuracy: 92,
     exerciseType: ExerciseType.KEYS,
-    targetFingers: ['pinky-left', 'ring-left', 'middle-left', 'index-left', 'index-right', 'middle-right', 'ring-right', 'pinky-right'],
+    targetFingers: [
+      'pinky-left',
+      'ring-left',
+      'middle-left',
+      'index-left',
+      'index-right',
+      'middle-right',
+      'ring-right',
+      'pinky-right',
+    ],
     unlockAfter: [],
     content: 'as df jk kl as df jk kl sa fd kj lk sa fd kj lk',
   },
@@ -50,7 +68,16 @@ const section1Lessons = [
     targetWpm: 20,
     minAccuracy: 93,
     exerciseType: ExerciseType.KEYS,
-    targetFingers: ['pinky-left', 'ring-left', 'middle-left', 'index-left', 'index-right', 'middle-right', 'ring-right', 'pinky-right'],
+    targetFingers: [
+      'pinky-left',
+      'ring-left',
+      'middle-left',
+      'index-left',
+      'index-right',
+      'middle-right',
+      'ring-right',
+      'pinky-right',
+    ],
     unlockAfter: [],
     content: 'asd fds jkl kl; sad dsf lkj ;lk asd fds jkl kl;',
   },
@@ -65,7 +92,16 @@ const section1Lessons = [
     targetWpm: 22,
     minAccuracy: 94,
     exerciseType: ExerciseType.KEYS,
-    targetFingers: ['pinky-left', 'ring-left', 'middle-left', 'index-left', 'index-right', 'middle-right', 'ring-right', 'pinky-right'],
+    targetFingers: [
+      'pinky-left',
+      'ring-left',
+      'middle-left',
+      'index-left',
+      'index-right',
+      'middle-right',
+      'ring-right',
+      'pinky-right',
+    ],
     unlockAfter: [],
     content: 'asdf jkl; fdsa ;lkj asdf jkl; fdsa ;lkj asdfg hjkl;',
   },
@@ -317,7 +353,8 @@ const section1Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'the quick brown fox jumps over the lazy dog near the riverbank while making very complex movements',
+    content:
+      'the quick brown fox jumps over the lazy dog near the riverbank while making very complex movements',
   },
 ];
 
@@ -401,7 +438,8 @@ const section2Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'the weather should change when the teacher chooses which phrase to read about the white elephant',
+    content:
+      'the weather should change when the teacher chooses which phrase to read about the white elephant',
   },
 
   // COMMON TRIGRAMS (Lessons 26-30)
@@ -479,7 +517,8 @@ const section2Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'the information and education station provides attention to the question about the action taking place across the nation',
+    content:
+      'the information and education station provides attention to the question about the action taking place across the nation',
   },
 
   // ALTERNATING HANDS (Lessons 31-35)
@@ -541,7 +580,8 @@ const section2Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: 'the giant turkey island provides an authentic visual element for the downtown chairman',
+    content:
+      'the giant turkey island provides an authentic visual element for the downtown chairman',
   },
   {
     level: 35,
@@ -557,7 +597,8 @@ const section2Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'the authentic chairman provides visible elements for the downtown neighbor during the ancient penalty theory',
+    content:
+      'the authentic chairman provides visible elements for the downtown neighbor during the ancient penalty theory',
   },
 
   // SAME HAND WORDS (Lessons 36-39)
@@ -637,7 +678,8 @@ const section2Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'The quick brown fox jumps over the lazy dog while the authentic chairman provides information about the education station. The theory suggests that alternating hands creates better typing flow and reduces fatigue during extended practice sessions.',
+    content:
+      'The quick brown fox jumps over the lazy dog while the authentic chairman provides information about the education station. The theory suggests that alternating hands creates better typing flow and reduces fatigue during extended practice sessions.',
   },
 ];
 
@@ -690,7 +732,8 @@ const section3Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: 'Mary and John visited Paris in France during August with their friend Peter from London.',
+    content:
+      'Mary and John visited Paris in France during August with their friend Peter from London.',
   },
   {
     level: 44,
@@ -706,7 +749,8 @@ const section3Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'The United States of America, Canada, Mexico, Brazil, and Argentina are countries in North and South America that Alice and Bob visited last summer.',
+    content:
+      'The United States of America, Canada, Mexico, Brazil, and Argentina are countries in North and South America that Alice and Bob visited last summer.',
   },
 
   // NUMBER ROW (Lessons 45-52)
@@ -829,7 +873,8 @@ const section3Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'The meeting on January 15 2024 at 3:30 PM will include 127 participants from 45 countries with budget of $1,250,000.',
+    content:
+      'The meeting on January 15 2024 at 3:30 PM will include 127 participants from 45 countries with budget of $1,250,000.',
   },
 
   // BASIC PUNCTUATION (Lessons 53-56)
@@ -892,7 +937,8 @@ const section3Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'Hello, everyone! How are you doing today? Please note: the meeting starts at 9:00 AM; however, you may arrive early.',
+    content:
+      'Hello, everyone! How are you doing today? Please note: the meeting starts at 9:00 AM; however, you may arrive early.',
   },
 
   // APOSTROPHES & QUOTES (Lessons 57-59)
@@ -924,7 +970,8 @@ const section3Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: ['pinky-right'],
     unlockAfter: [],
-    content: 'She said, "Hello there!" He replied, "How are you?" They answered, "We\'re doing great!"',
+    content:
+      'She said, "Hello there!" He replied, "How are you?" They answered, "We\'re doing great!"',
   },
   {
     level: 59,
@@ -939,7 +986,8 @@ const section3Lessons = [
     exerciseType: ExerciseType.SENTENCES,
     targetFingers: [],
     unlockAfter: [],
-    content: '"I can\'t believe it\'s already noon," she said. "Shouldn\'t we leave now?" he asked. "We\'re running late!"',
+    content:
+      '"I can\'t believe it\'s already noon," she said. "Shouldn\'t we leave now?" he asked. "We\'re running late!"',
   },
 
   // SECTION 3 CHECKPOINT (Lesson 60)
@@ -957,7 +1005,8 @@ const section3Lessons = [
     targetFingers: [],
     unlockAfter: [],
     isCheckpoint: true,
-    content: 'John said, "I can\'t believe we\'re meeting at 3:45 PM on January 15, 2024!" Mary replied, "That\'s wonderful! Should I call you at 555-1234?" They agreed: it was perfect timing; however, they wouldn\'t forget to confirm.',
+    content:
+      'John said, "I can\'t believe we\'re meeting at 3:45 PM on January 15, 2024!" Mary replied, "That\'s wonderful! Should I call you at 555-1234?" They agreed: it was perfect timing; however, they wouldn\'t forget to confirm.',
   },
 ];
 
