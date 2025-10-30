@@ -6,6 +6,7 @@ import { lessonAPI } from '@/lib/api';
 import { Star, ArrowLeft, Trophy, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
+import { MistakeAnalysis } from '@/components/MistakeAnalysis';
 import { useTypingStore } from '@/store';
 import { Lesson, getFallbackLessonById } from '@/lib/fallback-lessons';
 
