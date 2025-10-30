@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
+import { AchievementProvider } from '@/context/AchievementContext';
 import { Navbar } from '@/components/Navbar';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { ThemeApplicator } from '@/components/ThemeApplicator';
@@ -27,11 +28,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
-          <ThemeApplicator />
-          <PageLoadingIndicator />
-          <Navbar />
-          <ThemeSelector />
-          <main>{children}</main>
+          <AchievementProvider>
+            <ThemeApplicator />
+            <PageLoadingIndicator />
+            <Navbar />
+            <ThemeSelector />
+            <main>{children}</main>
+          </AchievementProvider>
         </Providers>
       </body>
     </html>

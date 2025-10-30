@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
-import { useAchievementChecker } from '@/hooks/useAchievementChecker';
 
 interface Lesson {
   id: string;
@@ -42,25 +41,15 @@ interface WeakKeyAnalysis {
   errorCount: number;
 }
 
-interface UserStats {
-  lessonsCompleted: number;
-  sectionsCompleted: number[];
-}
-
-export default function LessonPracticePage() {
+export default function EnhancedLessonPage() {
   const params = useParams();
   const router = useRouter();
   const lessonId = params.id as string;
-  const { checkAchievements } = useAchievementChecker();
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'initial' | 'typing' | 'results' | 'analysis'>('initial');
   const [isSaving, setIsSaving] = useState(false);
-  const [userStats, setUserStats] = useState<UserStats>({
-    lessonsCompleted: 0,
-    sectionsCompleted: [],
-  });
 
   // Typing state
   const [userInput, setUserInput] = useState('');
@@ -92,28 +81,6 @@ export default function LessonPracticePage() {
     }
     fetchLesson();
   }, [lessonId]);
-
-  // Fetch user stats for achievement tracking
-  useEffect(() => {
-    async function fetchUserStats() {
-      try {
-        // TODO: Replace with actual user ID from auth
-        const userId = 'mock-user-id'; // This will be replaced when auth is implemented
-        const response = await fetch(`http://localhost:5000/api/v1/users/${userId}/stats`);
-        if (response.ok) {
-          const data = await response.json();
-          setUserStats({
-            lessonsCompleted: data.stats?.totalLessonsCompleted || 0,
-            sectionsCompleted: data.stats?.sectionsCompleted || [],
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch user stats:', err);
-        // Continue with default stats
-      }
-    }
-    fetchUserStats();
-  }, []);
 
   const handleStart = useCallback(() => {
     setView('typing');
@@ -240,21 +207,6 @@ export default function LessonPracticePage() {
     setIsSaving(true);
 
     try {
-      const stars = calculateStars();
-      const completed = accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm;
-
-      // Check for achievements
-      await checkAchievements(
-        {
-          wpm,
-          accuracy,
-          lessonId: lesson.id,
-          completed,
-          stars,
-        },
-        userStats
-      );
-
       // TODO: Save lesson progress when auth is implemented
       // await lessonAPI.saveLessonProgress({
       //   lessonId: lesson.id,
@@ -264,16 +216,6 @@ export default function LessonPracticePage() {
       // });
       // Save to backend (requires auth)
       // await lessonAPI.saveLessonProgress({ lessonId: lesson.id, wpm, accuracy, completed });
-
-      // Update user stats for next achievement check
-      if (completed) {
-        setUserStats((prev) => ({
-          lessonsCompleted: prev.lessonsCompleted + 1,
-          sectionsCompleted: prev.sectionsCompleted.includes(lesson.section)
-            ? prev.sectionsCompleted
-            : [...prev.sectionsCompleted, lesson.section],
-        }));
-      }
 
       if (mistakes.length > 0) {
         setView('analysis');
@@ -461,7 +403,7 @@ export default function LessonPracticePage() {
                         ${status === 'pending' ? 'text-gray-400 dark:text-gray-600' : ''}
                       `}
                     >
-                      {char === ' ' ? 'Â·' : char}
+                      {char === ' ' ? '·' : char}
                     </span>
                   );
                 })}
@@ -501,7 +443,7 @@ export default function LessonPracticePage() {
                 transition={{ type: 'spring', duration: 0.6 }}
               >
                 <h2 className="text-4xl font-bold mb-2">
-                  {calculateStars() > 0 ? 'ðŸŽ‰ Excellent Work!' : 'ðŸ’ª Good Effort!'}
+                  {calculateStars() > 0 ? '🎉 Excellent Work!' : '💪 Good Effort!'}
                 </h2>
                 <p className="text-muted-foreground text-lg">
                   {calculateStars() > 0
@@ -591,7 +533,7 @@ export default function LessonPracticePage() {
                 className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
               >
                 <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                  ðŸ“Š We detected some mistakes
+                  📊 We detected some mistakes
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
                   Click "View Analysis" to see which keys you should practice more.

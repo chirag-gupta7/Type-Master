@@ -1,197 +1,18 @@
 /* eslint-disable no-console */
 import { PrismaClient, Difficulty, ExerciseType } from '@prisma/client';
+import { section1Lessons, section2Lessons, section3Lessons } from './comprehensive-seed';
+import { section4Lessons, section5Lessons, section6Lessons } from './seed-sections-4-6';
 
 const prisma = new PrismaClient();
 
-const lessons = [
-  // Level 1: Home Row
-  {
-    level: 1,
-    order: 1,
-    title: 'Home Row - Left Hand (ASDF)',
-    description: 'Learn the home row keys for your left hand',
-    keys: ['a', 's', 'd', 'f'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 15,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'asdf fdsa asdf fdsa asdf fdsa asdf fdsa asdf fdsa',
-  },
-  {
-    level: 1,
-    order: 2,
-    title: 'Home Row - Right Hand (JKL;)',
-    description: 'Learn the home row keys for your right hand',
-    keys: ['j', 'k', 'l', ';'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 15,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'jkl; ;lkj jkl; ;lkj jkl; ;lkj jkl; ;lkj jkl; ;lkj',
-  },
-  {
-    level: 1,
-    order: 3,
-    title: 'Home Row - Both Hands',
-    description: 'Practice all home row keys together',
-    keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 20,
-    minAccuracy: 90,
-    exerciseType: ExerciseType.KEYS,
-    content: 'asdf jkl; fdsa ;lkj asdf jkl; fdsa ;lkj asdf jkl;',
-  },
-
-  // Level 2: Top Row
-  {
-    level: 2,
-    order: 1,
-    title: 'Top Row - Left Hand (QWERT)',
-    description: 'Learn the top row keys for your left hand',
-    keys: ['q', 'w', 'e', 'r', 't'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 20,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'qwert trewq qwert trewq asdf qwert fdsa trewq',
-  },
-  {
-    level: 2,
-    order: 2,
-    title: 'Top Row - Right Hand (YUIOP)',
-    description: 'Learn the top row keys for your right hand',
-    keys: ['y', 'u', 'i', 'o', 'p'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 20,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'yuiop poiuy yuiop poiuy jkl; yuiop ;lkj poiuy',
-  },
-
-  // Level 3: Bottom Row
-  {
-    level: 3,
-    order: 1,
-    title: 'Bottom Row - Left Hand (ZXCV)',
-    description: 'Learn the bottom row keys for your left hand',
-    keys: ['z', 'x', 'c', 'v'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 20,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'zxcv vcxz zxcv vcxz asdf zxcv fdsa vcxz',
-  },
-  {
-    level: 3,
-    order: 2,
-    title: 'Bottom Row - Right Hand (BNM)',
-    description: 'Learn the bottom row keys for your right hand',
-    keys: ['b', 'n', 'm'],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 20,
-    minAccuracy: 85,
-    exerciseType: ExerciseType.KEYS,
-    content: 'bnm mnb bnm mnb jkl; bnm ;lkj mnb',
-  },
-
-  // Level 4: Simple Words
-  {
-    level: 4,
-    order: 1,
-    title: 'Common Words - Easy',
-    description: 'Type common English words',
-    keys: [],
-    difficulty: Difficulty.BEGINNER,
-    targetWpm: 25,
-    minAccuracy: 90,
-    exerciseType: ExerciseType.WORDS,
-    content:
-      'the and for are but not you all can her was one our out day get has him his how man new now old see two way who boy did its let put say she too use',
-  },
-  {
-    level: 4,
-    order: 2,
-    title: 'Common Words - Medium',
-    description: 'Type more common English words',
-    keys: [],
-    difficulty: Difficulty.INTERMEDIATE,
-    targetWpm: 30,
-    minAccuracy: 90,
-    exerciseType: ExerciseType.WORDS,
-    content:
-      'about after again also another back because before between both could every first found give great hand help here high just know last little long made many more must never next only over place right same should small still such take tell than that their there these they thing think this those time very were what when where which while would write year',
-  },
-
-  // Level 5: Sentences
-  {
-    level: 5,
-    order: 1,
-    title: 'Simple Sentences',
-    description: 'Practice typing complete sentences',
-    keys: [],
-    difficulty: Difficulty.INTERMEDIATE,
-    targetWpm: 35,
-    minAccuracy: 92,
-    exerciseType: ExerciseType.SENTENCES,
-    content:
-      'The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump. The five boxing wizards jump quickly.',
-  },
-  {
-    level: 5,
-    order: 2,
-    title: 'Complex Sentences',
-    description: 'Practice typing longer sentences with punctuation',
-    keys: [],
-    difficulty: Difficulty.INTERMEDIATE,
-    targetWpm: 35,
-    minAccuracy: 92,
-    exerciseType: ExerciseType.SENTENCES,
-    content:
-      'TypeMaster helps you improve your typing speed and accuracy. Regular practice is the key to becoming a proficient typist. Focus on accuracy first, speed will come naturally.',
-  },
-
-  // Level 6: Paragraphs
-  {
-    level: 6,
-    order: 1,
-    title: 'Short Paragraph',
-    description: 'Practice typing complete paragraphs',
-    keys: [],
-    difficulty: Difficulty.ADVANCED,
-    targetWpm: 40,
-    minAccuracy: 93,
-    exerciseType: ExerciseType.PARAGRAPHS,
-    content:
-      'Touch typing is a method of typing without looking at the keyboard. The typist locates keys by touch alone. This technique relies on muscle memory to find keys quickly and efficiently. With practice, touch typing becomes second nature and significantly increases typing speed.',
-  },
-
-  // Level 7: Code Snippets
-  {
-    level: 7,
-    order: 1,
-    title: 'JavaScript - Variables',
-    description: 'Practice typing JavaScript code',
-    keys: [],
-    difficulty: Difficulty.ADVANCED,
-    targetWpm: 35,
-    minAccuracy: 95,
-    exerciseType: ExerciseType.CODE,
-    content:
-      'const userName = "TypeMaster";\nlet score = 0;\nconst WPM = 45.5;\nlet accuracy = 98.2;',
-  },
-  {
-    level: 7,
-    order: 2,
-    title: 'JavaScript - Functions',
-    description: 'Practice typing JavaScript functions',
-    keys: [],
-    difficulty: Difficulty.EXPERT,
-    targetWpm: 35,
-    minAccuracy: 95,
-    exerciseType: ExerciseType.CODE,
-    content:
-      'function calculateWPM(chars, time) {\n  return (chars / 5) / (time / 60);\n}\n\nconst result = calculateWPM(250, 60);',
-  },
+// Combine all lesson sections (100 lessons total)
+const allLessons = [
+  ...section1Lessons, // Lessons 1-20: Foundation
+  ...section2Lessons, // Lessons 21-40: Skill Building
+  ...section3Lessons, // Lessons 41-60: Advanced Techniques
+  ...section4Lessons, // Lessons 61-80: Speed & Fluency
+  ...section5Lessons, // Lessons 81-95: Mastery
+  ...section6Lessons, // Lessons 96-100: Programming
 ];
 
 const achievements = [
@@ -307,7 +128,7 @@ const achievements = [
 ];
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('🌱 Starting comprehensive database seed...');
 
   // Clear existing data (optional - comment out if you want to keep existing data)
   console.log('🧹 Cleaning existing lessons and achievements...');
@@ -316,14 +137,19 @@ async function main() {
   await prisma.lesson.deleteMany({});
   await prisma.achievement.deleteMany({});
 
-  // Seed lessons
-  console.log('📝 Seeding lessons...');
-  for (const lesson of lessons) {
+  // Seed all 100 lessons
+  console.log('📝 Seeding 100 comprehensive lessons...');
+  let lessonCount = 0;
+  for (const lesson of allLessons) {
     await prisma.lesson.create({
       data: lesson,
     });
+    lessonCount++;
+    if (lessonCount % 10 === 0) {
+      console.log(`   ✓ Created ${lessonCount} lessons...`);
+    }
   }
-  console.log(`✅ Created ${lessons.length} lessons`);
+  console.log(`✅ Created ${lessonCount} lessons across 6 sections`);
 
   // Seed achievements
   console.log('🏆 Seeding achievements...');
@@ -334,7 +160,15 @@ async function main() {
   }
   console.log(`✅ Created ${achievements.length} achievements`);
 
-  console.log('🎉 Database seed completed successfully!');
+  console.log('🎉 Comprehensive database seed completed successfully!');
+  console.log('\n📊 Summary:');
+  console.log(`   • Section 1 (Foundation): Lessons 1-20`);
+  console.log(`   • Section 2 (Skill Building): Lessons 21-40`);
+  console.log(`   • Section 3 (Advanced Techniques): Lessons 41-60`);
+  console.log(`   • Section 4 (Speed & Fluency): Lessons 61-80`);
+  console.log(`   • Section 5 (Mastery): Lessons 81-95`);
+  console.log(`   • Section 6 (Programming): Lessons 96-100`);
+  console.log(`   • Total Achievements: ${achievements.length}`);
 }
 
 main()
