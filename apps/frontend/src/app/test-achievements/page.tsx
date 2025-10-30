@@ -6,9 +6,16 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Target, Star, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+type Milestone = {
+  type: 'lessons_completed' | 'speed_milestone' | 'accuracy_streak' | 'section_complete';
+  count: number;
+  title: string;
+  message: string;
+};
+
 /**
  * Achievement Testing Page
- * 
+ *
  * This page allows manual testing of the achievement system
  * without needing to complete actual lessons.
  */
@@ -81,13 +88,13 @@ export default function TestAchievementsPage() {
       type: 'lessons_completed' as const,
       count: 10,
       title: 'First 10 Lessons!',
-      message: 'You\'re making great progress!',
+      message: "You're making great progress!",
     },
     lessons25: {
       type: 'lessons_completed' as const,
       count: 25,
       title: 'Quarter Century!',
-      message: '25 lessons completed - you\'re on fire!',
+      message: "25 lessons completed - you're on fire!",
     },
     lessons50: {
       type: 'lessons_completed' as const,
@@ -99,23 +106,37 @@ export default function TestAchievementsPage() {
       type: 'lessons_completed' as const,
       count: 100,
       title: 'Century Complete!',
-      message: 'All 100 lessons completed - you\'re a typing master!',
+      message: "All 100 lessons completed - you're a typing master!",
     },
     section: {
       type: 'section_complete' as const,
       count: 1,
       title: 'Section Mastered!',
-      message: 'You\'ve completed an entire section!',
+      message: "You've completed an entire section!",
     },
   };
 
-  const handleShowAchievement = (achievement: typeof testAchievements.speed100, withModal: boolean = true) => {
+  const handleShowAchievement = (
+    achievement: {
+      id: string;
+      title: string;
+      description: string;
+      category: string;
+      points: number;
+    },
+    withModal: boolean = true
+  ) => {
     showAchievement(achievement, withModal);
     setAchievementCount((prev) => prev + 1);
   };
 
-  const handleShowMilestone = (milestone: typeof testMilestones.lessons10) => {
-    showMilestone(milestone);
+  const handleShowMilestone = (milestone: {
+    type: string;
+    count: number;
+    title: string;
+    message: string;
+  }) => {
+    showMilestone(milestone as Milestone);
   };
 
   const handleMultipleAchievements = () => {
@@ -147,7 +168,8 @@ export default function TestAchievementsPage() {
             Test all achievement notifications and milestone celebrations
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            Achievements triggered: <span className="font-bold text-primary">{achievementCount}</span>
+            Achievements triggered:{' '}
+            <span className="font-bold text-primary">{achievementCount}</span>
           </p>
         </div>
 
@@ -304,9 +326,7 @@ export default function TestAchievementsPage() {
               className="h-auto py-6 flex flex-col items-start"
             >
               <span className="font-bold mb-1">Multiple Achievements</span>
-              <span className="text-xs opacity-80">
-                1st as modal, rest as toasts (staggered)
-              </span>
+              <span className="text-xs opacity-80">1st as modal, rest as toasts (staggered)</span>
             </Button>
             <Button
               onClick={handleAchievementThenMilestone}

@@ -30,7 +30,6 @@ export default function AssessmentPage() {
   const [testContent, setTestContent] = useState('');
   const [userInput, setUserInput] = useState('');
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [endTime, setEndTime] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mistakes, setMistakes] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +43,7 @@ export default function AssessmentPage() {
       try {
         // For now, use demo user ID - replace with actual auth later
         const userId = 'demo-user-id';
-        
+
         const response = await fetch('http://localhost:5000/api/v1/assessment/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -71,54 +70,57 @@ export default function AssessmentPage() {
     setMistakes({});
   }, []);
 
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!startTime) return;
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!startTime) return;
 
-    const key = e.key;
-    
-    // Ignore special keys
-    if (key.length > 1 && key !== 'Backspace') return;
+      const key = e.key;
 
-    if (key === 'Backspace') {
-      if (currentIndex > 0) {
-        setCurrentIndex(prev => prev - 1);
-        setUserInput(prev => prev.slice(0, -1));
+      // Ignore special keys
+      if (key.length > 1 && key !== 'Backspace') return;
+
+      if (key === 'Backspace') {
+        if (currentIndex > 0) {
+          setCurrentIndex((prev) => prev - 1);
+          setUserInput((prev) => prev.slice(0, -1));
+        }
+        return;
       }
-      return;
-    }
 
-    const expectedChar = testContent[currentIndex];
-    const typedChar = key;
+      const expectedChar = testContent[currentIndex];
+      const typedChar = key;
 
-    // Track mistake
-    if (typedChar !== expectedChar) {
-      setMistakes(prev => ({
-        ...prev,
-        [expectedChar]: (prev[expectedChar] || 0) + 1,
-      }));
-    }
+      // Track mistake
+      if (typedChar !== expectedChar) {
+        setMistakes((prev) => ({
+          ...prev,
+          [expectedChar]: (prev[expectedChar] || 0) + 1,
+        }));
+      }
 
-    setUserInput(prev => prev + typedChar);
-    setCurrentIndex(prev => prev + 1);
+      setUserInput((prev) => prev + typedChar);
+      setCurrentIndex((prev) => prev + 1);
 
-    // Check if test is complete
-    if (currentIndex + 1 >= testContent.length) {
-      completeAssessment(typedChar === expectedChar);
-    }
-  }, [startTime, testContent, currentIndex]);
+      // Check if test is complete
+      if (currentIndex + 1 >= testContent.length) {
+        completeAssessment(typedChar === expectedChar);
+      }
+    },
+    [startTime, testContent, currentIndex]
+  );
 
   const completeAssessment = async (lastCharCorrect: boolean) => {
     if (!startTime) return;
 
     const endTime = Date.now();
-    setEndTime(endTime);
     setIsLoading(true);
 
     const timeSpent = (endTime - startTime) / 1000; // seconds
     const totalChars = testContent.length;
-    const correctChars = totalChars - Object.values(mistakes).reduce((a, b) => a + b, 0) - (lastCharCorrect ? 0 : 1);
+    const correctChars =
+      totalChars - Object.values(mistakes).reduce((a, b) => a + b, 0) - (lastCharCorrect ? 0 : 1);
     const accuracy = (correctChars / totalChars) * 100;
-    const wpm = (totalChars / 5) / (timeSpent / 60); // Standard WPM calculation
+    const wpm = totalChars / 5 / (timeSpent / 60); // Standard WPM calculation
 
     try {
       const userId = 'demo-user-id'; // Replace with actual auth
@@ -187,7 +189,9 @@ export default function AssessmentPage() {
                 <div className="flex items-start gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Quick & Easy</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                      Quick & Easy
+                    </h3>
                     <p className="text-gray-600 dark:text-gray-400 text-sm">
                       Takes only 1-2 minutes to complete
                     </p>
@@ -197,7 +201,9 @@ export default function AssessmentPage() {
                 <div className="flex items-start gap-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Personalized Path</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                      Personalized Path
+                    </h3>
                     <p className="text-gray-600 dark:text-gray-400 text-sm">
                       We'll recommend lessons based on your current skill level
                     </p>
@@ -207,7 +213,9 @@ export default function AssessmentPage() {
                 <div className="flex items-start gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <Award className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Track Progress</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                      Track Progress
+                    </h3>
                     <p className="text-gray-600 dark:text-gray-400 text-sm">
                       Identify weak areas and focus on improvement
                     </p>
@@ -216,7 +224,9 @@ export default function AssessmentPage() {
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-8">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">What to expect:</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                  What to expect:
+                </h3>
                 <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
@@ -385,7 +395,7 @@ export default function AssessmentPage() {
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                   Your Skill Level: {result.recommendedSkillLevel}
                 </h3>
-                
+
                 {result.problematicKeys.length > 0 && (
                   <div className="mb-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
@@ -427,7 +437,7 @@ export default function AssessmentPage() {
                   Browse All Lessons
                   <ArrowRight className="w-5 h-5" />
                 </button>
-                
+
                 {recommendedLesson && (
                   <button
                     onClick={() => router.push(`/learn/${recommendedLesson.id}`)}
