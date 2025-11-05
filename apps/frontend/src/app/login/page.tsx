@@ -26,14 +26,21 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await authAPI.login({ email, password });
+      const response = await authAPI.login({ email, password });
+
+      // Store backend JWT in a cookie (accessible server-side) AND localStorage (fallback)
+      if (response.accessToken) {
+        // Set cookie with 7 day expiry
+        document.cookie = `backend_jwt=${response.accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        // Also keep in localStorage for backward compatibility
+        localStorage.setItem('accessToken', response.accessToken);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
       setError(message);
       setIsSubmitting(false);
       return;
     }
-
     const result = await signIn('credentials', {
       redirect: false,
       email,

@@ -55,6 +55,7 @@ export default function LessonPracticePage() {
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'initial' | 'typing' | 'results' | 'analysis'>('initial');
   const [isSaving, setIsSaving] = useState(false);
   const [userStats, setUserStats] = useState<UserStats>({
@@ -80,12 +81,21 @@ export default function LessonPracticePage() {
   // Fetch lesson
   useEffect(() => {
     async function fetchLesson() {
+      setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`http://localhost:5000/api/v1/lessons/${lessonId}`);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to load lesson' }));
+          throw new Error(errorData.error || `HTTP ${response.status}: Failed to load lesson`);
+        }
+
         const data = await response.json();
         setLesson(data.lesson);
       } catch (err) {
         console.error('Failed to load lesson:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load lesson. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -300,8 +310,28 @@ export default function LessonPracticePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading lesson...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <div className="max-w-md mx-auto">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Error Loading Lesson</h2>
+          <p className="text-muted-foreground mb-6">{error}</p>
+          <div className="flex gap-4 justify-center">
+            <Button variant="outline" onClick={() => router.push('/learn')}>
+              <ArrowLeft className="mr-2" size={16} />
+              Back to Lessons
+            </Button>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -309,8 +339,12 @@ export default function LessonPracticePage() {
   if (!lesson) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
+        <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
         <p className="text-muted-foreground mb-4">Lesson not found</p>
-        <Button onClick={() => router.push('/learn')}>Back to Lessons</Button>
+        <Button onClick={() => router.push('/learn')}>
+          <ArrowLeft className="mr-2" size={16} />
+          Back to Lessons
+        </Button>
       </div>
     );
   }

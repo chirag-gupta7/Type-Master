@@ -55,16 +55,50 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
     const { id } = req.params;
     const userId = req.user?.userId;
 
-    const lesson = await prisma.lesson.findUnique({
-      where: { id },
-      include: userId
-        ? {
-            userProgress: {
-              where: { userId },
-            },
-          }
-        : undefined,
-    });
+    // Try to find by UUID first, then by title (for slug-like IDs)
+    let lesson = null;
+
+    // Check if it's a valid UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (uuidRegex.test(id)) {
+      // Try UUID lookup
+      lesson = await prisma.lesson.findUnique({
+        where: { id },
+        include: userId
+          ? {
+              userProgress: {
+                where: { userId },
+              },
+            }
+          : undefined,
+      });
+    }
+
+    // If not found by UUID or not a UUID, try finding by slug-like title
+    if (!lesson) {
+      // Convert slug format to title format (e.g., "home-row-basics" -> "Home Row Basics")
+      const titleFromSlug = id
+        .split('-')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+
+      lesson = await prisma.lesson.findFirst({
+        where: {
+          OR: [
+            { title: { equals: titleFromSlug, mode: 'insensitive' } },
+            { title: { contains: id.replace(/-/g, ' '), mode: 'insensitive' } },
+          ],
+        },
+        include: userId
+          ? {
+              userProgress: {
+                where: { userId },
+              },
+            }
+          : undefined,
+      });
+    }
 
     if (!lesson) {
       throw new AppError(404, 'Lesson not found');

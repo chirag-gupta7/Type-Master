@@ -6,7 +6,7 @@ import {
   getUserGameHistory,
   getGameStats,
 } from '../controllers/game.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -20,9 +20,9 @@ router.post('/score', authenticate, saveGameScore);
 /**
  * @route   GET /api/v1/games/leaderboard?gameType=WORD_BLITZ&limit=100
  * @desc    Get leaderboard for a specific game type
- * @access  Public
+ * @access  Public (shows user position if authenticated)
  */
-router.get('/leaderboard', getLeaderboard);
+router.get('/leaderboard', optionalAuthenticate, getLeaderboard);
 
 /**
  * @route   GET /api/v1/games/highscores

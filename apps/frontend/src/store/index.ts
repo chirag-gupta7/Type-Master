@@ -18,7 +18,7 @@ interface TypingState {
   startTimer: () => void;
   setUserInput: (input: string) => void;
   endTest: () => void;
-  resetTest: () => void;
+  resetTest: (preserveText?: boolean) => void;
 }
 
 /**
@@ -128,7 +128,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
 
     // Calculate real-time metrics if test has started
     if (nextStartTime && sanitizedInput.length > 0) {
-      const elapsedMinutes = (Date.now() - nextStartTime) / 1000 / 60;
+      const elapsedMinutes = Math.max(0.01, (Date.now() - nextStartTime) / 1000 / 60); // Min 0.01 to prevent division by zero
       const typedChars = sanitizedInput.length;
 
       // Calculate character-by-character accuracy
@@ -146,12 +146,10 @@ export const useTypingStore = create<TypingState>((set, get) => ({
 
       // Calculate WPM using industry-standard formula
       // Gross WPM = (total characters typed / 5) / time in minutes
-      if (elapsedMinutes > 0) {
-        const grossWPM = typedChars / 5 / elapsedMinutes;
-        // Net WPM = Gross WPM - (errors / time in minutes)
-        const netWPM = grossWPM - errors / elapsedMinutes;
-        wpm = Math.max(0, Math.round(netWPM));
-      }
+      const grossWPM = typedChars / 5 / elapsedMinutes;
+      // Net WPM = Gross WPM - (errors / time in minutes)
+      const netWPM = grossWPM - errors / elapsedMinutes;
+      wpm = Math.max(0, Math.round(netWPM));
     }
 
     set({
@@ -175,7 +173,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
 
     if (!startTime) return;
 
-    const timeInMinutes = (endTime - startTime) / 1000 / 60;
+    // Ensure minimum time of 1 second to prevent unrealistic WPM calculations
+    const timeInMinutes = Math.max(1 / 60, (endTime - startTime) / 1000 / 60);
     const totalCharsTyped = userInput.length;
     const totalErrors = calculateErrors(userInput, textToType);
 
@@ -191,10 +190,11 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     });
   },
 
-  resetTest: () => {
+  resetTest: (preserveText = false) => {
+    const currentText = preserveText ? get().textToType : '';
     set({
       status: 'waiting',
-      textToType: '',
+      textToType: currentText,
       userInput: '',
       startTime: null,
       endTime: null,

@@ -54,6 +54,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password');
         }
 
+        // After successful authentication, get the JWT from localStorage
+        // which was set by the authAPI.login() call in the login page
         return {
           id: user.id,
           email: user.email,
@@ -69,7 +71,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       const authToken = token as JWT & {
         user?: {
           id: string;
@@ -78,6 +80,7 @@ export const authOptions: NextAuthOptions = {
           username: string | null;
           image: string | null;
         };
+        accessToken?: string;
       };
 
       if (user) {
@@ -88,6 +91,25 @@ export const authOptions: NextAuthOptions = {
           username: (user as { username?: string }).username ?? null,
           image: (user as { image?: string | null }).image ?? null,
         };
+
+        // Try to get backend JWT from cookie (set by authAPI.login)
+        // Cookies are accessible server-side, unlike localStorage
+        if (typeof window !== 'undefined') {
+          // Client-side: read from document.cookie
+          const cookies = document.cookie.split('; ');
+          const backendJwtCookie = cookies.find((c) => c.startsWith('backend_jwt='));
+          if (backendJwtCookie) {
+            const backendToken = backendJwtCookie.split('=')[1];
+            if (backendToken) {
+              authToken.accessToken = backendToken;
+            }
+          }
+        }
+      }
+
+      // Store OAuth access token if available
+      if (account?.access_token) {
+        authToken.accessToken = account.access_token;
       }
 
       return authToken;
@@ -101,6 +123,7 @@ export const authOptions: NextAuthOptions = {
           username: string | null;
           image: string | null;
         };
+        accessToken?: string;
       };
 
       if (authToken.user && session.user) {
@@ -109,6 +132,11 @@ export const authOptions: NextAuthOptions = {
         session.user.name = authToken.user.name;
         session.user.username = authToken.user.username;
         session.user.image = authToken.user.image ?? session.user.image ?? null;
+
+        // Attach access token to session for API calls
+        if (authToken.accessToken) {
+          session.accessToken = authToken.accessToken;
+        }
       }
 
       return session;

@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
 import {
   getAllAchievements,
   checkAndAwardAchievements,
@@ -19,18 +19,7 @@ const router = Router();
  * Get all achievements with user's unlock status
  * Optional authentication (shows unlock status if authenticated)
  */
-router.get(
-  '/',
-  (req, res, next) => {
-    // Make authentication optional - if token exists, use it
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token) {
-      return authenticate(req, res, next);
-    }
-    next();
-  },
-  getAllAchievements
-);
+router.get('/', optionalAuthenticate, getAllAchievements);
 
 /**
  * POST /api/v1/achievements/check

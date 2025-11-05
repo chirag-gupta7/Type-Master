@@ -161,7 +161,10 @@ const TypingTest: React.FC = () => {
   }, [userInput, textToType]);
   const prepareTest = useCallback(
     (duration: 30 | 60 | 180, existingText?: string) => {
-      resetTest();
+      // If we have existing text (replay scenario), preserve it during reset
+      const shouldPreserveText = !!existingText;
+
+      resetTest(shouldPreserveText);
       setActiveDuration(duration);
       setResultDuration(duration);
       setTimeLeft(duration);
@@ -169,6 +172,7 @@ const TypingTest: React.FC = () => {
       setIsFeedbackLoading(false);
       feedbackRequestedRef.current = false;
 
+      // Generate new text only if not replaying
       const newText = existingText ?? generateTestText(duration);
       startTest(newText);
       setView('initial');
@@ -343,14 +347,18 @@ const TypingTest: React.FC = () => {
     }
   };
   const handleRestart = useCallback(() => {
-    if (textToType) {
-      prepareTest(activeDuration, textToType);
+    // Preserve the current text for replay
+    const currentText = textToType;
+    if (currentText) {
+      // Reset to initial view with same text
+      prepareTest(activeDuration, currentText);
     } else {
       prepareTest(activeDuration);
     }
   }, [prepareTest, activeDuration, textToType]);
 
   const handleNewTest = useCallback(() => {
+    // Generate completely new text
     prepareTest(activeDuration);
   }, [prepareTest, activeDuration]);
   const formatTime = (seconds: number) => {

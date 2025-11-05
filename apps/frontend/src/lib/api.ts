@@ -3,22 +3,41 @@
  * Handles all HTTP requests to the backend API
  */
 
+import { getSession } from 'next-auth/react';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const API_VERSION = 'v1';
 
 /**
- * Get authentication token from localStorage
+ * Get authentication token from NextAuth session or localStorage
  */
-const getAuthToken = (): string | null => {
+const getAuthToken = async (): Promise<string | null> => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('accessToken');
-};
 
+  // Try NextAuth session first (this will have the backend JWT)
+  try {
+    const session = await getSession();
+    if (session?.accessToken) {
+      // Use backend JWT token from session
+      return session.accessToken;
+    }
+  } catch (error) {
+    console.error('Failed to get session:', error);
+  }
+
+  // Fallback to localStorage (for direct backend auth without NextAuth)
+  return localStorage.getItem('accessToken');
+}; /**
+ * Generate a backend JWT token by calling the backend auth endpoint
+ * This is a temporary solution to integrate NextAuth with the Express backend
+ */
 /**
+ * Get authentication token from NextAuth session or localStorage
+ */ /**
  * Generic fetch wrapper with error handling
  */
 async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const token = await getAuthToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
