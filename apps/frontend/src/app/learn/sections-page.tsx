@@ -83,6 +83,30 @@ const SECTION_INFO = {
     color: 'from-indigo-500 to-blue-500',
     description: 'Master code typing with brackets and operators',
   },
+  7: {
+    name: 'Python Coding',
+    icon: <Code className="w-5 h-5" />,
+    color: 'from-blue-400 to-yellow-400',
+    description: 'Practice typing common Python keywords and syntax',
+  },
+  8: {
+    name: 'Java Coding',
+    icon: <Code className="w-5 h-5" />,
+    color: 'from-red-500 to-orange-500',
+    description: 'Practice typing Java syntax, classes, and methods',
+  },
+  9: {
+    name: 'C++ Coding',
+    icon: <Code className="w-5 h-5" />,
+    color: 'from-blue-600 to-indigo-600',
+    description: 'Practice typing C++ syntax, headers, and pointers',
+  },
+  10: {
+    name: 'C Coding',
+    icon: <Code className="w-5 h-5" />,
+    color: 'from-gray-500 to-gray-700',
+    description: 'Practice typing C syntax, stdio, and structs',
+  },
 };
 
 export default function LearnPage() {
@@ -96,7 +120,7 @@ export default function LearnPage() {
       try {
         const response = await fetch('http://localhost:5000/api/v1/lessons');
         const data = await response.json();
-        
+
         // Group lessons by section
         const lessonsBySection: Record<number, Lesson[]> = {};
         data.lessons.forEach((lesson: Lesson) => {
@@ -110,7 +134,7 @@ export default function LearnPage() {
         const sectionData: SectionData[] = Object.entries(lessonsBySection).map(
           ([sectionId, lessons]) => {
             const id = parseInt(sectionId);
-            const completed = lessons.filter(l => l.userProgress?.[0]?.completed).length;
+            const completed = lessons.filter((l) => l.userProgress?.[0]?.completed).length;
             return {
               id,
               name: SECTION_INFO[id as keyof typeof SECTION_INFO].name,
@@ -155,8 +179,8 @@ export default function LearnPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Learn Touch Typing</h1>
         <p className="text-muted-foreground text-lg">
-          100 progressive lessons organized into 6 sections. Start from the beginning or jump to your
-          level.
+          100 progressive lessons organized into 6 sections. Start from the beginning or jump to
+          your level.
         </p>
       </div>
 
@@ -197,7 +221,8 @@ export default function LearnPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {sections.map((section, index) => {
           const progress = (section.completed / section.total) * 100;
-          const isUnlocked = index === 0 || sections[index - 1].completed === sections[index - 1].total;
+          const isUnlocked =
+            index === 0 || sections[index - 1].completed === sections[index - 1].total;
 
           return (
             <motion.div
@@ -220,9 +245,7 @@ export default function LearnPage() {
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
                   <div className="text-center">
                     <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Complete Section {index} first
-                    </p>
+                    <p className="text-sm text-muted-foreground">Complete Section {index} first</p>
                   </div>
                 </div>
               )}
@@ -262,7 +285,7 @@ export default function LearnPage() {
                 </div>
 
                 {/* Checkpoint indicator */}
-                {section.lessons.some(l => l.isCheckpoint) && (
+                {section.lessons.some((l) => l.isCheckpoint) && (
                   <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                     <Trophy className="w-4 h-4" />
                     <span>Includes checkpoint test</span>
@@ -276,11 +299,7 @@ export default function LearnPage() {
 
       {/* Selected Section Lessons */}
       {selectedSection && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">
               {SECTION_INFO[selectedSection as keyof typeof SECTION_INFO].name} - Lessons
@@ -292,12 +311,13 @@ export default function LearnPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sections
-              .find(s => s.id === selectedSection)
+              .find((s) => s.id === selectedSection)
               ?.lessons.map((lesson, index) => {
                 const progress = lesson.userProgress?.[0];
-                const prevLesson = index > 0 
-                  ? sections.find(s => s.id === selectedSection)?.lessons[index - 1]
-                  : null;
+                const prevLesson =
+                  index > 0
+                    ? sections.find((s) => s.id === selectedSection)?.lessons[index - 1]
+                    : null;
                 const isUnlocked = index === 0 || prevLesson?.userProgress?.[0]?.completed;
 
                 return (
@@ -382,7 +402,8 @@ export default function LearnPage() {
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Best:</span>
                               <span className="font-medium">
-                                {progress.bestWpm.toFixed(0)} WPM • {progress.bestAccuracy.toFixed(0)}%
+                                {progress.bestWpm.toFixed(0)} WPM •{' '}
+                                {progress.bestAccuracy.toFixed(0)}%
                               </span>
                             </div>
                             <div className="flex justify-between mt-1">

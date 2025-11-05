@@ -2,10 +2,11 @@
 import { PrismaClient } from '@prisma/client';
 import { section1Lessons, section2Lessons, section3Lessons } from './comprehensive-seed';
 import { section4Lessons, section5Lessons, section6Lessons } from './seed-sections-4-6';
+import { codingLessons } from './seed-coding-lessons';
 
 const prisma = new PrismaClient();
 
-// Combine all lesson sections (100 lessons total)
+// Combine all lesson sections (200 lessons total)
 const allLessons = [
   ...section1Lessons, // Lessons 1-20: Foundation
   ...section2Lessons, // Lessons 21-40: Skill Building
@@ -13,6 +14,7 @@ const allLessons = [
   ...section4Lessons, // Lessons 61-80: Speed & Fluency
   ...section5Lessons, // Lessons 81-95: Mastery
   ...section6Lessons, // Lessons 96-100: Programming
+  ...codingLessons, // Lessons 101-200: Python, Java, C++, C
 ];
 
 const achievements = [
@@ -141,15 +143,20 @@ async function main() {
   console.log('📝 Seeding 100 comprehensive lessons...');
   let lessonCount = 0;
   for (const lesson of allLessons) {
+    const normalizedLesson = {
+      ...lesson,
+      unlockAfter: lesson.unlockAfter.map((dependency) => dependency.toString()),
+    };
+
     await prisma.lesson.create({
-      data: lesson,
+      data: normalizedLesson,
     });
     lessonCount++;
     if (lessonCount % 10 === 0) {
       console.log(`   ✓ Created ${lessonCount} lessons...`);
     }
   }
-  console.log(`✅ Created ${lessonCount} lessons across 6 sections`);
+  console.log(`✅ Created ${lessonCount} lessons across 10 sections`);
 
   // Seed achievements
   console.log('🏆 Seeding achievements...');
@@ -168,6 +175,10 @@ async function main() {
   console.log(`   • Section 4 (Speed & Fluency): Lessons 61-80`);
   console.log(`   • Section 5 (Mastery): Lessons 81-95`);
   console.log(`   • Section 6 (Programming): Lessons 96-100`);
+  console.log(`   • Section 7 (Python): Lessons 101-125`);
+  console.log(`   • Section 8 (Java): Lessons 126-150`);
+  console.log(`   • Section 9 (C++): Lessons 151-175`);
+  console.log(`   • Section 10 (C): Lessons 176-200`);
   console.log(`   • Total Achievements: ${achievements.length}`);
 }
 

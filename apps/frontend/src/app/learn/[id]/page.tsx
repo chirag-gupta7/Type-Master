@@ -135,11 +135,8 @@ export default function LessonPracticePage() {
       if (key.length > 1 && key !== 'Backspace') return;
 
       if (key === 'Backspace') {
-        if (currentIndex > 0) {
-          setCurrentIndex((prev) => prev - 1);
-          setUserInput((prev) => prev.slice(0, -1));
-        }
-        return;
+        e.preventDefault(); // Prevent default browser action
+        return; // Stop further execution
       }
 
       const expectedChar = lesson.content[currentIndex];

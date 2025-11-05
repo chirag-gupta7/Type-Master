@@ -1,7 +1,5 @@
 /* eslint-disable no-console */
-import { PrismaClient, Difficulty, ExerciseType, SkillLevel } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Difficulty, ExerciseType } from '@prisma/client';
 
 // ============================================================================
 // SECTION 1: FOUNDATION (Levels 1-20)

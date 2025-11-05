@@ -311,10 +311,17 @@ IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introduc
       {gameState === 'idle' ? (
         <>
           <h2 className="text-2xl font-bold mb-4">Story Chain</h2>
-          <p className="text-muted-foreground mb-6 text-center">
-            Write a story one sentence at a time, alternating with an AI. See how many sentences you
-            can add in 3 minutes!
-          </p>
+          <ul className="list-disc list-inside text-muted-foreground mb-6 text-left space-y-2">
+            <li>You and an AI will write a story together.</li>
+            <li>The AI will start with the first sentence.</li>
+            <li>You write the next sentence, then the AI writes one, and so on.</li>
+            <li>
+              You have <strong>3 minutes</strong> to add as many sentences as you can.
+            </li>
+            <li>
+              Your score is the number of sentences <em>you</em> added.
+            </li>
+          </ul>
           <Button onClick={startGame} size="lg" disabled={isStarting}>
             {isStarting ? (
               <>

@@ -300,7 +300,7 @@ const TypingTest: React.FC = () => {
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-foreground font-sans w-full">
+    <div className="flex flex-col items-center justify-center w-full p-4 text-foreground font-sans">
       <AnimatePresence mode="wait">
         {view === 'initial' && (
           <motion.div
@@ -469,6 +469,10 @@ const TypingTest: React.FC = () => {
               value={userInput}
               onChange={handleUserInput}
               onKeyDown={(e) => {
+                if (e.key === 'Backspace') {
+                  e.preventDefault();
+                  return; // Do not process backspace
+                }
                 if (e.key === ' ' && status !== 'finished') {
                   // FIX: Manually append a space so input continues to track progression while still preventing body scroll.
                   e.preventDefault();

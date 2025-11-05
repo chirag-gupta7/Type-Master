@@ -217,9 +217,14 @@ export function WordBlitz() {
       {gameState === 'idle' ? (
         <>
           <h2 className="text-2xl font-bold mb-4">Word Blitz</h2>
-          <p className="text-muted-foreground mb-6 text-center">
-            Type the falling words before they hit the bottom. Type a word and press space to score.
-          </p>
+          <ul className="list-disc list-inside text-muted-foreground mb-6 text-left space-y-2">
+            <li>Words will fall from the top of the screen.</li>
+            <li>Type a complete word exactly as it appears.</li>
+            <li>
+              Press the <strong>Spacebar</strong> after each correct word to score.
+            </li>
+            <li>Don't let the words reach the bottom!</li>
+          </ul>
           <Button onClick={startGame} size="lg">
             Start Game
           </Button>

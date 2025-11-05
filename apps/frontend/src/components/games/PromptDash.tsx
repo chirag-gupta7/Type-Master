@@ -268,10 +268,16 @@ Provide fresh feedback focused on writing style, tone, word choice, and narrativ
       {gameState === 'idle' ? (
         <>
           <h2 className="text-2xl font-bold mb-4">Prompt Dash</h2>
-          <p className="text-muted-foreground mb-6 text-center">
-            You have 60 seconds to write as much as you can based on a creative prompt. Your score
-            is your final WPM.
-          </p>
+          <ul className="list-disc list-inside text-muted-foreground mb-6 text-left space-y-2">
+            <li>A creative writing prompt will be shown.</li>
+            <li>
+              You have <strong>60 seconds</strong> to write a story based on it.
+            </li>
+            <li>
+              Your score is your final <strong>Words Per Minute (WPM)</strong>.
+            </li>
+            <li>After the game, you'll get AI feedback on your writing!</li>
+          </ul>
           <Button onClick={startGame} size="lg" disabled={isLoading}>
             {isLoading ? (
               <>
