@@ -4,9 +4,16 @@
  */
 
 import { getSession } from 'next-auth/react';
+import { getCache, setCache, invalidateCache, clearCache, DEFAULT_CACHE_TTL } from './cache';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const API_VERSION = 'v1';
+
+interface FetchOptions extends RequestInit {
+  cacheKey?: string;
+  cacheTtl?: number;
+  skipCache?: boolean;
+}
 
 /**
  * Get authentication token from NextAuth session or localStorage
@@ -36,20 +43,32 @@ const getAuthToken = async (): Promise<string | null> => {
  */ /**
  * Generic fetch wrapper with error handling
  */
-async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+  const { cacheKey, cacheTtl, skipCache, ...requestInit } = options;
+
   const token = await getAuthToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(requestInit.headers as Record<string, string>),
   };
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
+  const method = (requestInit.method || 'GET').toUpperCase();
+  const effectiveCacheKey = method === 'GET' && !skipCache ? (cacheKey ?? endpoint) : undefined;
+
+  if (effectiveCacheKey) {
+    const cached = getCache<T>(effectiveCacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}${endpoint}`, {
-    ...options,
+    ...requestInit,
     headers,
   });
 
@@ -60,7 +79,13 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
-  return response.json();
+  const data = (await response.json()) as T;
+
+  if (effectiveCacheKey) {
+    setCache(effectiveCacheKey, data, cacheTtl ?? DEFAULT_CACHE_TTL);
+  }
+
+  return data;
 }
 
 /**
@@ -130,13 +155,22 @@ export const authAPI = {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
     }
+
+    clearCache();
   },
 
   /**
    * Check if user is authenticated
    */
   isAuthenticated: (): boolean => {
-    return !!getAuthToken();
+    if (typeof window === 'undefined') return false;
+
+    const cookieHasToken = document.cookie
+      .split('; ')
+      .some((cookie) => cookie.startsWith('backend_jwt='));
+    const storedToken = localStorage.getItem('accessToken');
+
+    return Boolean(storedToken || cookieHasToken);
   },
 };
 
@@ -304,6 +338,7 @@ export const lessonAPI = {
    * Get all lessons with user progress
    */
   getAllLessons: async () => {
+    const cacheKey = 'lessons:all';
     return fetchAPI<{
       lessons: Array<{
         id: string;
@@ -325,13 +360,14 @@ export const lessonAPI = {
           attempts: number;
         }>;
       }>;
-    }>('/lessons');
+    }>('/lessons', { cacheKey, cacheTtl: DEFAULT_CACHE_TTL });
   },
 
   /**
    * Get single lesson by ID
    */
   getLessonById: async (id: string) => {
+    const cacheKey = `lessons:detail:${id}`;
     return fetchAPI<{
       lesson: {
         id: string;
@@ -353,7 +389,7 @@ export const lessonAPI = {
           attempts: number;
         }>;
       };
-    }>(`/lessons/${id}`);
+    }>(`/lessons/${id}`, { cacheKey, cacheTtl: DEFAULT_CACHE_TTL });
   },
 
   /**
@@ -365,7 +401,7 @@ export const lessonAPI = {
     accuracy: number;
     completed: boolean;
   }) => {
-    return fetchAPI<{
+    const response = await fetchAPI<{
       message: string;
       progress: {
         id: string;
@@ -379,6 +415,13 @@ export const lessonAPI = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+
+    invalidateCache('lessons:all');
+    invalidateCache(`lessons:detail:${data.lessonId}`);
+    invalidateCache('lessons:stats');
+    invalidateCache('lessons:progress');
+
+    return response;
   },
 
   /**
@@ -395,7 +438,7 @@ export const lessonAPI = {
         averageWpm: number;
         averageAccuracy: number;
       };
-    }>('/lessons/progress/stats');
+    }>('/lessons/progress/stats', { cacheKey: 'lessons:stats' });
   },
 
   /**
@@ -440,7 +483,10 @@ export const lessonAPI = {
         locked: boolean;
         prerequisites: string[];
       }>;
-    }>('/lessons/progress/visualization');
+    }>('/lessons/progress/visualization', {
+      cacheKey: 'lessons:progress',
+      cacheTtl: DEFAULT_CACHE_TTL,
+    });
   },
 };
 
@@ -467,14 +513,14 @@ export const achievementAPI = {
       unlockedCount: number;
       totalPoints: number;
       earnedPoints: number;
-    }>('/achievements');
+    }>('/achievements', { cacheKey: 'achievements:all', cacheTtl: DEFAULT_CACHE_TTL });
   },
 
   /**
    * Check and award new achievements
    */
   checkAchievements: async () => {
-    return fetchAPI<{
+    const response = await fetchAPI<{
       message: string;
       newlyUnlocked: Array<{
         id: string;
@@ -488,6 +534,12 @@ export const achievementAPI = {
     }>('/achievements/check', {
       method: 'POST',
     });
+
+    invalidateCache('achievements:all');
+    invalidateCache('achievements:stats');
+    invalidateCache('achievements:progress');
+
+    return response;
   },
 
   /**
@@ -512,7 +564,7 @@ export const achievementAPI = {
         points: number;
         unlockedAt: string;
       }>;
-    }>('/achievements/stats');
+    }>('/achievements/stats', { cacheKey: 'achievements:stats', cacheTtl: DEFAULT_CACHE_TTL });
   },
 
   /**
@@ -541,7 +593,10 @@ export const achievementAPI = {
         bestWpm: number;
         uniqueDaysThisWeek: number;
       };
-    }>('/achievements/progress');
+    }>('/achievements/progress', {
+      cacheKey: 'achievements:progress',
+      cacheTtl: DEFAULT_CACHE_TTL,
+    });
   },
 };
 
