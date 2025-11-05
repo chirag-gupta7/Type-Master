@@ -95,9 +95,11 @@ const TypingTest: React.FC = () => {
     endTest,
     resetTest,
     startTime,
+    endTime,
   } = useTypingStore();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [activeDuration, setActiveDuration] = useState<30 | 60 | 180>(60);
+  const [resultDuration, setResultDuration] = useState<number>(activeDuration);
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
   const [displayMode, setDisplayMode] = useState<'vertical' | 'horizontal'>('horizontal');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
@@ -106,6 +108,7 @@ const TypingTest: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   // FIX: Add ref for the hidden input to programmatically focus it
   const inputRef = useRef<HTMLInputElement>(null);
+  const feedbackRequestedRef = useRef(false);
   // Memoize word arrays to prevent recalculation on every render
   const words = useMemo(() => textToType.split(' '), [textToType]);
 
@@ -136,13 +139,37 @@ const TypingTest: React.FC = () => {
       return idx < arr.length - 1 || word.length > 0;
     });
   }, [userInput]);
+
+  const { correctCharsCount, incorrectCharsCount, missedCharsCount } = useMemo(() => {
+    let correct = 0;
+    const typedLength = userInput.length;
+
+    for (let i = 0; i < typedLength; i++) {
+      if (userInput[i] === textToType[i]) {
+        correct++;
+      }
+    }
+
+    const incorrect = typedLength - correct;
+    const missed = Math.max(textToType.length - typedLength, 0);
+
+    return {
+      correctCharsCount: correct,
+      incorrectCharsCount: incorrect,
+      missedCharsCount: missed,
+    };
+  }, [userInput, textToType]);
   const prepareTest = useCallback(
-    async (duration: 30 | 60 | 180) => {
+    (duration: 30 | 60 | 180, existingText?: string) => {
       resetTest();
       setActiveDuration(duration);
+      setResultDuration(duration);
       setTimeLeft(duration);
-      // Use the text generator instead of random words
-      const newText = generateTestText(duration);
+      setAiFeedback(null);
+      setIsFeedbackLoading(false);
+      feedbackRequestedRef.current = false;
+
+      const newText = existingText ?? generateTestText(duration);
       startTest(newText);
       setView('initial');
     },
@@ -160,69 +187,72 @@ const TypingTest: React.FC = () => {
   }, [view, status]);
 
   // AI Feedback Function
-  const getAiTypingFeedback = useCallback(async () => {
-    setIsFeedbackLoading(true);
-    setAiFeedback(null);
+  const getAiTypingFeedback = useCallback(
+    async (summaryDuration: number) => {
+      setIsFeedbackLoading(true);
+      setAiFeedback(null);
 
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
-    if (!apiKey) {
-      console.error(
-        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-      );
-      setIsFeedbackLoading(false);
-      return;
-    }
+      if (!apiKey) {
+        console.error(
+          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
+        );
+        setIsFeedbackLoading(false);
+        return;
+      }
 
-    try {
-      const systemPrompt =
-        "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-      const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${activeDuration} seconds\n\nProvide helpful feedback.`;
+      try {
+        const systemPrompt =
+          "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
+        const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${summaryDuration} seconds\n\nProvide helpful feedback.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${systemPrompt}\n\n${userQuery}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 200,
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-          }),
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `${systemPrompt}\n\n${userQuery}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 200,
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to get AI feedback');
         }
-      );
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI feedback');
+        const data = await response.json();
+        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (feedback) {
+          setAiFeedback(feedback);
+        } else {
+          setAiFeedback('Could not load AI feedback at this time.');
+        }
+      } catch (error) {
+        console.error('Error getting AI feedback:', error);
+        setAiFeedback('Could not load AI feedback. Please try again later.');
+      } finally {
+        setIsFeedbackLoading(false);
       }
-
-      const data = await response.json();
-      const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      if (feedback) {
-        setAiFeedback(feedback);
-      } else {
-        setAiFeedback('Could not load AI feedback at this time.');
-      }
-    } catch (error) {
-      console.error('Error getting AI feedback:', error);
-      setAiFeedback('Could not load AI feedback. Please try again later.');
-    } finally {
-      setIsFeedbackLoading(false);
-    }
-  }, [wpm, accuracy, errors, activeDuration]);
+    },
+    [wpm, accuracy, errors]
+  );
 
   // Main timer logic
   useEffect(() => {
@@ -234,8 +264,6 @@ const TypingTest: React.FC = () => {
         if (remaining <= 0) {
           setTimeLeft(0);
           endTest();
-          setView('results');
-          getAiTypingFeedback();
           clearInterval(timer);
         } else {
           setTimeLeft(remaining);
@@ -243,7 +271,31 @@ const TypingTest: React.FC = () => {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [view, status, startTime, activeDuration, endTest, getAiTypingFeedback]);
+  }, [view, status, startTime, activeDuration, endTest]);
+
+  useEffect(() => {
+    if (status === 'finished') {
+      let effectiveDuration = Math.max(activeDuration, 1);
+
+      if (startTime) {
+        const finishedAt = endTime ?? Date.now();
+        effectiveDuration = Math.max(1, Math.round((finishedAt - startTime) / 1000));
+      }
+
+      setResultDuration(effectiveDuration);
+      setTimeLeft(0);
+      if (view !== 'results') {
+        setView('results');
+      }
+
+      if (!feedbackRequestedRef.current) {
+        feedbackRequestedRef.current = true;
+        void getAiTypingFeedback(effectiveDuration);
+      }
+    } else {
+      feedbackRequestedRef.current = false;
+    }
+  }, [status, startTime, endTime, activeDuration, view, getAiTypingFeedback]);
   // This crucial effect handles scrolling the active word into the center of the viewbox.
   useEffect(() => {
     if (activeWordRef.current && containerRef.current) {
@@ -290,10 +342,17 @@ const TypingTest: React.FC = () => {
       inputRef.current?.focus();
     }
   };
-  const handleRestart = () => {
+  const handleRestart = useCallback(() => {
+    if (textToType) {
+      prepareTest(activeDuration, textToType);
+    } else {
+      prepareTest(activeDuration);
+    }
+  }, [prepareTest, activeDuration, textToType]);
+
+  const handleNewTest = useCallback(() => {
     prepareTest(activeDuration);
-    setView('initial');
-  };
+  }, [prepareTest, activeDuration]);
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -496,7 +555,10 @@ const TypingTest: React.FC = () => {
             wpm={wpm}
             accuracy={accuracy}
             errors={errors}
-            duration={activeDuration}
+            duration={resultDuration}
+            correctChars={correctCharsCount}
+            incorrectChars={incorrectCharsCount}
+            missedChars={missedCharsCount}
             aiFeedback={aiFeedback}
             isFeedbackLoading={isFeedbackLoading}
             footer={
@@ -508,10 +570,7 @@ const TypingTest: React.FC = () => {
                   Retry Same Text
                 </button>
                 <button
-                  onClick={() => {
-                    prepareTest(activeDuration);
-                    setView('initial');
-                  }}
+                  onClick={handleNewTest}
                   className="px-8 py-4 bg-card/40 backdrop-blur-sm border-2 border-[var(--theme-primary)]/50 text-foreground font-semibold rounded-xl hover:bg-[var(--theme-primary)]/10 transition-all flex items-center justify-center gap-2"
                 >
                   New Test

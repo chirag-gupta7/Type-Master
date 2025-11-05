@@ -10,6 +10,9 @@ interface ResultsScreenProps {
   accuracy: number;
   errors: number;
   duration: number;
+  correctChars: number;
+  incorrectChars: number;
+  missedChars: number;
   footer?: ReactNode;
   aiFeedback?: string | null;
   isFeedbackLoading?: boolean;
@@ -20,16 +23,18 @@ export default function ResultsScreen({
   accuracy,
   errors,
   duration,
+  correctChars,
+  incorrectChars,
+  missedChars,
   footer,
   aiFeedback,
   isFeedbackLoading,
 }: ResultsScreenProps) {
   // Calculate additional stats
-  const rawWpm = Math.round(wpm * (100 / Math.max(accuracy, 1)));
-  const correctChars = Math.round((wpm * 5 * duration) / 60);
-  const totalChars = Math.round(correctChars / (accuracy / 100));
-  const incorrectChars = errors;
-  const missedChars = totalChars - correctChars - incorrectChars;
+  const totalChars = correctChars + incorrectChars + missedChars;
+  const safeTotalChars = Math.max(totalChars, 1);
+  const safeDuration = Math.max(duration, 1);
+  const rawWpm = Math.round(((correctChars + incorrectChars) / 5 / safeDuration) * 60);
 
   // Determine if it's a personal best (mock for now)
   const isPersonalBest = wpm > 100; // TODO: Compare with actual user history
@@ -151,15 +156,15 @@ export default function ResultsScreen({
           <div className="flex-1 h-6 bg-muted rounded-full overflow-hidden flex">
             <div
               className="bg-green-500 h-full transition-all duration-1000"
-              style={{ width: `${(correctChars / totalChars) * 100}%` }}
+              style={{ width: `${(correctChars / safeTotalChars) * 100}%` }}
             />
             <div
               className="bg-red-500 h-full transition-all duration-1000"
-              style={{ width: `${(incorrectChars / totalChars) * 100}%` }}
+              style={{ width: `${(incorrectChars / safeTotalChars) * 100}%` }}
             />
             <div
               className="bg-gray-600 h-full transition-all duration-1000"
-              style={{ width: `${(missedChars / totalChars) * 100}%` }}
+              style={{ width: `${(missedChars / safeTotalChars) * 100}%` }}
             />
           </div>
         </div>
