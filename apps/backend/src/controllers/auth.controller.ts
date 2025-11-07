@@ -201,3 +201,45 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     }
   }
 };
+
+/**
+ * @route   POST /api/v1/auth/token
+ * @desc    Get backend JWT token for NextAuth authenticated users
+ * @access  Public
+ */
+export const getTokenForNextAuthUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new AppError(404, 'User not found');
+    }
+
+    // Generate tokens for this user
+    const accessToken = generateAccessToken(user.id, user.email);
+    const refreshToken = generateRefreshToken(user.id, user.email);
+
+    logger.info('Backend token generated for NextAuth user', {
+      userId: user.id,
+      email: user.email,
+    });
+
+    res.json({
+      message: 'Token generated successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      },
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

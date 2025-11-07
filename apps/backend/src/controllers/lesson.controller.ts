@@ -135,10 +135,12 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
 
     // Calculate stars (0-3 based on performance)
     let stars = 0;
-    if (completed) {
+    const meetsRequirements = wpm >= lesson.targetWpm && accuracy >= lesson.minAccuracy;
+
+    if (meetsRequirements && completed) {
       if (wpm >= lesson.targetWpm * 1.5 && accuracy >= 98) stars = 3;
       else if (wpm >= lesson.targetWpm * 1.2 && accuracy >= 95) stars = 2;
-      else if (wpm >= lesson.targetWpm && accuracy >= lesson.minAccuracy) stars = 1;
+      else stars = 1;
     }
 
     // Get existing progress to compare
@@ -150,6 +152,9 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
         },
       },
     });
+
+    // Override completed flag - only mark as completed if requirements are met
+    const actuallyCompleted = meetsRequirements && completed;
 
     // Upsert progress
     const progress = await prisma.userLessonProgress.upsert({
@@ -165,7 +170,7 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
           ? Math.max(existingProgress.bestAccuracy, accuracy)
           : accuracy,
         attempts: { increment: 1 },
-        completed: completed || undefined,
+        completed: actuallyCompleted || undefined,
         stars: existingProgress ? Math.max(existingProgress.stars, stars) : stars,
         lastAttempt: new Date(),
       },
@@ -175,16 +180,35 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
         bestWpm: wpm,
         bestAccuracy: accuracy,
         attempts: 1,
-        completed,
+        completed: actuallyCompleted,
         stars,
       },
     });
 
-    logger.info('Lesson progress saved', { userId, lessonId, stars, completed });
+    logger.info('Lesson progress saved', {
+      userId,
+      lessonId,
+      stars,
+      completed: actuallyCompleted,
+      meetsRequirements,
+    });
 
     res.json({
-      message: 'Progress saved successfully',
+      message: actuallyCompleted
+        ? 'Lesson completed! You can move to the next lesson.'
+        : meetsRequirements
+          ? 'Progress saved. Lesson completed!'
+          : 'Progress saved. Keep practicing to meet the requirements!',
       progress,
+      meetsRequirements,
+      required: {
+        targetWpm: lesson.targetWpm,
+        minAccuracy: lesson.minAccuracy,
+      },
+      current: {
+        wpm,
+        accuracy,
+      },
     });
   } catch (error) {
     next(error);

@@ -117,6 +117,53 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       },
     });
 
+    // UNLOCK LESSONS BASED ON SKILL LEVEL
+    // Get all lessons up to the recommended section
+    let sectionsToUnlock: number[] = [];
+
+    if (recommendedSkillLevel === 'EXPERT') {
+      sectionsToUnlock = [1, 2, 3]; // Unlock Sections 1-3
+    } else if (recommendedSkillLevel === 'ADVANCED') {
+      sectionsToUnlock = [1, 2]; // Unlock Sections 1-2
+    } else if (recommendedSkillLevel === 'INTERMEDIATE') {
+      sectionsToUnlock = [1]; // Unlock Section 1
+    }
+    // BEGINNER starts at lesson 1, no need to unlock
+
+    if (sectionsToUnlock.length > 0) {
+      // Get all lessons in the sections to unlock
+      const lessonsToUnlock = await prisma.lesson.findMany({
+        where: {
+          section: {
+            in: sectionsToUnlock,
+          },
+        },
+        select: { id: true },
+      });
+
+      // Create UserLessonProgress records to unlock these lessons
+      // Mark them as "completed" with basic stats so they show as unlocked
+      const unlockData = lessonsToUnlock.map((lesson) => ({
+        userId,
+        lessonId: lesson.id,
+        completed: true,
+        bestWpm: 0,
+        bestAccuracy: 0,
+        attempts: 0,
+        stars: 0,
+      }));
+
+      // Batch insert (skip if already exists)
+      await prisma.userLessonProgress.createMany({
+        data: unlockData,
+        skipDuplicates: true,
+      });
+
+      logger.info(
+        `Unlocked ${lessonsToUnlock.length} lessons in sections ${sectionsToUnlock.join(', ')} for user: ${userId}`
+      );
+    }
+
     // Get the recommended lesson details
     const recommendedLesson = await prisma.lesson.findFirst({
       where: { level: recommendedLessonLevel },
@@ -132,7 +179,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
     });
 
     logger.info(
-      `Assessment completed for user: ${userId}, recommended level: ${recommendedLessonLevel}`
+      `Assessment completed for user: ${userId}, recommended level: ${recommendedLessonLevel}, unlocked ${sectionsToUnlock.length} section(s)`
     );
 
     return res.json({
@@ -145,6 +192,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
         recommendedLessonLevel,
         weakFingers,
         problematicKeys,
+        sectionsUnlocked: sectionsToUnlock,
       },
       recommendedLesson,
       feedback: generateFeedback(wpm, accuracy),

@@ -32,6 +32,7 @@ export default function RegisterPage() {
     }
 
     try {
+      // Register the user through the backend
       await authAPI.register({ email, username, password });
       setSuccessMessage('Account created successfully! Signing you in...');
     } catch (err) {
@@ -41,6 +42,7 @@ export default function RegisterPage() {
       return;
     }
 
+    // Sign in with NextAuth - it will automatically get the backend JWT token
     const result = await signIn('credentials', {
       redirect: false,
       email,

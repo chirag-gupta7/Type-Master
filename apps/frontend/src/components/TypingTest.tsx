@@ -90,6 +90,7 @@ const TypingTest: React.FC = () => {
     wpm,
     accuracy,
     errors,
+    mistakes,
     startTest,
     setUserInput,
     endTest,
@@ -567,8 +568,11 @@ const TypingTest: React.FC = () => {
             correctChars={correctCharsCount}
             incorrectChars={incorrectCharsCount}
             missedChars={missedCharsCount}
+            mistakes={mistakes}
             aiFeedback={aiFeedback}
             isFeedbackLoading={isFeedbackLoading}
+            onRetry={handleRestart}
+            onContinue={handleNewTest}
             footer={
               <>
                 <button

@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       const authToken = token as JWT & {
         user?: {
           id: string;
@@ -92,24 +92,24 @@ export const authOptions: NextAuthOptions = {
           image: (user as { image?: string | null }).image ?? null,
         };
 
-        // Try to get backend JWT from cookie (set by authAPI.login)
-        // Cookies are accessible server-side, unlike localStorage
-        if (typeof window !== 'undefined') {
-          // Client-side: read from document.cookie
-          const cookies = document.cookie.split('; ');
-          const backendJwtCookie = cookies.find((c) => c.startsWith('backend_jwt='));
-          if (backendJwtCookie) {
-            const backendToken = backendJwtCookie.split('=')[1];
-            if (backendToken) {
-              authToken.accessToken = backendToken;
-            }
-          }
-        }
-      }
+        // Get backend JWT token for this user
+        try {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+          const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: user.email }),
+          });
 
-      // Store OAuth access token if available
-      if (account?.access_token) {
-        authToken.accessToken = account.access_token;
+          if (response.ok) {
+            const data = await response.json();
+            authToken.accessToken = data.accessToken;
+          }
+        } catch (error) {
+          console.error('Failed to get backend token:', error);
+        }
       }
 
       return authToken;

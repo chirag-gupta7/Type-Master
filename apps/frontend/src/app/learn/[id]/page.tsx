@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
+import { HandPositionGuide } from '@/components/HandPositionGuide';
+import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
+import { authAPI } from '@/lib/api';
 
 interface Lesson {
   id: string;
@@ -58,6 +61,7 @@ export default function LessonPracticePage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'initial' | 'typing' | 'results' | 'analysis'>('initial');
   const [isSaving, setIsSaving] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [userStats, setUserStats] = useState<UserStats>({
     lessonsCompleted: 0,
     sectionsCompleted: [],
@@ -93,6 +97,11 @@ export default function LessonPracticePage() {
 
         const data = await response.json();
         setLesson(data.lesson);
+
+        // Show onboarding modal for the first lesson (level 1, order 1)
+        if (data.lesson.level === 1 && data.lesson.order === 1) {
+          setShowOnboarding(true);
+        }
       } catch (err) {
         console.error('Failed to load lesson:', err);
         setError(err instanceof Error ? err.message : 'Failed to load lesson. Please try again.');
@@ -106,6 +115,10 @@ export default function LessonPracticePage() {
   // Fetch user stats for achievement tracking
   useEffect(() => {
     async function fetchUserStats() {
+      if (!authAPI.isAuthenticated()) {
+        return;
+      }
+
       try {
         // TODO: Replace with actual user ID from auth
         const userId = 'mock-user-id'; // This will be replaced when auth is implemented
@@ -355,6 +368,93 @@ export default function LessonPracticePage() {
         <ArrowLeft className="mr-2" size={16} />
         Back to Lessons
       </Button>
+
+      {/* Onboarding Modal for First Lesson */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowOnboarding(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-card border-2 border-primary rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  👋 Welcome to TypeMaster!
+                </h2>
+                <p className="text-xl text-muted-foreground">
+                  Before we start, let's learn proper hand positioning
+                </p>
+              </div>
+
+              <div className="bg-muted/50 rounded-xl p-6 mb-6">
+                <h3 className="text-2xl font-semibold mb-4 text-center">✋ Proper Hand Position</h3>
+                <HandPositionGuide
+                  showArrow={true}
+                  showFingerLabels={true}
+                  showKeyClusters={true}
+                  className="mb-4"
+                />
+                <div className="mt-6 space-y-3 text-lg">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">👆</span>
+                    <p>
+                      <strong>Home Row:</strong> Place your left fingers on{' '}
+                      <kbd className="px-2 py-1 bg-primary/20 rounded">A S D F</kbd> and right
+                      fingers on <kbd className="px-2 py-1 bg-primary/20 rounded">J K L ;</kbd>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">👀</span>
+                    <p>
+                      <strong>Look at the screen:</strong> Not the keyboard! Trust your muscle
+                      memory.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">⚡</span>
+                    <p>
+                      <strong>Use the correct finger:</strong> Each key has an assigned finger for
+                      maximum efficiency.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">🎯</span>
+                    <p>
+                      <strong>Return to home row:</strong> After each keystroke, return your fingers
+                      to the starting position.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-primary/10 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-3 text-center">
+                  Watch your hands in action
+                </h3>
+                <AnimatedHandOverlay targetKey={lesson?.content[0] || 'a'} className="mx-auto" />
+                <p className="text-center text-sm text-muted-foreground mt-4">
+                  The keyboard will highlight which key to press and show the correct finger to use
+                </p>
+              </div>
+
+              <div className="flex gap-4 justify-center">
+                <Button size="lg" onClick={() => setShowOnboarding(false)} className="px-12">
+                  Got it! Let's Start Typing
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {view === 'initial' && (

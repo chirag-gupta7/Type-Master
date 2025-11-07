@@ -1,9 +1,17 @@
 'use client';
 
-import { type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { useState, type ReactNode } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MistakeAnalysis } from '@/components/MistakeAnalysis';
+
+interface MistakeDetail {
+  key: string;
+  expected: string;
+  position: number;
+}
 
 interface ResultsScreenProps {
   wpm: number;
@@ -13,9 +21,12 @@ interface ResultsScreenProps {
   correctChars: number;
   incorrectChars: number;
   missedChars: number;
+  mistakes?: MistakeDetail[]; // Add mistakes array
   footer?: ReactNode;
   aiFeedback?: string | null;
   isFeedbackLoading?: boolean;
+  onRetry?: () => void;
+  onContinue?: () => void;
 }
 
 export default function ResultsScreen({
@@ -26,9 +37,12 @@ export default function ResultsScreen({
   correctChars,
   incorrectChars,
   missedChars,
+  mistakes = [],
   footer,
   aiFeedback,
   isFeedbackLoading,
+  onRetry,
+  onContinue,
 }: ResultsScreenProps) {
   // Calculate additional stats
   const totalChars = correctChars + incorrectChars + missedChars;
@@ -38,6 +52,66 @@ export default function ResultsScreen({
 
   // Determine if it's a personal best (mock for now)
   const isPersonalBest = wpm > 100; // TODO: Compare with actual user history
+
+  // State for showing detailed analysis
+  const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
+
+  // Process mistakes to create weak keys data for MistakeAnalysis
+  const weakKeys =
+    mistakes.length > 0
+      ? Object.values(
+          mistakes.reduce(
+            (acc, mistake) => {
+              const key = mistake.key === ' ' ? '␣' : mistake.key;
+              if (!acc[key]) {
+                acc[key] = { key, errorCount: 0 };
+              }
+              acc[key].errorCount++;
+              return acc;
+            },
+            {} as Record<string, { key: string; errorCount: number }>
+          )
+        ).sort((a, b) => b.errorCount - a.errorCount)
+      : [];
+
+  // Generate practice text from weak keys
+  const practiceText =
+    weakKeys.length > 0
+      ? weakKeys
+          .slice(0, 10)
+          .map((wk) => wk.key)
+          .join(' ')
+          .repeat(10)
+          .substring(0, 200)
+      : '';
+
+  // If showing detailed analysis, render MistakeAnalysis component
+  if (showDetailedAnalysis) {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="detailed-analysis"
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-4xl mx-auto"
+        >
+          <MistakeAnalysis
+            weakKeys={weakKeys}
+            practiceText={practiceText}
+            onRetry={onRetry}
+            onContinue={onContinue}
+          />
+          <div className="flex justify-center mt-6">
+            <Button variant="outline" onClick={() => setShowDetailedAnalysis(false)}>
+              ← Back to Results
+            </Button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <motion.div
@@ -204,6 +278,26 @@ export default function ResultsScreen({
           ) : aiFeedback ? (
             <p className="text-foreground leading-relaxed">{aiFeedback}</p>
           ) : null}
+        </motion.div>
+      )}
+
+      {/* Detailed Analysis Button */}
+      {mistakes.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.75 }}
+          className="flex justify-center mb-6"
+        >
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => setShowDetailedAnalysis(true)}
+            className="gap-2"
+          >
+            <BarChart3 className="w-5 h-5" />
+            View Detailed Analysis
+          </Button>
         </motion.div>
       )}
 

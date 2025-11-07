@@ -4,6 +4,12 @@ import { generateTestText } from '@/lib/textGenerator';
 // Re-export theme store
 export * from './theme';
 
+interface MistakeDetail {
+  key: string;
+  expected: string;
+  position: number;
+}
+
 interface TypingState {
   status: 'waiting' | 'in-progress' | 'finished';
   textToType: string;
@@ -13,6 +19,7 @@ interface TypingState {
   errors: number;
   wpm: number;
   accuracy: number;
+  mistakes: MistakeDetail[]; // Track individual mistakes
   startTest: (text: string) => void;
   generateAndStartTest: (duration: 30 | 60 | 180, category?: string) => void;
   startTimer: () => void;
@@ -74,6 +81,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   errors: 0,
   wpm: 0,
   accuracy: 100,
+  mistakes: [],
 
   startTest: (text: string) => {
     set({
@@ -84,6 +92,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errors: 0,
       wpm: 0,
       accuracy: 100,
+      mistakes: [],
     });
   },
 
@@ -104,7 +113,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
 
   setUserInput: (input: string) => {
     const state = get();
-    const { textToType, status, startTime } = state;
+    const { textToType, status, startTime, mistakes } = state;
 
     // Sanitize input: replace newlines with spaces and collapse multiple spaces
     const sanitizedInput = input.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ');
@@ -125,17 +134,28 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     let wpm = 0;
     let accuracy = 100;
     let errors = 0;
+    const updatedMistakes = [...mistakes];
 
     // Calculate real-time metrics if test has started
     if (nextStartTime && sanitizedInput.length > 0) {
       const elapsedMinutes = Math.max(0.01, (Date.now() - nextStartTime) / 1000 / 60); // Min 0.01 to prevent division by zero
       const typedChars = sanitizedInput.length;
 
-      // Calculate character-by-character accuracy
+      // Calculate character-by-character accuracy and track mistakes
       let correctChars = 0;
       for (let i = 0; i < typedChars; i++) {
         if (sanitizedInput[i] === textToType[i]) {
           correctChars++;
+        } else {
+          // Track this mistake if not already tracked at this position
+          const existingMistake = updatedMistakes.find((m) => m.position === i);
+          if (!existingMistake) {
+            updatedMistakes.push({
+              key: sanitizedInput[i],
+              expected: textToType[i],
+              position: i,
+            });
+          }
         }
       }
 
@@ -159,6 +179,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       wpm,
       accuracy,
       errors,
+      mistakes: updatedMistakes,
     });
 
     // Auto-complete test when full text is typed
@@ -201,6 +222,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errors: 0,
       wpm: 0,
       accuracy: 100,
+      mistakes: [],
     });
   },
 }));

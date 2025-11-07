@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { register, login, refreshToken } from '../controllers/auth.controller';
+import {
+  register,
+  login,
+  refreshToken,
+  getTokenForNextAuthUser,
+} from '../controllers/auth.controller';
 import { authLimiter } from '../middleware/rate-limiter';
 
 const router = Router();
@@ -24,5 +29,12 @@ router.post('/login', authLimiter, login);
  * @access  Public
  */
 router.post('/refresh', refreshToken);
+
+/**
+ * @route   POST /api/v1/auth/token
+ * @desc    Get backend JWT token for NextAuth authenticated users
+ * @access  Public
+ */
+router.post('/token', getTokenForNextAuthUser);
 
 export default router;

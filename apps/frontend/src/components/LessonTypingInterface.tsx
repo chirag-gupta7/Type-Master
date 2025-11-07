@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, CheckCircle2, Trophy, Target, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
+import { saveFallbackLessonProgress } from '@/lib/fallbackProgress';
 
 // Lazy-load react-confetti with a small typed interface to avoid using `any`
 // NOTE: ambient module declarations must live in a .d.ts file (e.g. src/types/react-confetti.d.ts).
@@ -25,6 +26,7 @@ interface ReactConfettiProps {
 const Confetti: ComponentType<ReactConfettiProps> = dynamic(() => import('react-confetti'), {
   ssr: false,
 }) as unknown as ComponentType<ReactConfettiProps>;
+
 interface Lesson {
   id: string;
   level: number;
@@ -143,6 +145,23 @@ export function LessonTypingInterface({
       const earnedStars = calculateStars(wpm, accuracy);
       setStars(earnedStars);
 
+      const handlePersistedProgress = () => {
+        setSavedProgress(true);
+        setShowConfetti(earnedStars > 0);
+
+        if (earnedStars > 0) {
+          saveFallbackLessonProgress(lesson.id, {
+            wpm,
+            accuracy,
+            stars: earnedStars,
+          });
+        }
+
+        if (onComplete) {
+          onComplete({ wpm, accuracy, stars: earnedStars });
+        }
+      };
+
       const saveProgress = async () => {
         setIsSaving(true);
         try {
@@ -152,15 +171,10 @@ export function LessonTypingInterface({
             accuracy,
             completed: earnedStars > 0,
           });
-          setSavedProgress(true);
-          setShowConfetti(earnedStars > 0);
-
-          // Call onComplete callback if provided
-          if (onComplete) {
-            onComplete({ wpm, accuracy, stars: earnedStars });
-          }
+          handlePersistedProgress();
         } catch (error) {
           console.error('Failed to save lesson progress:', error);
+          handlePersistedProgress();
         } finally {
           setIsSaving(false);
         }

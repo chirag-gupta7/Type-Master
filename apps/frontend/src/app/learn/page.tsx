@@ -7,12 +7,24 @@ import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { Button } from '@/components/ui/button';
 import { lessonAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson, isExerciseType } from '@/lib/fallback-lessons';
+import { getFallbackProgress } from '@/lib/fallbackProgress';
 
 export default function LearnPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [fallbackProgress, setFallbackProgress] = useState<{
+    completedLessonIds: string[];
+    stats: Record<
+      string,
+      {
+        bestWpm: number;
+        bestAccuracy: number;
+        stars: number;
+      }
+    >;
+  }>({ completedLessonIds: [], stats: {} });
 
   useEffect(() => {
     let isMounted = true;
@@ -75,6 +87,27 @@ export default function LearnPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const loadFallbackProgress = () => {
+      setFallbackProgress(getFallbackProgress());
+    };
+
+    if (usingFallback) {
+      loadFallbackProgress();
+      window.addEventListener('typemaster:fallback-progress-updated', loadFallbackProgress);
+      return () => {
+        window.removeEventListener('typemaster:fallback-progress-updated', loadFallbackProgress);
+      };
+    }
+
+    setFallbackProgress({ completedLessonIds: [], stats: {} });
+    return undefined;
+  }, [usingFallback]);
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -90,6 +123,24 @@ export default function LearnPage() {
         Master touch typing from the ground up. Our lessons build on each other, from basic home row
         keys to complex sentences and symbols.
       </p>
+
+      {/* Placement Test Call-to-Action */}
+      <div className="mb-8 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-2 border-purple-500/30 rounded-xl p-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-2xl font-bold mb-2">🚀 Already know how to type?</h3>
+            <p className="text-muted-foreground">
+              Take our placement test to find your skill level and skip the basics. We'll unlock the
+              appropriate lessons based on your performance.
+            </p>
+          </div>
+          <Link href="/learn/assessment">
+            <Button size="lg" className="whitespace-nowrap">
+              Take Placement Test →
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200">
@@ -115,14 +166,26 @@ export default function LearnPage() {
             {/* Lesson nodes */}
             {lessons.map((lesson, index) => {
               const progress = lesson.userProgress?.[0];
-              const isUnlocked = index === 0 || lessons[index - 1]?.userProgress?.[0]?.completed;
+              const previousLesson = lessons[index - 1];
+              const previousCompleted =
+                index === 0
+                  ? true
+                  : usingFallback
+                    ? previousLesson
+                      ? fallbackProgress.completedLessonIds.includes(previousLesson.id)
+                      : false
+                    : Boolean(previousLesson?.userProgress?.[0]?.completed);
+              const isCompleted = usingFallback
+                ? fallbackProgress.completedLessonIds.includes(lesson.id)
+                : Boolean(progress?.completed);
+              const isUnlocked = index === 0 ? true : previousCompleted || isCompleted;
 
               return (
                 <div key={lesson.id} className="flex items-center gap-4 mb-4 relative">
                   {/* Node */}
                   {isUnlocked ? (
                     <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10">
-                      {progress?.completed ? (
+                      {isCompleted ? (
                         <Check size={16} />
                       ) : (
                         <span className="text-xs font-bold">{index + 1}</span>
@@ -150,7 +213,24 @@ export default function LearnPage() {
           <div className="space-y-4">
             {lessons.map((lesson, index) => {
               const progress = lesson.userProgress?.[0];
-              const isUnlocked = index === 0 || lessons[index - 1]?.userProgress?.[0]?.completed;
+              const fallbackStats = fallbackProgress.stats[lesson.id];
+              const previousLesson = lessons[index - 1];
+              const previousCompleted =
+                index === 0
+                  ? true
+                  : usingFallback
+                    ? previousLesson
+                      ? fallbackProgress.completedLessonIds.includes(previousLesson.id)
+                      : false
+                    : Boolean(previousLesson?.userProgress?.[0]?.completed);
+              const isCompleted = usingFallback
+                ? fallbackProgress.completedLessonIds.includes(lesson.id)
+                : Boolean(progress?.completed);
+              const isUnlocked = index === 0 ? true : previousCompleted || isCompleted;
+              const bestWpm = usingFallback ? fallbackStats?.bestWpm : progress?.bestWpm;
+              const bestAccuracy = usingFallback
+                ? fallbackStats?.bestAccuracy
+                : progress?.bestAccuracy;
 
               return (
                 <Link
@@ -167,10 +247,10 @@ export default function LearnPage() {
                     <div>
                       <h3 className="font-semibold text-lg mb-1">{lesson.title}</h3>
                       <p className="text-sm text-muted-foreground">{lesson.description}</p>
-                      {progress && (
+                      {(progress || fallbackStats) && (
                         <div className="text-xs text-muted-foreground mt-2">
-                          Best: {progress.bestWpm.toFixed(0)} WPM •{' '}
-                          {progress.bestAccuracy.toFixed(0)}% Accuracy
+                          Best: {Math.round(bestWpm ?? 0)} WPM • {Math.round(bestAccuracy ?? 0)}%
+                          Accuracy
                         </div>
                       )}
                     </div>
@@ -178,7 +258,7 @@ export default function LearnPage() {
                     {/* Right side: button */}
                     <div>
                       <Button disabled={!isUnlocked}>
-                        {progress?.completed ? 'Practice Again' : 'Start Lesson'}
+                        {isCompleted ? 'Practice Again' : 'Start Lesson'}
                       </Button>
                     </div>
                   </div>

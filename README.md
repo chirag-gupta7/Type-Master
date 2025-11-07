@@ -15,6 +15,7 @@ A comprehensive typing improvement platform with 100 progressive lessons, intell
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
+- [Authentication Setup](#authentication-setup)
 - [Documentation](#documentation)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -254,15 +255,37 @@ typemaster/
    ```env
    DATABASE_URL="postgresql://user:password@localhost:5432/typemaster"
    JWT_SECRET="your-secret-key-here"
+   JWT_REFRESH_SECRET="your-refresh-secret-here"
    PORT=5000
    NODE_ENV=development
+   CORS_ORIGIN=http://localhost:3000
    ```
 
    **Frontend** (`apps/frontend/.env.local`):
 
    ```env
+   # Backend API
    NEXT_PUBLIC_API_URL=http://localhost:5000
+
+   # Database (must match backend!)
+   DATABASE_URL=postgresql://user:password@localhost:5432/typemaster
+
+   # NextAuth
+   NEXTAUTH_URL=http://localhost:3000
+   NEXTAUTH_SECRET=your-nextauth-secret
+
+   # Google OAuth (optional)
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
    ```
+
+   ⚠️ **Generate secure secrets**:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+   📚 **See [AUTH_FIX_README.md](./AUTH_FIX_README.md) for detailed auth setup**
 
 4. **Set up database**
 
@@ -296,10 +319,56 @@ typemaster/
 
 ### First Steps
 
-1. **Take the Placement Test** - Visit `/learn/assessment` to find your skill level
-2. **Start Your First Lesson** - Go to `/learn` and begin with your recommended level
-3. **Complete a Lesson** - Type the text and watch achievements unlock! 🎉
-4. **Test the Achievement System** - Visit `/test-achievements` to see all celebration animations
+1. **Register an Account** - Visit `/register` to create your account (required for data persistence)
+2. **Take the Placement Test** - Visit `/learn/assessment` to find your skill level
+3. **Start Your First Lesson** - Go to `/learn` and begin with your recommended level
+4. **Complete a Lesson** - Type the text and watch achievements unlock! 🎉
+5. **Test the Achievement System** - Visit `/test-achievements` to see all celebration animations
+
+---
+
+## 🔐 Authentication Setup
+
+TypeMaster uses NextAuth with backend JWT integration. Both **Google OAuth** and **email/password** authentication are supported.
+
+### Quick Setup
+
+1. **Configure environment variables** (see Quick Start section above)
+2. **Generate secrets** using the crypto command
+3. **Run migrations** to set up the database
+4. **Verify setup** (optional):
+   ```bash
+   node scripts/verify-auth-setup.js
+   ```
+
+### Features
+
+✅ Email/password registration and login  
+✅ Google OAuth integration  
+✅ Automatic JWT token generation  
+✅ Persistent user data across sessions  
+✅ Secure session management
+
+### Detailed Documentation
+
+- **[AUTH_FIX_README.md](./AUTH_FIX_README.md)** - Quick fix guide with troubleshooting
+- **[docs/AUTH_SETUP_GUIDE.md](./docs/AUTH_SETUP_GUIDE.md)** - Complete setup and architecture guide
+
+### Common Issues
+
+**Data not persisting?**
+
+- Ensure frontend and backend use the **same** `DATABASE_URL`
+- Check that `NEXT_PUBLIC_API_URL` points to your backend
+- Verify backend is running when you log in
+
+**Google OAuth not working?**
+
+- Configure OAuth credentials in [Google Cloud Console](https://console.cloud.google.com/)
+- Set authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+- Add credentials to frontend `.env.local`
+
+---
 
 ### Testing the Achievement System
 

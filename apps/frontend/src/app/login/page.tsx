@@ -5,7 +5,6 @@ import { signIn } from 'next-auth/react';
 import { FormEvent, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { authAPI } from '@/lib/api';
 
 export default function LoginPage() {
   const params = useSearchParams();
@@ -25,22 +24,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError(null);
 
-    try {
-      const response = await authAPI.login({ email, password });
-
-      // Store backend JWT in a cookie (accessible server-side) AND localStorage (fallback)
-      if (response.accessToken) {
-        // Set cookie with 7 day expiry
-        document.cookie = `backend_jwt=${response.accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        // Also keep in localStorage for backward compatibility
-        localStorage.setItem('accessToken', response.accessToken);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
-      setError(message);
-      setIsSubmitting(false);
-      return;
-    }
+    // Sign in with NextAuth - it will automatically get the backend JWT token
     const result = await signIn('credentials', {
       redirect: false,
       email,
@@ -49,14 +33,12 @@ export default function LoginPage() {
     });
 
     if (!result) {
-      authAPI.logout();
       setError('Unexpected error. Please try again.');
       setIsSubmitting(false);
       return;
     }
 
     if (result.error) {
-      authAPI.logout();
       setError(result.error);
       setIsSubmitting(false);
       return;
