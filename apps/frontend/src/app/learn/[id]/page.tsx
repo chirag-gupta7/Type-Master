@@ -18,7 +18,9 @@ import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
-import { authAPI } from '@/lib/api';
+import { authAPI, lessonAPI } from '@/lib/api';
+import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
+import { getFallbackProgress } from '@/lib/fallbackProgress';
 
 interface Lesson {
   id: string;
@@ -62,6 +64,11 @@ export default function LessonPracticePage() {
   const [view, setView] = useState<'initial' | 'typing' | 'results' | 'analysis'>('initial');
   const [isSaving, setIsSaving] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
+  const [fallbackProgress, setFallbackProgress] = useState<any>({
+    completedLessonIds: [],
+    stats: {},
+  });
   const [userStats, setUserStats] = useState<UserStats>({
     lessonsCompleted: 0,
     sectionsCompleted: [],
@@ -84,32 +91,69 @@ export default function LessonPracticePage() {
 
   // Fetch lesson
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchLesson() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/v1/lessons/${lessonId}`);
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to load lesson' }));
-          throw new Error(errorData.error || `HTTP ${response.status}: Failed to load lesson`);
+        // First, try to fetch from the API
+        const data = await lessonAPI.getLessonById(lessonId);
+        if (!data || !data.lesson) {
+          throw new Error('Lesson not found from API');
         }
 
-        const data = await response.json();
-        setLesson(data.lesson);
+        const exerciseType = isExerciseType(data.lesson.exerciseType)
+          ? data.lesson.exerciseType
+          : undefined;
 
-        // Show onboarding modal for the first lesson (level 1, order 1)
-        if (data.lesson.level === 1 && data.lesson.order === 1) {
-          setShowOnboarding(true);
+        if (isMounted) {
+          setLesson({ ...data.lesson, exerciseType });
+          // Show onboarding modal for the first lesson (level 1, order 1)
+          if (data.lesson.level === 1 && data.lesson.order === 1) {
+            setShowOnboarding(true);
+          }
         }
-      } catch (err) {
-        console.error('Failed to load lesson:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load lesson. Please try again.');
+      } catch (apiError) {
+        console.warn('API fetch failed, attempting to load fallback lesson:', apiError);
+        // If API fails, try to find in fallback lessons
+        const fallbackLesson = FALLBACK_LESSONS.find((l) => l.id === lessonId);
+
+        if (fallbackLesson) {
+          if (isMounted) {
+            const progress = getFallbackProgress();
+            const lessonStats = progress.stats[fallbackLesson.id] || {
+              completed: false,
+              bestWpm: 0,
+              bestAccuracy: 0,
+            };
+
+            setLesson({
+              ...fallbackLesson,
+              userProgress: [lessonStats],
+            } as any);
+            setIsFallback(true);
+            setFallbackProgress(progress);
+            setError('Showing offline lesson. Progress will be saved locally.');
+          }
+        } else {
+          // If not in API and not in fallback, it's a true 404
+          if (isMounted) {
+            setError('Lesson not found. It might not exist.');
+            setLesson(null);
+          }
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     fetchLesson();
+
+    return () => {
+      isMounted = false;
+    };
   }, [lessonId]);
 
   // Fetch user stats for achievement tracking
@@ -219,6 +263,29 @@ export default function LessonPracticePage() {
 
     setWpm(finalWpm);
     setAccuracy(finalAccuracy);
+
+    // Save fallback progress if in offline mode
+    if (isFallback && lesson) {
+      // Update fallback progress in local storage
+      const newProgress = { ...fallbackProgress };
+      const currentStats = newProgress.stats[lesson.id] || {};
+      const completed = finalAccuracy >= (lesson.minAccuracy || 90);
+
+      newProgress.stats[lesson.id] = {
+        bestWpm: Math.max(currentStats.bestWpm || 0, finalWpm),
+        bestAccuracy: Math.max(currentStats.bestAccuracy || 0, finalAccuracy),
+        stars: 0, // Fallback doesn't calculate stars
+        completed: currentStats.completed || completed, // Persist completion
+      };
+
+      if (completed && !newProgress.completedLessonIds.includes(lesson.id)) {
+        newProgress.completedLessonIds.push(lesson.id);
+      }
+
+      localStorage.setItem('typemaster_fallback_progress', JSON.stringify(newProgress));
+      window.dispatchEvent(new Event('typemaster:fallback-progress-updated'));
+      setFallbackProgress(newProgress);
+    }
 
     // Log mistakes to backend
     try {

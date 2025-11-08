@@ -2,12 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Check, Lock } from 'lucide-react';
+import { AlertTriangle, Check, Lock, Trophy, Rocket } from 'lucide-react';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { lessonAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress } from '@/lib/fallbackProgress';
+
+// Section names for displaying headers
+const sectionNames: Record<number, string> = {
+  1: '🏠 Foundation',
+  2: '🔤 Letters',
+  3: '🔢 Numbers & Symbols',
+  4: '📝 Words & Sentences',
+  5: '💻 Code Practice',
+  6: '🚀 Programming',
+};
+
+// Helper function to determine section based on lesson level
+const getLessonSection = (level: number): number => {
+  if (level <= 2) return 1; // Foundation
+  if (level <= 5) return 2; // Letters
+  if (level <= 7) return 3; // Numbers & Symbols
+  if (level <= 9) return 4; // Words & Sentences
+  if (level <= 11) return 5; // Code Practice
+  return 6; // Programming
+};
 
 export default function LearnPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -128,7 +149,10 @@ export default function LearnPage() {
       <div className="mb-8 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-2 border-purple-500/30 rounded-xl p-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex-1">
-            <h3 className="text-2xl font-bold mb-2">🚀 Already know how to type?</h3>
+            <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+              <Rocket className="w-6 h-6" />
+              Already know how to type?
+            </h3>
             <p className="text-muted-foreground">
               Take our placement test to find your skill level and skip the basics. We'll unlock the
               appropriate lessons based on your performance.
@@ -154,63 +178,14 @@ export default function LearnPage() {
         </div>
       )}
 
-      {/* 2-column grid layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Lesson Progress Roadmap */}
-        <div className="md:col-span-1">
-          <h2 className="text-xl font-semibold mb-6">Your Progress</h2>
+      {/* Vertical Skill Tree Layout */}
+      <TooltipProvider>
+        <div className="max-w-2xl mx-auto">
           <div className="relative">
-            {/* Vertical line */}
-            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-primary/30" />
+            {/* Vertical connecting line */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 via-primary/30 to-primary/20 -translate-x-1/2 rounded-full" />
 
             {/* Lesson nodes */}
-            {lessons.map((lesson, index) => {
-              const progress = lesson.userProgress?.[0];
-              const previousLesson = lessons[index - 1];
-              const previousCompleted =
-                index === 0
-                  ? true
-                  : usingFallback
-                    ? previousLesson
-                      ? fallbackProgress.completedLessonIds.includes(previousLesson.id)
-                      : false
-                    : Boolean(previousLesson?.userProgress?.[0]?.completed);
-              const isCompleted = usingFallback
-                ? fallbackProgress.completedLessonIds.includes(lesson.id)
-                : Boolean(progress?.completed);
-              const isUnlocked = index === 0 ? true : previousCompleted || isCompleted;
-
-              return (
-                <div key={lesson.id} className="flex items-center gap-4 mb-4 relative">
-                  {/* Node */}
-                  {isUnlocked ? (
-                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10">
-                      {isCompleted ? (
-                        <Check size={16} />
-                      ) : (
-                        <span className="text-xs font-bold">{index + 1}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center bg-background z-10">
-                      <Lock size={16} className="text-muted-foreground" />
-                    </div>
-                  )}
-
-                  {/* Lesson title */}
-                  <span className={`font-medium ${!isUnlocked ? 'text-muted-foreground' : ''}`}>
-                    {lesson.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right Column: All Lessons */}
-        <div className="md:col-span-2">
-          <h2 className="text-xl font-semibold mb-6">All Lessons</h2>
-          <div className="space-y-4">
             {lessons.map((lesson, index) => {
               const progress = lesson.userProgress?.[0];
               const fallbackStats = fallbackProgress.stats[lesson.id];
@@ -232,42 +207,93 @@ export default function LearnPage() {
                 ? fallbackStats?.bestAccuracy
                 : progress?.bestAccuracy;
 
-              return (
-                <Link
-                  key={lesson.id}
-                  href={isUnlocked ? `/learn/${lesson.id}` : '#'}
-                  className={`block ${!isUnlocked ? 'pointer-events-none' : ''}`}
-                >
-                  <div
-                    className={`flex items-center justify-between p-4 bg-card rounded-lg shadow-sm hover:shadow-md transition-shadow ${
-                      !isUnlocked ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    {/* Left side: title and description */}
-                    <div>
-                      <h3 className="font-semibold text-lg mb-1">{lesson.title}</h3>
-                      <p className="text-sm text-muted-foreground">{lesson.description}</p>
-                      {(progress || fallbackStats) && (
-                        <div className="text-xs text-muted-foreground mt-2">
-                          Best: {Math.round(bestWpm ?? 0)} WPM • {Math.round(bestAccuracy ?? 0)}%
-                          Accuracy
-                        </div>
-                      )}
-                    </div>
+              // Section header (display when section changes)
+              const currentSection = getLessonSection(lesson.level);
+              const previousSection =
+                index > 0 ? getLessonSection(lessons[index - 1].level) : null;
+              const showSectionHeader = index === 0 || currentSection !== previousSection;
 
-                    {/* Right side: button */}
-                    <div>
-                      <Button disabled={!isUnlocked}>
-                        {isCompleted ? 'Practice Again' : 'Start Lesson'}
-                      </Button>
+              return (
+                <div key={lesson.id} className="relative">
+                  {/* Section Header */}
+                  {showSectionHeader && (
+                    <div className="flex justify-center mb-8 mt-12 first:mt-0">
+                      <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 px-8 py-3 rounded-full border-2 border-primary/50 shadow-lg">
+                        <h2 className="text-xl font-bold text-center flex items-center gap-2">
+                          {sectionNames[lesson.sectionId] || `Section ${lesson.sectionId}`}
+                        </h2>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Lesson Node */}
+                  <div className="flex items-center justify-center mb-8">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href={isUnlocked ? `/learn/${lesson.id}` : '#'}
+                          className={`block ${!isUnlocked ? 'pointer-events-none' : ''}`}
+                        >
+                          <div
+                            className={`
+                              relative w-20 h-20 rounded-full flex items-center justify-center
+                              transition-all duration-300 z-10
+                              ${
+                                isCompleted
+                                  ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-lg shadow-green-500/50 hover:scale-110'
+                                  : isUnlocked
+                                    ? 'bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/50 hover:scale-110'
+                                    : 'bg-gray-300 dark:bg-gray-700 border-4 border-gray-400 dark:border-gray-600'
+                              }
+                            `}
+                          >
+                            {isCompleted ? (
+                              <div className="flex flex-col items-center">
+                                <Check className="w-8 h-8 text-white" strokeWidth={3} />
+                                <Trophy className="w-4 h-4 text-yellow-300 -mt-1" />
+                              </div>
+                            ) : isUnlocked ? (
+                              <span className="text-2xl font-bold text-white">{index + 1}</span>
+                            ) : (
+                              <Lock className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+                            )}
+                          </div>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-sm p-4">
+                        <div>
+                          <h3 className="font-bold text-lg mb-2">{lesson.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-3">{lesson.description}</p>
+                          {(progress || fallbackStats) && (
+                            <div className="text-xs text-muted-foreground border-t pt-2">
+                              <div className="flex justify-between">
+                                <span>Best WPM:</span>
+                                <span className="font-semibold">{Math.round(bestWpm ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Best Accuracy:</span>
+                                <span className="font-semibold">
+                                  {Math.round(bestAccuracy ?? 0)}%
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {!isUnlocked && (
+                            <div className="text-xs text-red-500 dark:text-red-400 mt-2 flex items-center gap-1">
+                              <Lock className="w-3 h-3" />
+                              Complete previous lesson to unlock
+                            </div>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
         </div>
-      </div>
+      </TooltipProvider>
 
       {lessons.length === 0 && (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
