@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { AlertTriangle, Check, Lock, Trophy, User, LogIn } from 'lucide-react';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { lessonAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson, isExerciseType } from '@/lib/fallback-lessons';
@@ -154,44 +155,46 @@ export default function LearnPage() {
       </p>
 
       {/* Session-aware welcome card */}
-      <div className="mb-8">
-        {sessionStatus === 'authenticated' ? (
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <User className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">
-                  Welcome back{userName ? `, ${userName}` : ''}!
-                </h3>
-                <p className="text-muted-foreground">
-                  Pick up where you left off and keep your streak going.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary">
-                <LogIn className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">Log in to sync your progress</h3>
-                <p className="text-muted-foreground">
-                  Sign in to save your lesson history and track achievements across devices.
-                </p>
+      <Card className="mb-8">
+        <CardContent className="p-6">
+          {sessionStatus === 'authenticated' ? (
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <User className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    Welcome back{userName ? `, ${userName}` : ''}!
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Pick up where you left off and keep your streak going.
+                  </p>
+                </div>
               </div>
             </div>
-            <Link href="/login" className="w-full md:w-auto">
-              <Button size="lg" className="w-full">
-                Sign in
-              </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary">
+                  <LogIn className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">Log in to sync your progress</h3>
+                  <p className="text-muted-foreground">
+                    Sign in to save your lesson history and track achievements across devices.
+                  </p>
+                </div>
+              </div>
+              <Link href="/login" className="w-full md:w-auto">
+                <Button size="lg" className="w-full">
+                  Sign in
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {error && (
         <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200">
@@ -206,120 +209,127 @@ export default function LearnPage() {
       )}
 
       {/* Vertical Skill Tree Layout */}
-      <TooltipProvider>
-        <div className="max-w-2xl mx-auto">
-          <div className="relative">
-            {/* Vertical connecting line */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 via-primary/30 to-primary/20 -translate-x-1/2 rounded-full" />
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Your Learning Path</CardTitle>
+          <CardDescription>Complete lessons to unlock new challenges.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TooltipProvider>
+            <div className="relative py-10">
+              {/* Vertical connecting line */}
+              <div className="absolute top-0 bottom-0 left-1/2 -ml-px w-0 border-l-2 border-dashed border-border/80" />
 
-            {/* Lesson nodes */}
-            {lessons.map((lesson, index) => {
-              const progress = lesson.userProgress?.[0];
-              const fallbackStats = fallbackProgress.stats[lesson.id];
-              const previousLesson = lessons[index - 1];
-              const previousCompleted =
-                index === 0
-                  ? true
-                  : usingFallback
-                    ? previousLesson
-                      ? fallbackProgress.completedLessonIds.includes(previousLesson.id)
-                      : false
-                    : Boolean(previousLesson?.userProgress?.[0]?.completed);
-              const isCompleted = usingFallback
-                ? fallbackProgress.completedLessonIds.includes(lesson.id)
-                : Boolean(progress?.completed);
-              const isUnlocked = index === 0 ? true : previousCompleted || isCompleted;
-              const bestWpm = usingFallback ? fallbackStats?.bestWpm : progress?.bestWpm;
-              const bestAccuracy = usingFallback
-                ? fallbackStats?.bestAccuracy
-                : progress?.bestAccuracy;
+              {/* Lesson nodes */}
+              {lessons.map((lesson, index) => {
+                const progress = lesson.userProgress?.[0];
+                const fallbackStats = fallbackProgress.stats[lesson.id];
+                const previousLesson = lessons[index - 1];
+                const previousCompleted =
+                  index === 0
+                    ? true
+                    : usingFallback
+                      ? previousLesson
+                        ? fallbackProgress.completedLessonIds.includes(previousLesson.id)
+                        : false
+                      : Boolean(previousLesson?.userProgress?.[0]?.completed);
+                const isCompleted = usingFallback
+                  ? fallbackProgress.completedLessonIds.includes(lesson.id)
+                  : Boolean(progress?.completed);
+                const isUnlocked = index === 0 ? true : previousCompleted || isCompleted;
+                const bestWpm = usingFallback ? fallbackStats?.bestWpm : progress?.bestWpm;
+                const bestAccuracy = usingFallback
+                  ? fallbackStats?.bestAccuracy
+                  : progress?.bestAccuracy;
 
-              // Section header (display when section changes)
-              const currentSection = getLessonSection(lesson.level);
-              const previousSection = index > 0 ? getLessonSection(lessons[index - 1].level) : null;
-              const showSectionHeader = index === 0 || currentSection !== previousSection;
+                // Section header (display when section changes)
+                const currentSection = getLessonSection(lesson.level);
+                const previousSection =
+                  index > 0 ? getLessonSection(lessons[index - 1].level) : null;
+                const showSectionHeader = index === 0 || currentSection !== previousSection;
 
-              return (
-                <div key={lesson.id} className="relative">
-                  {/* Section Header */}
-                  {showSectionHeader && (
-                    <div className="flex justify-center mb-8 mt-12 first:mt-0">
-                      <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 px-8 py-3 rounded-full border-2 border-primary/50 shadow-lg">
-                        <h2 className="text-xl font-bold text-center flex items-center gap-2">
+                return (
+                  <div key={lesson.id} className="relative">
+                    {/* Section Header */}
+                    {showSectionHeader && (
+                      <div className="flex justify-center mb-8 mt-12 first:mt-0">
+                        <h2 className="text-lg font-semibold text-center text-secondary-foreground relative z-10 bg-secondary px-6 py-1.5 rounded-full shadow-md">
                           {sectionNames[currentSection] || `Section ${currentSection}`}
                         </h2>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Lesson Node */}
-                  <div className="flex items-center justify-center mb-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Link
-                          href={isUnlocked ? `/learn/${lesson.id}` : '#'}
-                          className={`block ${!isUnlocked ? 'pointer-events-none' : ''}`}
-                        >
-                          <div
-                            className={`
+                    {/* Lesson Node */}
+                    <div className="flex items-center justify-center mb-8">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link
+                            href={isUnlocked ? `/learn/${lesson.id}` : '#'}
+                            className={`block transition-transform duration-300 hover:-translate-y-1 ${!isUnlocked ? 'pointer-events-none' : ''}`}
+                          >
+                            <div
+                              className={`
                               relative w-20 h-20 rounded-full flex items-center justify-center
                               transition-all duration-300 z-10
                               ${
                                 isCompleted
-                                  ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-lg shadow-green-500/50 hover:scale-110'
+                                  ? 'bg-gradient-to-br from-green-500 to-green-700 border-green-800 text-white shadow-lg hover:shadow-green-500/30'
                                   : isUnlocked
-                                    ? 'bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/50 hover:scale-110'
-                                    : 'bg-gray-300 dark:bg-gray-700 border-4 border-gray-400 dark:border-gray-600'
+                                    ? 'bg-gradient-to-br from-blue-500 to-purple-600 border-blue-700 text-white shadow-lg hover:shadow-blue-500/40'
+                                    : 'bg-muted/70 border-gray-300 text-muted-foreground opacity-70 shadow-inner'
                               }
                             `}
-                          >
-                            {isCompleted ? (
-                              <div className="flex flex-col items-center">
-                                <Check className="w-8 h-8 text-white" strokeWidth={3} />
-                                <Trophy className="w-4 h-4 text-yellow-300 -mt-1" />
+                            >
+                              {isCompleted ? (
+                                <div className="flex flex-col items-center">
+                                  <Check className="w-8 h-8 text-white" strokeWidth={3} />
+                                  <Trophy className="w-4 h-4 text-yellow-300 -mt-1" />
+                                </div>
+                              ) : isUnlocked ? (
+                                <span className="text-2xl font-bold text-white">{index + 1}</span>
+                              ) : (
+                                <Lock className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+                              )}
+                            </div>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-sm p-4">
+                          <div>
+                            <h3 className="font-bold text-lg mb-2">{lesson.title}</h3>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {lesson.description}
+                            </p>
+                            {(progress || fallbackStats) && (
+                              <div className="text-xs text-muted-foreground border-t pt-2">
+                                <div className="flex justify-between">
+                                  <span>Best WPM:</span>
+                                  <span className="font-semibold">{Math.round(bestWpm ?? 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Best Accuracy:</span>
+                                  <span className="font-semibold">
+                                    {Math.round(bestAccuracy ?? 0)}%
+                                  </span>
+                                </div>
                               </div>
-                            ) : isUnlocked ? (
-                              <span className="text-2xl font-bold text-white">{index + 1}</span>
-                            ) : (
-                              <Lock className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+                            )}
+                            {!isUnlocked && (
+                              <div className="text-xs text-red-500 dark:text-red-400 mt-2 flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                Complete previous lesson to unlock
+                              </div>
                             )}
                           </div>
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-sm p-4">
-                        <div>
-                          <h3 className="font-bold text-lg mb-2">{lesson.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-3">{lesson.description}</p>
-                          {(progress || fallbackStats) && (
-                            <div className="text-xs text-muted-foreground border-t pt-2">
-                              <div className="flex justify-between">
-                                <span>Best WPM:</span>
-                                <span className="font-semibold">{Math.round(bestWpm ?? 0)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Best Accuracy:</span>
-                                <span className="font-semibold">
-                                  {Math.round(bestAccuracy ?? 0)}%
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          {!isUnlocked && (
-                            <div className="text-xs text-red-500 dark:text-red-400 mt-2 flex items-center gap-1">
-                              <Lock className="w-3 h-3" />
-                              Complete previous lesson to unlock
-                            </div>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </TooltipProvider>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+        </CardContent>
+      </Card>
 
       {lessons.length === 0 && (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
