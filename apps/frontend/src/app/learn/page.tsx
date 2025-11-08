@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Check, Lock, Trophy, Rocket } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { AlertTriangle, Check, Lock, Trophy, User, LogIn } from 'lucide-react';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -31,6 +32,8 @@ const getLessonSection = (level: number): number => {
 };
 
 export default function LearnPage() {
+  const { data: session, status: sessionStatus } = useSession();
+  const userName = session?.user?.name ?? session?.user?.email ?? null;
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,17 +51,22 @@ export default function LearnPage() {
   }>({ completedLessonIds: [], stats: {} });
 
   useEffect(() => {
+    if (sessionStatus === 'loading') {
+      return;
+    }
+
     let isMounted = true;
 
     async function fetchData() {
       try {
         const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+        const isAuthenticated = sessionStatus === 'authenticated' || hasToken;
 
-        if (!hasToken) {
+        if (!isAuthenticated) {
           if (isMounted) {
             setLessons(FALLBACK_LESSONS);
             setUsingFallback(true);
-            setError("You're viewing the sample lesson plan. Sign in to sync your progress.");
+            setError('Sign in to sync your progress. Showing sample lessons for now.');
           }
           return;
         }
@@ -106,7 +114,7 @@ export default function LearnPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [sessionStatus]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -145,25 +153,44 @@ export default function LearnPage() {
         keys to complex sentences and symbols.
       </p>
 
-      {/* Placement Test Call-to-Action */}
-      <div className="mb-8 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-2 border-purple-500/30 rounded-xl p-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex-1">
-            <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
-              <Rocket className="w-6 h-6" />
-              Already know how to type?
-            </h3>
-            <p className="text-muted-foreground">
-              Take our placement test to find your skill level and skip the basics. We'll unlock the
-              appropriate lessons based on your performance.
-            </p>
+      {/* Session-aware welcome card */}
+      <div className="mb-8">
+        {sessionStatus === 'authenticated' ? (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <User className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">
+                  Welcome back{userName ? `, ${userName}` : ''}!
+                </h3>
+                <p className="text-muted-foreground">
+                  Pick up where you left off and keep your streak going.
+                </p>
+              </div>
+            </div>
           </div>
-          <Link href="/learn/assessment">
-            <Button size="lg" className="whitespace-nowrap">
-              Take Placement Test →
-            </Button>
-          </Link>
-        </div>
+        ) : (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary">
+                <LogIn className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">Log in to sync your progress</h3>
+                <p className="text-muted-foreground">
+                  Sign in to save your lesson history and track achievements across devices.
+                </p>
+              </div>
+            </div>
+            <Link href="/login" className="w-full md:w-auto">
+              <Button size="lg" className="w-full">
+                Sign in
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -209,8 +236,7 @@ export default function LearnPage() {
 
               // Section header (display when section changes)
               const currentSection = getLessonSection(lesson.level);
-              const previousSection =
-                index > 0 ? getLessonSection(lessons[index - 1].level) : null;
+              const previousSection = index > 0 ? getLessonSection(lessons[index - 1].level) : null;
               const showSectionHeader = index === 0 || currentSection !== previousSection;
 
               return (
@@ -220,7 +246,7 @@ export default function LearnPage() {
                     <div className="flex justify-center mb-8 mt-12 first:mt-0">
                       <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 px-8 py-3 rounded-full border-2 border-primary/50 shadow-lg">
                         <h2 className="text-xl font-bold text-center flex items-center gap-2">
-                          {sectionNames[lesson.sectionId] || `Section ${lesson.sectionId}`}
+                          {sectionNames[currentSection] || `Section ${currentSection}`}
                         </h2>
                       </div>
                     </div>

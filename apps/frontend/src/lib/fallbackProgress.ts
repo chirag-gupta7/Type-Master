@@ -4,6 +4,7 @@ export type FallbackLessonStats = {
   bestWpm: number;
   bestAccuracy: number;
   stars: number;
+  completed?: boolean;
 };
 
 export type FallbackProgress = {

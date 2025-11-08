@@ -20,7 +20,10 @@ import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
 import { authAPI, lessonAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
-import { getFallbackProgress } from '@/lib/fallbackProgress';
+import {
+  getFallbackProgress,
+  type FallbackProgress,
+} from '@/lib/fallbackProgress';
 
 interface Lesson {
   id: string;
@@ -65,7 +68,7 @@ export default function LessonPracticePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
-  const [fallbackProgress, setFallbackProgress] = useState<any>({
+  const [fallbackProgress, setFallbackProgress] = useState<FallbackProgress>({
     completedLessonIds: [],
     stats: {},
   });
@@ -117,21 +120,29 @@ export default function LessonPracticePage() {
       } catch (apiError) {
         console.warn('API fetch failed, attempting to load fallback lesson:', apiError);
         // If API fails, try to find in fallback lessons
-        const fallbackLesson = FALLBACK_LESSONS.find((l) => l.id === lessonId);
+        const fallbackLesson: FallbackLesson | undefined = FALLBACK_LESSONS.find(
+          (l) => l.id === lessonId
+        );
 
         if (fallbackLesson) {
           if (isMounted) {
             const progress = getFallbackProgress();
-            const lessonStats = progress.stats[fallbackLesson.id] || {
-              completed: false,
-              bestWpm: 0,
-              bestAccuracy: 0,
+
+            const fallbackLessonData: Lesson = {
+              id: fallbackLesson.id,
+              level: fallbackLesson.level,
+              title: fallbackLesson.title,
+              description: fallbackLesson.description,
+              difficulty: fallbackLesson.difficulty,
+              targetWpm: fallbackLesson.targetWpm,
+              minAccuracy: fallbackLesson.minAccuracy,
+              content: fallbackLesson.content ?? '',
+              section: (fallbackLesson as { section?: number }).section ?? 1,
+              isCheckpoint: Boolean((fallbackLesson as { isCheckpoint?: boolean }).isCheckpoint),
+              targetFingers: fallbackLesson.keys,
             };
 
-            setLesson({
-              ...fallbackLesson,
-              userProgress: [lessonStats],
-            } as any);
+            setLesson(fallbackLessonData);
             setIsFallback(true);
             setFallbackProgress(progress);
             setError('Showing offline lesson. Progress will be saved locally.');
@@ -267,8 +278,16 @@ export default function LessonPracticePage() {
     // Save fallback progress if in offline mode
     if (isFallback && lesson) {
       // Update fallback progress in local storage
-      const newProgress = { ...fallbackProgress };
-      const currentStats = newProgress.stats[lesson.id] || {};
+      const newProgress: FallbackProgress = {
+        completedLessonIds: [...fallbackProgress.completedLessonIds],
+        stats: { ...fallbackProgress.stats },
+      };
+      const currentStats = newProgress.stats[lesson.id] || {
+        bestWpm: 0,
+        bestAccuracy: 0,
+        stars: 0,
+        completed: false,
+      };
       const completed = finalAccuracy >= (lesson.minAccuracy || 90);
 
       newProgress.stats[lesson.id] = {

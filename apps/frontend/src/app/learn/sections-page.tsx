@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -14,6 +15,8 @@ import {
   Target,
   TrendingUp,
   Award,
+  User,
+  LogIn,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -110,6 +113,8 @@ const SECTION_INFO = {
 };
 
 export default function LearnPage() {
+  const { data: session, status: sessionStatus } = useSession();
+  const userName = session?.user?.name ?? session?.user?.email ?? null;
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,25 +189,43 @@ export default function LearnPage() {
         </p>
       </div>
 
-      {/* Take Assessment CTA */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-semibold mb-1">Not sure where to start?</h3>
-            <p className="text-muted-foreground">
-              Take a quick 2-minute assessment to find your perfect starting point
-            </p>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        {sessionStatus === 'authenticated' ? (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <User className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">
+                  Welcome back{userName ? `, ${userName}` : ''}!
+                </h3>
+                <p className="text-muted-foreground">
+                  Jump into any section and continue building your typing mastery.
+                </p>
+              </div>
+            </div>
           </div>
-          <Link href="/learn/assessment">
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-              Take Assessment
-            </Button>
-          </Link>
-        </div>
+        ) : (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary">
+                <LogIn className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">Sign in to track your progress</h3>
+                <p className="text-muted-foreground">
+                  Sync your section completions and unlock achievements across devices.
+                </p>
+              </div>
+            </div>
+            <Link href="/login" className="w-full md:w-auto">
+              <Button size="lg" className="w-full">
+                Sign in
+              </Button>
+            </Link>
+          </div>
+        )}
       </motion.div>
 
       {error && (
