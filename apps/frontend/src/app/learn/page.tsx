@@ -1,174 +1,211 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Check } from 'lucide-react';
 import { lessonAPI } from '@/lib/api';
-import { FALLBACK_LESSONS, Lesson, isExerciseType } from '@/lib/fallback-lessons';
-import { getFallbackProgress } from '@/lib/fallbackProgress';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CheckCircle, Lock } from 'lucide-react';
 
-export default function LearnPage() {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [usingFallback, setUsingFallback] = useState(false);
-  const [fallbackProgress, setFallbackProgress] = useState<{
-    completedLessonIds: string[];
-    stats: Record<
-      string,
-      {
-        bestWpm: number;
-        bestAccuracy: number;
-        stars: number;
-      }
-    >;
-  }>({ completedLessonIds: [], stats: {} });
+type Section = {
+  id: number;
+  title: string;
+  order: number;
+  lessons: Lesson[];
+};
 
-  useEffect(() => {
-    let isMounted = true;
+type Lesson = {
+  id: string;
+  level: number;
+  order: number;
+  title: string;
+  description: string;
+  keys: string[];
+  difficulty: string;
+  targetWpm: number;
+  minAccuracy: number;
+  exerciseType: string;
+  content: string;
+  section: number;
+  isCheckpoint: boolean;
+  userProgress: UserProgress[];
+};
 
-    async function fetchData() {
-      try {
-        const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+type UserProgress = {
+  id: string;
+  completed: boolean;
+  bestWpm: number;
+  bestAccuracy: number;
+  stars: number;
+  attempts: number;
+};
 
-        if (!hasToken) {
-          if (isMounted) {
-            setLessons(FALLBACK_LESSONS);
-            setUsingFallback(true);
-          }
-          return;
-        }
-
-        const lessonsData = await lessonAPI.getAllLessons();
-
-        const normalizedLessons: Lesson[] = (lessonsData?.lessons ?? []).map((lesson) => {
-          const exerciseType = isExerciseType(lesson.exerciseType)
-            ? lesson.exerciseType
-            : undefined;
-
-          return {
-            ...lesson,
-            exerciseType,
-          };
-        });
-
-        if (isMounted) {
-          setLessons(normalizedLessons);
-          setUsingFallback(false);
-        }
-      } catch (err) {
-        console.error('Failed to load lessons:', err);
-
-        if (isMounted) {
-          setLessons(FALLBACK_LESSONS);
-          setUsingFallback(true);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+const LearnPage = () => {
+  const { data: session } = useSession();
+  const [sections, setSections] = useState<Section[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const loadFallbackProgress = () => {
-      setFallbackProgress(getFallbackProgress());
+    const fetchDashboard = async () => {
+      if (session?.accessToken) {
+        try {
+          setIsLoading(true);
+          const data = await lessonAPI.getLearningDashboard();
+          setSections(data);
+        } catch (error) {
+          console.error('Failed to fetch learning dashboard:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
     };
 
-    if (usingFallback) {
-      loadFallbackProgress();
-      window.addEventListener('typemaster:fallback-progress-updated', loadFallbackProgress);
-      return () => {
-        window.removeEventListener('typemaster:fallback-progress-updated', loadFallbackProgress);
-      };
+    if (session) {
+      fetchDashboard();
+    } else {
+      setIsLoading(false);
     }
+  }, [session]);
 
-    setFallbackProgress({ completedLessonIds: [], stats: {} });
-    return undefined;
-  }, [usingFallback]);
+  const renderLoadingSkeleton = () => (
+    <div className="space-y-8">
+      {[1, 2].map((group) => (
+        <div key={group}>
+          <Skeleton className="h-8 w-1/3 mb-4" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((item) => (
+              <Skeleton key={item} className="h-32 w-full" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
-  const getLessonState = (lesson: Lesson) => {
-    const progress = lesson.userProgress?.[0];
-    const fallbackStats = fallbackProgress.stats[lesson.id];
-    const isCompleted = usingFallback
-      ? fallbackProgress.completedLessonIds.includes(lesson.id)
-      : Boolean(progress?.completed);
-    const bestWpm = usingFallback ? fallbackStats?.bestWpm : progress?.bestWpm;
-    const bestAccuracy = usingFallback ? fallbackStats?.bestAccuracy : progress?.bestAccuracy;
-
-    return {
-      isCompleted,
-      bestWpm,
-      bestAccuracy,
-    };
-  };
-
-  if (loading) {
+  if (isLoading && !sections.length) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-center text-muted-foreground">Loading...</p>
+      <div className="container mx-auto py-10 px-4">
+        <h1 className="text-4xl font-bold mb-8">Learn to Type</h1>
+        {renderLoadingSkeleton()}
       </div>
     );
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Lessons</h1>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {lessons.map((lesson, index) => {
-          const { isCompleted, bestWpm, bestAccuracy } = getLessonState(lesson);
-
-          return (
-            <Link
-              key={lesson.id}
-              href={`/learn/${lesson.id}`}
-              className="group relative block overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/50"
-            >
-              <div className="flex h-full flex-col gap-3 p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Lesson {index + 1}
-                  </span>
-                  {isCompleted && <Check className="h-5 w-5 text-emerald-500" strokeWidth={2.5} />}
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                    {lesson.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{lesson.description}</p>
-                </div>
-                <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Target: {lesson.targetWpm} WPM</span>
-                  <span>Min: {lesson.minAccuracy}%</span>
-                </div>
-                {isCompleted && bestWpm && bestAccuracy && (
-                  <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
-                    <span className="font-medium">{Math.round(bestWpm)} WPM</span>
-                    <span className="font-medium">{Math.round(bestAccuracy)}%</span>
-                  </div>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+  if (!session) {
+    return (
+      <div className="container mx-auto py-10 px-4">
+        <h1 className="text-4xl font-bold mb-8">Learn to Type</h1>
+        <p>
+          Please{' '}
+          <Link href="/login" className="text-primary underline">
+            sign in
+          </Link>{' '}
+          to view your lesson progress.
+        </p>
       </div>
+    );
+  }
 
-      {lessons.length === 0 && (
-        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          <p>No lessons available.</p>
-        </div>
-      )}
+  // Helper to determine if a lesson is unlocked
+  const isLessonUnlocked = (sectionIndex: number, lessonIndex: number): boolean => {
+    if (sectionIndex === 0 && lessonIndex === 0) return true; // First lesson always unlocked
+
+    // Check if previous lesson is complete
+    let prevLesson: Lesson | undefined;
+    const currentSection = sections[sectionIndex];
+
+    if (lessonIndex > 0) {
+      prevLesson = currentSection?.lessons[lessonIndex - 1];
+    } else if (sectionIndex > 0) {
+      const prevSection = sections[sectionIndex - 1];
+      const lessonsInPrevSection = prevSection?.lessons ?? [];
+      prevLesson = lessonsInPrevSection[lessonsInPrevSection.length - 1];
+    }
+
+    const previousProgress = prevLesson?.userProgress?.[0];
+    return previousProgress?.completed ?? false;
+  };
+
+  return (
+    <div className="container mx-auto py-10 px-4">
+      <h1 className="text-4xl font-bold mb-8">Learn to Type</h1>
+      <div className="space-y-12">
+        {sections.map((section, sectionIndex) => (
+          <section key={section.id}>
+            <h2 className="text-2xl font-semibold mb-4 pb-2 border-b border-gray-700">
+              {section.title}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {section.lessons.map((lesson, lessonIndex) => {
+                const isCompleted =
+                  lesson.userProgress.length > 0 && lesson.userProgress[0]?.completed;
+                const unlocked = isLessonUnlocked(sectionIndex, lessonIndex);
+
+                return (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    isCompleted={isCompleted}
+                    isUnlocked={unlocked}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
-}
+};
+
+// A new component for the lesson card
+const LessonCard = ({
+  lesson,
+  isCompleted,
+  isUnlocked,
+}: {
+  lesson: Lesson;
+  isCompleted: boolean;
+  isUnlocked: boolean;
+}) => {
+  const cardContent = (
+    <Card
+      className={`h-full transition-all ${
+        isUnlocked
+          ? 'border-border hover:border-primary cursor-pointer'
+          : 'bg-gray-800/50 border-gray-700'
+      } ${isCompleted ? 'border-green-500' : ''}`}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-lg font-medium">{lesson.title}</CardTitle>
+        {isCompleted && <CheckCircle className="h-5 w-5 text-green-500" />}
+        {!isUnlocked && <Lock className="h-5 w-5 text-gray-500" />}
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Practice{' '}
+          {lesson.keys.length > 0 ? `the keys: ${lesson.keys.join(', ')}` : 'typing skills'}
+        </p>
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Target: {lesson.targetWpm} WPM</span>
+          <span>Min: {lesson.minAccuracy}%</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (!isUnlocked) {
+    return <div className="opacity-60 cursor-not-allowed">{cardContent}</div>;
+  }
+
+  return (
+    <Link href={`/learn/${lesson.id}`} legacyBehavior>
+      <a className="block h-full">{cardContent}</a>
+    </Link>
+  );
+};
+
+export default LearnPage;

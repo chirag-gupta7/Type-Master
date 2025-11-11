@@ -335,6 +335,45 @@ export const userAPI = {
  */
 export const lessonAPI = {
   /**
+   * Get learning dashboard with sections, lessons, and progress
+   */
+  getLearningDashboard: async () => {
+    return fetchAPI<
+      Array<{
+        id: number;
+        title: string;
+        order: number;
+        lessons: Array<{
+          id: string;
+          level: number;
+          order: number;
+          title: string;
+          description: string;
+          keys: string[];
+          difficulty: string;
+          targetWpm: number;
+          minAccuracy: number;
+          exerciseType: string;
+          content: string;
+          section: number;
+          isCheckpoint: boolean;
+          userProgress: Array<{
+            id: string;
+            completed: boolean;
+            bestWpm: number;
+            bestAccuracy: number;
+            stars: number;
+            attempts: number;
+          }>;
+        }>;
+      }>
+    >('/lessons/dashboard', {
+      cacheKey: 'lessons:dashboard',
+      cacheTtl: DEFAULT_CACHE_TTL,
+    });
+  },
+
+  /**
    * Get all lessons with user progress
    */
   getAllLessons: async () => {

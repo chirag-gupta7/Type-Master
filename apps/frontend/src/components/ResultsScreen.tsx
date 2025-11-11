@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Loader2, Sparkles, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MistakeAnalysis } from '@/components/MistakeAnalysis';
+import { useSession } from 'next-auth/react';
+import { lessonAPI } from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MistakeDetail {
   key: string;
@@ -14,6 +17,7 @@ interface MistakeDetail {
 }
 
 interface ResultsScreenProps {
+  lessonId?: string; // Add lessonId prop for auto-save
   wpm: number;
   accuracy: number;
   errors: number;
@@ -30,6 +34,7 @@ interface ResultsScreenProps {
 }
 
 export default function ResultsScreen({
+  lessonId,
   wpm,
   accuracy,
   errors,
@@ -44,6 +49,65 @@ export default function ResultsScreen({
   onRetry,
   onContinue,
 }: ResultsScreenProps) {
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const savingRef = useRef(false);
+  const lastSavedAttemptRef = useRef<string | null>(null);
+
+  // Auto-save progress when component mounts
+  useEffect(() => {
+    if (!session?.accessToken || !lessonId || wpm <= 0 || savingRef.current) {
+      return;
+    }
+
+    const attemptKey = `${lessonId}-${wpm}-${accuracy}-${errors}-${duration}`;
+    if (lastSavedAttemptRef.current === attemptKey) {
+      return;
+    }
+
+    let isActive = true;
+    savingRef.current = true;
+
+    const persistProgress = async () => {
+      try {
+        const completed = accuracy >= 90; // Adjust threshold as needed
+        await lessonAPI.saveLessonProgress({
+          lessonId,
+          wpm,
+          accuracy,
+          completed,
+        });
+
+        if (!isActive) return;
+        lastSavedAttemptRef.current = attemptKey;
+
+        toast({
+          title: 'Progress Saved!',
+          description: 'Your score for this lesson has been recorded.',
+        });
+      } catch (err) {
+        console.error('Failed to save progress:', err);
+        if (isActive) {
+          lastSavedAttemptRef.current = null;
+          toast({
+            title: 'Error',
+            description: 'Could not save your progress. Please try again.',
+          });
+        }
+      } finally {
+        if (isActive) {
+          savingRef.current = false;
+        }
+      }
+    };
+
+    void persistProgress();
+
+    return () => {
+      isActive = false;
+      savingRef.current = false;
+    };
+  }, [session?.accessToken, lessonId, wpm, accuracy, errors, duration, toast]);
   // Calculate additional stats
   const totalChars = correctChars + incorrectChars + missedChars;
   const safeTotalChars = Math.max(totalChars, 1);

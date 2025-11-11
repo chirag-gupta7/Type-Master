@@ -9,6 +9,7 @@ import {
   getLessonsBySection,
   getCheckpointLessons,
   getRecommendedLesson,
+  getLearningDashboard,
 } from '../controllers/lesson.controller';
 
 const router = Router();
@@ -20,6 +21,7 @@ router.get('/section/:sectionId', optionalAuthenticate, getLessonsBySection);
 router.get('/:id', optionalAuthenticate, getLessonById);
 
 // Protected routes (require authentication)
+router.get('/dashboard', authenticate, getLearningDashboard);
 router.get('/recommended/next', authenticate, getRecommendedLesson);
 router.post('/progress', authenticate, saveLessonProgress);
 router.get('/progress/stats', authenticate, getLearningStats);

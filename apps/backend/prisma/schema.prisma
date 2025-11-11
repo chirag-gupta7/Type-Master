@@ -165,6 +165,7 @@ model UserLessonProgress {
   @@unique([userId, lessonId])
   @@index([userId])
   @@index([lessonId])
+  @@index([userId, lessonId]) // Add multi-column index for better query performance
   @@map("user_lesson_progress")
 }
 

@@ -1,8 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+
+type LessonWithProgress = Prisma.LessonGetPayload<{
+  include: {
+    userProgress: true;
+  };
+}>;
+
+type SectionWithProgress = {
+  id: number;
+  title: string;
+  order: number;
+  lessons: LessonWithProgress[];
+};
 
 // Validation schemas
 const saveLessonProgressSchema = z.object({
@@ -115,7 +129,11 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
  * @desc    Save lesson progress
  * @access  Private
  */
-export const saveLessonProgress = async (req: Request, res: Response, next: NextFunction) => {
+export const saveLessonProgress = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -156,7 +174,48 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
     // Override completed flag - only mark as completed if requirements are met
     const actuallyCompleted = meetsRequirements && completed;
 
-    // Upsert progress
+    // Check if this is a better score (higher WPM is considered better)
+    const isBetterScore = !existingProgress || wpm > existingProgress.bestWpm;
+
+    if (existingProgress && !isBetterScore) {
+      // New score is not better, just increment attempts and return existing progress
+      const updatedProgress = await prisma.userLessonProgress.update({
+        where: {
+          id: existingProgress.id,
+        },
+        data: {
+          attempts: { increment: 1 },
+          lastAttempt: new Date(),
+          // Still update completed if user achieved it this time and hadn't before
+          completed: actuallyCompleted || existingProgress.completed,
+        },
+      });
+
+      logger.info('Lesson progress updated (not a new best)', {
+        userId,
+        lessonId,
+        currentWpm: wpm,
+        bestWpm: existingProgress.bestWpm,
+      });
+
+      res.json({
+        message: 'Progress saved. Previous best score maintained.',
+        progress: updatedProgress,
+        meetsRequirements,
+        isNewBest: false,
+        required: {
+          targetWpm: lesson.targetWpm,
+          minAccuracy: lesson.minAccuracy,
+        },
+        current: {
+          wpm,
+          accuracy,
+        },
+      });
+      return;
+    }
+
+    // Either first attempt or better score - save the new record
     const progress = await prisma.userLessonProgress.upsert({
       where: {
         userId_lessonId: {
@@ -165,13 +224,11 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
         },
       },
       update: {
-        bestWpm: existingProgress ? Math.max(existingProgress.bestWpm, wpm) : wpm,
-        bestAccuracy: existingProgress
-          ? Math.max(existingProgress.bestAccuracy, accuracy)
-          : accuracy,
+        bestWpm: Math.max(existingProgress?.bestWpm || 0, wpm),
+        bestAccuracy: Math.max(existingProgress?.bestAccuracy || 0, accuracy),
         attempts: { increment: 1 },
-        completed: actuallyCompleted || undefined,
-        stars: existingProgress ? Math.max(existingProgress.stars, stars) : stars,
+        completed: actuallyCompleted || existingProgress?.completed,
+        stars: Math.max(existingProgress?.stars || 0, stars),
         lastAttempt: new Date(),
       },
       create: {
@@ -185,12 +242,13 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
       },
     });
 
-    logger.info('Lesson progress saved', {
+    logger.info('Lesson progress saved (new best!)', {
       userId,
       lessonId,
       stars,
       completed: actuallyCompleted,
       meetsRequirements,
+      wpm,
     });
 
     res.json({
@@ -201,6 +259,7 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
           : 'Progress saved. Keep practicing to meet the requirements!',
       progress,
       meetsRequirements,
+      isNewBest: true,
       required: {
         targetWpm: lesson.targetWpm,
         minAccuracy: lesson.minAccuracy,
@@ -210,6 +269,7 @@ export const saveLessonProgress = async (req: Request, res: Response, next: Next
         accuracy,
       },
     });
+    return;
   } catch (error) {
     next(error);
   }
@@ -648,6 +708,55 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
         ? `Based on your ${assessment.recommendedLevel} skill level assessment`
         : 'Starting with foundational lessons',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/v1/lessons/dashboard
+ * @desc    Get all sections with lessons and user progress
+ * @access  Private
+ */
+export const getLearningDashboard = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new AppError(401, 'User not authenticated');
+    }
+
+    const userId = req.user.userId;
+
+    // Get all lessons with user progress grouped by section
+    const lessons = await prisma.lesson.findMany({
+      orderBy: [{ section: 'asc' }, { order: 'asc' }],
+      include: {
+        userProgress: {
+          where: { userId },
+        },
+      },
+    });
+
+    // Group lessons by section
+    const sectionsMap = lessons.reduce<Record<number, SectionWithProgress>>((acc, lesson) => {
+      const sectionId = lesson.section;
+      if (!acc[sectionId]) {
+        acc[sectionId] = {
+          id: sectionId,
+          title: getSectionName(sectionId),
+          order: sectionId,
+          lessons: [],
+        };
+      }
+      acc[sectionId].lessons.push(lesson);
+      return acc;
+    }, {});
+
+    // Convert to array and sort
+    const sectionsWithProgress = Object.values(sectionsMap).sort((a, b) => a.order - b.order);
+
+    logger.info(`Fetched learning dashboard for user: ${userId}`);
+
+    res.status(200).json(sectionsWithProgress);
   } catch (error) {
     next(error);
   }
