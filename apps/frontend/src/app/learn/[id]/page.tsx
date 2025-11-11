@@ -20,10 +20,7 @@ import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
 import { authAPI, lessonAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
-import {
-  getFallbackProgress,
-  type FallbackProgress,
-} from '@/lib/fallbackProgress';
+import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
 
 interface Lesson {
   id: string;
@@ -37,6 +34,7 @@ interface Lesson {
   section: number;
   isCheckpoint: boolean;
   targetFingers?: string[];
+  exerciseType?: NonNullable<FallbackLesson['exerciseType']>;
 }
 
 interface TypingMistake {
@@ -111,7 +109,29 @@ export default function LessonPracticePage() {
           : undefined;
 
         if (isMounted) {
-          setLesson({ ...data.lesson, exerciseType });
+          const rawLesson = data.lesson as Partial<FallbackLesson> & {
+            content?: string;
+            section?: number;
+            isCheckpoint?: boolean;
+            targetFingers?: string[];
+          };
+
+          const normalizedLesson: Lesson = {
+            id: rawLesson.id ?? lessonId,
+            level: rawLesson.level ?? 1,
+            title: rawLesson.title ?? 'Typing Lesson',
+            description: rawLesson.description ?? 'Improve your typing skills.',
+            difficulty: rawLesson.difficulty ?? 'Beginner',
+            targetWpm: rawLesson.targetWpm ?? 0,
+            minAccuracy: rawLesson.minAccuracy ?? 0,
+            content: rawLesson.content ?? '',
+            section: rawLesson.section ?? 1,
+            isCheckpoint: Boolean(rawLesson.isCheckpoint),
+            targetFingers: rawLesson.targetFingers ?? rawLesson.keys,
+            exerciseType,
+          };
+
+          setLesson(normalizedLesson);
           // Show onboarding modal for the first lesson (level 1, order 1)
           if (data.lesson.level === 1 && data.lesson.order === 1) {
             setShowOnboarding(true);
@@ -140,6 +160,7 @@ export default function LessonPracticePage() {
               section: (fallbackLesson as { section?: number }).section ?? 1,
               isCheckpoint: Boolean((fallbackLesson as { isCheckpoint?: boolean }).isCheckpoint),
               targetFingers: fallbackLesson.keys,
+              exerciseType: fallbackLesson.exerciseType ?? undefined,
             };
 
             setLesson(fallbackLessonData);
