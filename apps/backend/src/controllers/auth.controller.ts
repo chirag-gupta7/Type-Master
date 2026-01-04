@@ -31,6 +31,82 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
+const tokenProvisionSchema = z.object({
+  email: z.string().email('Invalid email'),
+  name: z.string().min(1).max(100).nullable().optional(),
+  username: z.string().min(1).max(50).nullable().optional(),
+  image: z.string().url('Invalid image URL').nullable().optional(),
+});
+
+const MIN_USERNAME_LENGTH = 3;
+const MAX_USERNAME_LENGTH = 20;
+const DEFAULT_USERNAME_SEED = 'typist';
+
+const normalizeUsernameSeed = (value: string | null | undefined, email: string): string => {
+  const fallback =
+    value && value.trim().length > 0 ? value : (email.split('@')[0] ?? DEFAULT_USERNAME_SEED);
+  const cleaned = fallback
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  const truncated = cleaned.slice(0, MAX_USERNAME_LENGTH);
+  if (truncated.length >= MIN_USERNAME_LENGTH) {
+    return truncated;
+  }
+  const padded = `${truncated}${DEFAULT_USERNAME_SEED}`.slice(0, MIN_USERNAME_LENGTH);
+  return padded || DEFAULT_USERNAME_SEED;
+};
+
+const MAX_USERNAME_ATTEMPTS = 1000;
+
+const ensureUniqueUsername = async (seed: string): Promise<string> => {
+  let attempt = 0;
+  let candidate = seed;
+
+  while (attempt < MAX_USERNAME_ATTEMPTS) {
+    const existing = await prisma.user.findUnique({ where: { username: candidate } });
+    if (!existing) {
+      return candidate;
+    }
+
+    attempt += 1;
+    const suffix = `_${attempt}`;
+    const truncatedSeed = seed.slice(
+      0,
+      Math.max(MIN_USERNAME_LENGTH, MAX_USERNAME_LENGTH - suffix.length)
+    );
+    candidate = `${truncatedSeed}${suffix}`;
+  }
+
+  throw new AppError(500, 'Unable to generate unique username');
+};
+
+const findOrCreateUserForToken = async (payload: z.infer<typeof tokenProvisionSchema>) => {
+  const existingUser = await prisma.user.findUnique({ where: { email: payload.email } });
+  if (existingUser) {
+    return existingUser;
+  }
+
+  const usernameSeed = normalizeUsernameSeed(
+    payload.username ?? payload.name ?? null,
+    payload.email
+  );
+  const username = await ensureUniqueUsername(usernameSeed);
+
+  const user = await prisma.user.create({
+    data: {
+      email: payload.email,
+      username,
+      name: payload.name ?? username,
+      image: payload.image ?? null,
+    },
+  });
+
+  logger.info('Provisioned user during token request', { userId: user.id, email: user.email });
+  return user;
+};
+
 /**
  * Generate JWT access token
  */
@@ -209,16 +285,10 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
  */
 export const getTokenForNextAuthUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const payload = tokenProvisionSchema.parse(req.body);
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new AppError(404, 'User not found');
-    }
+    // Find or provision the user on-demand for OAuth/NextAuth callers
+    const user = await findOrCreateUserForToken(payload);
 
     // Generate tokens for this user
     const accessToken = generateAccessToken(user.id, user.email);

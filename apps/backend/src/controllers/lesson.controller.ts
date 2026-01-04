@@ -152,8 +152,10 @@ export const saveLessonProgress = async (
     }
 
     // Calculate stars (0-3 based on performance)
+    // Reduce minimum accuracy requirement by 10 percentage points
+    const adjustedMinAccuracy = Math.max(0, lesson.minAccuracy - 10);
     let stars = 0;
-    const meetsRequirements = wpm >= lesson.targetWpm && accuracy >= lesson.minAccuracy;
+    const meetsRequirements = wpm >= lesson.targetWpm && accuracy >= adjustedMinAccuracy;
 
     if (meetsRequirements && completed) {
       if (wpm >= lesson.targetWpm * 1.5 && accuracy >= 98) stars = 3;
@@ -174,10 +176,13 @@ export const saveLessonProgress = async (
     // Override completed flag - only mark as completed if requirements are met
     const actuallyCompleted = meetsRequirements && completed;
 
-    // Check if this is a better score (higher WPM is considered better)
-    const isBetterScore = !existingProgress || wpm > existingProgress.bestWpm;
+    // Check if this is a better score (improved WPM, accuracy, or stars)
+    const improvedWpm = !existingProgress || wpm > existingProgress.bestWpm;
+    const improvedAccuracy = !existingProgress || accuracy > existingProgress.bestAccuracy;
+    const improvedStars = !existingProgress || stars > (existingProgress?.stars || 0);
+    const hasMetricImprovement = improvedWpm || improvedAccuracy || improvedStars;
 
-    if (existingProgress && !isBetterScore) {
+    if (existingProgress && !hasMetricImprovement) {
       // New score is not better, just increment attempts and return existing progress
       const updatedProgress = await prisma.userLessonProgress.update({
         where: {
@@ -196,6 +201,7 @@ export const saveLessonProgress = async (
         lessonId,
         currentWpm: wpm,
         bestWpm: existingProgress.bestWpm,
+        bestAccuracy: existingProgress.bestAccuracy,
       });
 
       res.json({
@@ -259,7 +265,7 @@ export const saveLessonProgress = async (
           : 'Progress saved. Keep practicing to meet the requirements!',
       progress,
       meetsRequirements,
-      isNewBest: true,
+      isNewBest: hasMetricImprovement,
       required: {
         targetWpm: lesson.targetWpm,
         minAccuracy: lesson.minAccuracy,
@@ -546,14 +552,17 @@ export const getProgressVisualization = async (req: Request, res: Response, next
  * @desc    Get all lessons for a specific section
  * @access  Public
  */
+const MIN_SECTION_ID = 1;
+const MAX_SECTION_ID = 10;
+
 export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sectionId } = req.params;
     const userId = req.user?.userId;
     const section = parseInt(sectionId);
 
-    if (isNaN(section) || section < 1 || section > 6) {
-      throw new AppError(400, 'Section must be between 1 and 6');
+    if (isNaN(section) || section < MIN_SECTION_ID || section > MAX_SECTION_ID) {
+      throw new AppError(400, `Section must be between ${MIN_SECTION_ID} and ${MAX_SECTION_ID}`);
     }
 
     const lessons = await prisma.lesson.findMany({
@@ -773,6 +782,10 @@ function getSectionName(sectionId: number): string {
     4: 'Speed & Fluency',
     5: 'Mastery',
     6: 'Programming',
+    7: 'Python Coding',
+    8: 'Java Coding',
+    9: 'C++ Coding',
+    10: 'C Coding',
   };
   return sectionNames[sectionId] || `Section ${sectionId}`;
 }

@@ -8,6 +8,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import authRoutes from '../routes/auth.routes';
 import userRoutes from '../routes/user.routes';
+import { errorHandler } from '../middleware/error-handler';
 import { prisma } from '../utils/prisma';
 
 // Note: This is a template - you'll need to set up your test environment
@@ -19,6 +20,7 @@ const createTestApp = () => {
   const apiPrefix = '/api/v1';
   app.use(`${apiPrefix}/auth`, authRoutes);
   app.use(`${apiPrefix}/users`, userRoutes);
+  app.use(errorHandler);
 
   return app;
 };

@@ -35,10 +35,11 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
       req.user = decoded;
       next();
     } catch (jwtError) {
-      // If JWT verification fails, try to parse as a simple base64-encoded user payload
-      // This allows NextAuth sessions to work temporarily until proper integration
+      // If JWT verification fails, try to parse as a simple base64-encoded user payload.
+      // TODO: Remove this fallback once NextAuth starts issuing proper JWT access tokens everywhere.
       try {
-        const decoded = JSON.parse(atob(token)) as { userId: string; email: string };
+        const decodedPayload = Buffer.from(token, 'base64').toString('utf-8');
+        const decoded = JSON.parse(decodedPayload) as { userId: string; email: string };
         if (decoded.userId && decoded.email) {
           req.user = {
             userId: decoded.userId,
