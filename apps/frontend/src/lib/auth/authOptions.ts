@@ -73,8 +73,25 @@ const isJwtExpired = (token: string, skewSeconds = 30): boolean => {
   return payload.exp - skewSeconds <= now;
 };
 
-const requestBackendToken = async (email?: string | null): Promise<string | null> => {
+type TokenRequestPayload = {
+  email?: string | null;
+  name?: string | null;
+  username?: string | null;
+  image?: string | null;
+};
+
+const normalizeEmail = (email?: string | null): string | null => {
   if (!email) {
+    return null;
+  }
+  const trimmed = email.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
+const requestBackendToken = async (payload: TokenRequestPayload): Promise<string | null> => {
+  const normalizedEmail = normalizeEmail(payload.email);
+
+  if (!normalizedEmail) {
     return null;
   }
 
@@ -84,7 +101,12 @@ const requestBackendToken = async (email?: string | null): Promise<string | null
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email: normalizedEmail,
+        name: payload.name ?? null,
+        username: payload.username ?? null,
+        image: payload.image ?? null,
+      }),
     });
 
     if (response.ok) {
@@ -118,7 +140,12 @@ const ensureBackendToken = async (
     return;
   }
 
-  const backendToken = await requestBackendToken(email);
+  const backendToken = await requestBackendToken({
+    email,
+    name: authToken.user?.name ?? null,
+    username: authToken.user?.username ?? null,
+    image: authToken.user?.image ?? null,
+  });
   if (backendToken) {
     authToken.backendAccessToken = backendToken;
     authToken.accessToken = backendToken;

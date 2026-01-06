@@ -15,25 +15,190 @@ interface FetchOptions extends RequestInit {
   skipCache?: boolean;
 }
 
-/**
- * Get authentication token from NextAuth session or localStorage
- */
+const sanitizeToken = (token?: string | null): string | null => {
+  if (!token) return null;
+  return token.trim();
+};
+
+const base64UrlDecode = (value: string): string => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+  const input = normalized + padding;
+
+  if (typeof window === 'undefined') {
+    return Buffer.from(input, 'base64').toString('utf-8');
+  }
+
+  if (typeof window.atob === 'function') {
+    return window.atob(input);
+  }
+
+  return Buffer.from(input, 'base64').toString('utf-8');
+};
+
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const segments = token.split('.');
+    if (segments.length !== 3) return null;
+    const payload = base64UrlDecode(segments[1]);
+    return JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const isBackendJwt = (token: string): boolean => {
+  const payload = decodeJwtPayload(token);
+  return Boolean(
+    payload && typeof payload.userId === 'string' && typeof payload.email === 'string'
+  );
+};
+
+const isJwtExpired = (token: string, skewSeconds = 30): boolean => {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== 'number') {
+    return false;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp - skewSeconds <= now;
+};
+
+const persistBackendToken = (token?: string | null) => {
+  const cleaned = sanitizeToken(token);
+  if (typeof window === 'undefined' || !cleaned) {
+    return;
+  }
+  localStorage.setItem('accessToken', cleaned);
+};
+
+type TokenRequestPayload = {
+  email?: string | null;
+  name?: string | null;
+  username?: string | null;
+  image?: string | null;
+};
+
+const normalizeEmail = (email?: string | null): string | null => {
+  if (!email) {
+    return null;
+  }
+  const trimmed = email.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
+const requestBackendToken = async (payload: TokenRequestPayload): Promise<string | null> => {
+  const normalizedEmail = normalizeEmail(payload.email);
+
+  console.log('[API] Requesting backend token for:', {
+    email: normalizedEmail,
+    hasUsername: !!payload.username,
+  });
+
+  if (!normalizedEmail) {
+    console.error('[API] Cannot request token: no email provided');
+    return null;
+  }
+
+  try {
+    const requestBody = {
+      email: normalizedEmail,
+      name: payload.name ?? null,
+      username: payload.username ?? null,
+      image: payload.image ?? null,
+    };
+    console.log('[API] Token request payload:', requestBody);
+
+    const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('[API] Token request response:', response.status, response.statusText);
+
+    if (response.ok) {
+      const data = (await response.json()) as { accessToken?: string };
+      const token = sanitizeToken(data.accessToken);
+      if (token && isBackendJwt(token)) {
+        console.log('[API] Received valid backend JWT token');
+        persistBackendToken(token);
+        return token;
+      } else {
+        console.error('[API] Token response invalid:', {
+          hasToken: !!token,
+          isBackendJwt: token ? isBackendJwt(token) : false,
+        });
+      }
+    } else {
+      const errorText = await response.text();
+      console.error('[API] Token request failed:', response.status, errorText);
+    }
+  } catch (error) {
+    console.error('[API] Failed to fetch backend token:', error);
+  }
+
+  return null;
+};
+
 const getAuthToken = async (): Promise<string | null> => {
   if (typeof window === 'undefined') return null;
 
-  // Try NextAuth session first (this will have the backend JWT)
+  let session = null;
+
   try {
-    const session = await getSession();
-    if (session?.accessToken) {
-      // Use backend JWT token from session
-      return session.accessToken;
-    }
+    session = await getSession();
+    console.log('[API] Session retrieved:', {
+      hasUser: !!session?.user,
+      email: session?.user?.email,
+      hasAccessToken: !!session?.accessToken,
+      hasBackendAccessToken: !!(session as any)?.backendAccessToken,
+    });
   } catch (error) {
-    console.error('Failed to get session:', error);
+    console.error('[API] Failed to get session:', error);
   }
 
-  // Fallback to localStorage (for direct backend auth without NextAuth)
-  return localStorage.getItem('accessToken');
+  const candidates = [
+    sanitizeToken((session as any)?.backendAccessToken),
+    sanitizeToken(session?.accessToken),
+    sanitizeToken(localStorage.getItem('accessToken')),
+  ];
+
+  console.log('[API] Checking token candidates:', {
+    backendAccessToken: candidates[0] ? 'present' : 'missing',
+    sessionAccessToken: candidates[1] ? 'present' : 'missing',
+    localStorageToken: candidates[2] ? 'present' : 'missing',
+  });
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    if (candidate) {
+      const isValid = isBackendJwt(candidate);
+      const isExpired = isJwtExpired(candidate);
+      console.log(`[API] Candidate ${i}: valid=${isValid}, expired=${isExpired}`);
+
+      if (isValid && !isExpired) {
+        console.log('[API] Using valid token from candidate', i);
+        persistBackendToken(candidate);
+        return candidate;
+      }
+    }
+  }
+
+  console.log('[API] No valid token found, requesting new token from backend');
+  const refreshedToken = await requestBackendToken({
+    email: session?.user?.email ?? null,
+    name: session?.user?.name ?? null,
+    username: (session?.user as any)?.username ?? null,
+    image: session?.user?.image ?? null,
+  });
+
+  if (refreshedToken) {
+    console.log('[API] Successfully obtained new backend token');
+    return refreshedToken;
+  }
+
+  console.error('[API] Failed to obtain any valid token');
+  return null;
 }; /**
  * Generate a backend JWT token by calling the backend auth endpoint
  * This is a temporary solution to integrate NextAuth with the Express backend
@@ -46,7 +211,9 @@ const getAuthToken = async (): Promise<string | null> => {
 async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { cacheKey, cacheTtl, skipCache, ...requestInit } = options;
 
+  console.log(`[API] Fetching ${endpoint}`);
   const token = await getAuthToken();
+  console.log(`[API] Token for ${endpoint}:`, token ? 'present' : 'MISSING');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -63,23 +230,31 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   if (effectiveCacheKey) {
     const cached = getCache<T>(effectiveCacheKey);
     if (cached) {
+      console.log(`[API] Returning cached data for ${endpoint}`);
       return cached;
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}${endpoint}`, {
+  const url = `${API_BASE_URL}/api/${API_VERSION}${endpoint}`;
+  console.log(`[API] Making request to: ${url}`);
+
+  const response = await fetch(url, {
     ...requestInit,
     headers,
   });
+
+  console.log(`[API] Response from ${endpoint}:`, response.status, response.statusText);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({
       error: 'An error occurred',
     }));
+    console.error(`[API] Request failed for ${endpoint}:`, error);
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
   const data = (await response.json()) as T;
+  console.log(`[API] Data received from ${endpoint}:`, data);
 
   if (effectiveCacheKey) {
     setCache(effectiveCacheKey, data, cacheTtl ?? DEFAULT_CACHE_TTL);
@@ -113,7 +288,7 @@ export const authAPI = {
 
     // Store tokens
     if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', response.accessToken);
+      persistBackendToken(response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
     }
 
@@ -140,7 +315,7 @@ export const authAPI = {
 
     // Store tokens
     if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', response.accessToken);
+      persistBackendToken(response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
     }
 
@@ -455,10 +630,14 @@ export const lessonAPI = {
       body: JSON.stringify(data),
     });
 
+    // Invalidate all relevant caches so dashboard reflects new progress
     invalidateCache('lessons:all');
+    invalidateCache('lessons:dashboard');
     invalidateCache(`lessons:detail:${data.lessonId}`);
     invalidateCache('lessons:stats');
     invalidateCache('lessons:progress');
+
+    console.log('[API] Invalidated lesson caches after progress save');
 
     return response;
   },
@@ -526,6 +705,40 @@ export const lessonAPI = {
       cacheKey: 'lessons:progress',
       cacheTtl: DEFAULT_CACHE_TTL,
     });
+  },
+};
+
+/**
+ * Mistake logging and analysis API
+ */
+export const mistakeAPI = {
+  logMistakes: async (payload: {
+    userId: string;
+    lessonId: string;
+    mistakes: Array<{ keyPressed: string; keyExpected: string; fingerUsed?: string }>;
+  }) => {
+    return fetchAPI<{ message: string; count: number }>('/mistakes/log', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getWeakKeyAnalysis: async (userId: string, limit = 5) => {
+    return fetchAPI<{
+      weakKeys: Array<{ key: string; errorCount: number; lastError?: string }>;
+      fingerErrors: Array<{ finger: string; count: number }>;
+      recentMistakes: Array<{ keyPressed: string; keyExpected: string; fingerUsed?: string }>;
+      analysis: string;
+    }>(`/mistakes/analysis/${userId}?limit=${limit}`);
+  },
+
+  getPracticeText: async (userId: string) => {
+    return fetchAPI<{
+      message: string;
+      practiceText: string;
+      instructions?: string;
+      weakKeys?: string[];
+    }>(`/mistakes/practice/${userId}`);
   },
 };
 

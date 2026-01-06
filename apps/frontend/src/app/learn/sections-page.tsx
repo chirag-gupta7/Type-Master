@@ -49,7 +49,14 @@ interface SectionData {
   total: number;
 }
 
-const SECTION_INFO = {
+type SectionInfo = {
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  description: string;
+};
+
+const SECTION_INFO: Record<number, SectionInfo> = {
   1: {
     name: 'Foundation',
     icon: <Target className="w-5 h-5" />,
@@ -112,6 +119,17 @@ const SECTION_INFO = {
   },
 };
 
+const getSectionInfo = (sectionId: number): SectionInfo => {
+  return (
+    SECTION_INFO[sectionId as keyof typeof SECTION_INFO] ?? {
+      name: `Section ${sectionId}`,
+      icon: <Target className="w-5 h-5" />,
+      color: 'from-gray-500 to-gray-700',
+      description: 'Additional lesson content',
+    }
+  );
+};
+
 export default function LearnPage() {
   const { data: session, status: sessionStatus } = useSession();
   const userName = session?.user?.name ?? session?.user?.email ?? null;
@@ -140,11 +158,12 @@ export default function LearnPage() {
           ([sectionId, lessons]) => {
             const id = parseInt(sectionId);
             const completed = lessons.filter((l) => l.userProgress?.[0]?.completed).length;
+            const info = getSectionInfo(id);
             return {
               id,
-              name: SECTION_INFO[id as keyof typeof SECTION_INFO].name,
-              icon: SECTION_INFO[id as keyof typeof SECTION_INFO].icon,
-              color: SECTION_INFO[id as keyof typeof SECTION_INFO].color,
+              name: info.name,
+              icon: info.icon,
+              color: info.color,
               lessons: lessons.sort((a, b) => a.level - b.level),
               completed,
               total: lessons.length,
@@ -286,7 +305,7 @@ export default function LearnPage() {
 
                 <h3 className="text-xl font-bold mb-2">{section.name}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {SECTION_INFO[section.id as keyof typeof SECTION_INFO].description}
+                  {getSectionInfo(section.id).description}
                 </p>
 
                 {/* Progress */}
@@ -324,9 +343,7 @@ export default function LearnPage() {
       {selectedSection && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">
-              {SECTION_INFO[selectedSection as keyof typeof SECTION_INFO].name} - Lessons
-            </h2>
+            <h2 className="text-2xl font-bold">{getSectionInfo(selectedSection).name} - Lessons</h2>
             <Button variant="outline" onClick={() => setSelectedSection(null)}>
               View All Sections
             </Button>

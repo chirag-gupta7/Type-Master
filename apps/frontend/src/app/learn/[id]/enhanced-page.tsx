@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
+import { authAPI, lessonAPI, mistakeAPI } from '@/lib/api';
 
 interface Lesson {
   id: string;
@@ -50,6 +51,7 @@ export default function EnhancedLessonPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'initial' | 'typing' | 'results' | 'analysis'>('initial');
   const [isSaving, setIsSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Typing state
   const [userInput, setUserInput] = useState('');
@@ -66,12 +68,25 @@ export default function EnhancedLessonPage() {
   const [weakKeyAnalysis, setWeakKeyAnalysis] = useState<WeakKeyAnalysis[]>([]);
   const [practiceText, setPracticeText] = useState('');
 
+  // Load authenticated user profile for API calls
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const profile = await authAPI.getProfile();
+        setUserId(profile.user.id);
+      } catch (err) {
+        console.warn('Proceeding without authenticated user profile', err);
+      }
+    }
+
+    loadUserProfile();
+  }, []);
+
   // Fetch lesson
   useEffect(() => {
     async function fetchLesson() {
       try {
-        const response = await fetch(`http://localhost:5000/api/v1/lessons/${lessonId}`);
-        const data = await response.json();
+        const data = await lessonAPI.getLessonById(lessonId);
         setLesson(data.lesson);
       } catch (err) {
         console.error('Failed to load lesson:', err);
@@ -167,32 +182,22 @@ export default function EnhancedLessonPage() {
     setWpm(finalWpm);
     setAccuracy(finalAccuracy);
 
-    // Log mistakes to backend
+    // Log mistakes to backend (only when authenticated)
     try {
-      const userId = 'demo-user-id'; // Replace with actual auth
-
-      if (finalMistakes.length > 0) {
-        await fetch('http://localhost:5000/api/v1/mistakes/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            lessonId: lesson.id,
-            mistakes: finalMistakes,
-          }),
+      if (finalMistakes.length > 0 && userId) {
+        await mistakeAPI.logMistakes({
+          userId,
+          lessonId: lesson.id,
+          mistakes: finalMistakes,
         });
 
-        // Fetch analysis
-        const analysisRes = await fetch(
-          `http://localhost:5000/api/v1/mistakes/analysis/${userId}?limit=5`
-        );
-        const analysisData = await analysisRes.json();
+        const analysisData = await mistakeAPI.getWeakKeyAnalysis(userId, 5);
         setWeakKeyAnalysis(analysisData.weakKeys || []);
 
-        // Fetch practice text
-        const practiceRes = await fetch(`http://localhost:5000/api/v1/mistakes/practice/${userId}`);
-        const practiceData = await practiceRes.json();
+        const practiceData = await mistakeAPI.getPracticeText(userId);
         setPracticeText(practiceData.practiceText || '');
+      } else if (finalMistakes.length > 0) {
+        console.warn('Skipping mistake logging because no userId is available');
       }
     } catch (error) {
       console.error('Failed to log mistakes:', error);
@@ -207,15 +212,12 @@ export default function EnhancedLessonPage() {
     setIsSaving(true);
 
     try {
-      // TODO: Save lesson progress when auth is implemented
-      // await lessonAPI.saveLessonProgress({
-      //   lessonId: lesson.id,
-      //   wpm,
-      //   accuracy,
-      //   completed: accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm
-      // });
-      // Save to backend (requires auth)
-      // await lessonAPI.saveLessonProgress({ lessonId: lesson.id, wpm, accuracy, completed });
+      await lessonAPI.saveLessonProgress({
+        lessonId: lesson.id,
+        wpm,
+        accuracy,
+        completed: accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm,
+      });
 
       if (mistakes.length > 0) {
         setView('analysis');

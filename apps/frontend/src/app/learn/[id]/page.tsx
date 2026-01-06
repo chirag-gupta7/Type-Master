@@ -18,7 +18,7 @@ import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
-import { authAPI, lessonAPI } from '@/lib/api';
+import { authAPI, lessonAPI, mistakeAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
 
@@ -74,6 +74,7 @@ export default function LessonPracticePage() {
     lessonsCompleted: 0,
     sectionsCompleted: [],
   });
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Typing state
   const [userInput, setUserInput] = useState('');
@@ -89,6 +90,24 @@ export default function LessonPracticePage() {
   // Analysis state
   const [weakKeyAnalysis, setWeakKeyAnalysis] = useState<WeakKeyAnalysis[]>([]);
   const [practiceText, setPracticeText] = useState('');
+
+  // Load authenticated user profile for API calls that need userId
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        // Get user ID from localStorage where it's stored after login
+        const userDataStr = localStorage.getItem('typemaster_user');
+        if (userDataStr) {
+          const userData = JSON.parse(userDataStr);
+          setUserId(userData.id || userData.userId);
+        }
+      } catch (err) {
+        console.warn('Proceeding without authenticated user profile', err);
+      }
+    }
+
+    loadUserProfile();
+  }, []);
 
   // Fetch lesson
   useEffect(() => {
@@ -191,28 +210,23 @@ export default function LessonPracticePage() {
   // Fetch user stats for achievement tracking
   useEffect(() => {
     async function fetchUserStats() {
-      if (!authAPI.isAuthenticated()) {
-        return;
-      }
+      if (!userId) return;
 
       try {
-        // TODO: Replace with actual user ID from auth
-        const userId = 'mock-user-id'; // This will be replaced when auth is implemented
-        const response = await fetch(`http://localhost:5000/api/v1/users/${userId}/stats`);
-        if (response.ok) {
-          const data = await response.json();
-          setUserStats({
-            lessonsCompleted: data.stats?.totalLessonsCompleted || 0,
-            sectionsCompleted: data.stats?.sectionsCompleted || [],
-          });
-        }
+        const statsResponse = await lessonAPI.getLearningStats();
+
+        setUserStats({
+          lessonsCompleted: statsResponse.stats?.completedLessons || 0,
+          // Sections completed are not provided by the endpoint yet
+          sectionsCompleted: [],
+        });
       } catch (err) {
         console.error('Failed to fetch user stats:', err);
         // Continue with default stats
       }
     }
     fetchUserStats();
-  }, []);
+  }, [userId]);
 
   const handleStart = useCallback(() => {
     setView('typing');
@@ -263,12 +277,18 @@ export default function LessonPracticePage() {
       // Calculate real-time WPM and accuracy
       const timeElapsed = (Date.now() - startTime) / 1000 / 60; // minutes
       const charsTyped = currentIndex + 1;
-      const wordsTyped = charsTyped / 5;
-      const currentWpm = Math.round(wordsTyped / timeElapsed);
-      const currentAccuracy = ((charsTyped - mistakes.length) / charsTyped) * 100;
+      const errorCount = mistakes.length + (typedChar !== expectedChar ? 1 : 0);
+
+      // WPM = (total characters typed / 5) / time in minutes
+      // Standard WPM formula: characters per minute divided by 5 (average word length)
+      const currentWpm = timeElapsed > 0 ? Math.round(charsTyped / 5 / timeElapsed) : 0;
+
+      // Accuracy = (correct characters / total characters typed) * 100
+      const correctChars = charsTyped - errorCount;
+      const currentAccuracy = charsTyped > 0 ? (correctChars / charsTyped) * 100 : 100;
 
       setWpm(currentWpm);
-      setAccuracy(currentAccuracy);
+      setAccuracy(Math.max(0, currentAccuracy));
 
       // Check if test is complete
       if (currentIndex + 1 >= lesson.content.length) {
@@ -284,14 +304,22 @@ export default function LessonPracticePage() {
     const end = Date.now();
     setEndTime(end);
 
-    const timeSpent = (end - startTime) / 1000;
+    const timeSpent = (end - startTime) / 1000; // seconds
+    const timeInMinutes = timeSpent / 60;
     const totalChars = lesson.content.length;
+
+    // Count final mistakes including last character if incorrect
     const finalMistakes = lastCharCorrect
       ? mistakes
       : [...mistakes, { keyPressed: '', keyExpected: lesson.content[lesson.content.length - 1] }];
+
+    // Calculate final accuracy: (correct chars / total chars) * 100
     const correctChars = totalChars - finalMistakes.length;
-    const finalAccuracy = (correctChars / totalChars) * 100;
-    const finalWpm = Math.round(totalChars / 5 / (timeSpent / 60));
+    const finalAccuracy = totalChars > 0 ? (correctChars / totalChars) * 100 : 0;
+
+    // Calculate final WPM: (total characters / 5) / time in minutes
+    // Standard typing test formula
+    const finalWpm = timeInMinutes > 0 ? Math.round(totalChars / 5 / timeInMinutes) : 0;
 
     setWpm(finalWpm);
     setAccuracy(finalAccuracy);
@@ -309,7 +337,9 @@ export default function LessonPracticePage() {
         stars: 0,
         completed: false,
       };
-      const completed = finalAccuracy >= (lesson.minAccuracy || 90);
+      // Reduce passing requirement by 10 percentage points
+      const adjustedMinAccuracy = Math.max(0, (lesson.minAccuracy || 90) - 10);
+      const completed = finalAccuracy >= adjustedMinAccuracy;
 
       newProgress.stats[lesson.id] = {
         bestWpm: Math.max(currentStats.bestWpm || 0, finalWpm),
@@ -327,38 +357,31 @@ export default function LessonPracticePage() {
       setFallbackProgress(newProgress);
     }
 
-    // Log mistakes to backend
+    // Log mistakes to backend (only when we have an authenticated user)
     try {
-      const userId = 'demo-user-id'; // Replace with actual auth
-
-      if (finalMistakes.length > 0) {
-        await fetch('http://localhost:5000/api/v1/mistakes/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            lessonId: lesson.id,
-            mistakes: finalMistakes,
-          }),
+      if (finalMistakes.length > 0 && userId) {
+        await mistakeAPI.logMistakes({
+          userId,
+          lessonId: lesson.id,
+          mistakes: finalMistakes,
         });
 
-        // Fetch analysis
-        const analysisRes = await fetch(
-          `http://localhost:5000/api/v1/mistakes/analysis/${userId}?limit=5`
-        );
-        const analysisData = await analysisRes.json();
+        const analysisData = await mistakeAPI.getWeakKeyAnalysis(userId, 5);
         setWeakKeyAnalysis(analysisData.weakKeys || []);
 
-        // Fetch practice text
-        const practiceRes = await fetch(`http://localhost:5000/api/v1/mistakes/practice/${userId}`);
-        const practiceData = await practiceRes.json();
+        const practiceData = await mistakeAPI.getPracticeText(userId);
         setPracticeText(practiceData.practiceText || '');
+      } else if (finalMistakes.length > 0) {
+        console.warn('Skipping mistake logging because no userId is available');
       }
     } catch (error) {
       console.error('Failed to log mistakes:', error);
     }
 
     setView('results');
+
+    // Auto-save progress when lesson completes
+    setTimeout(() => handleSaveProgress(), 100);
   };
 
   const handleSaveProgress = async () => {
@@ -368,7 +391,19 @@ export default function LessonPracticePage() {
 
     try {
       const stars = calculateStars();
-      const completed = accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm;
+      // Reduce passing requirement by 10 percentage points for minAccuracy
+      const adjustedMinAccuracy = Math.max(0, lesson.minAccuracy - 10);
+      const completed = accuracy >= adjustedMinAccuracy && wpm >= lesson.targetWpm;
+
+      console.log('[Lesson] Saving progress:', {
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        wpm,
+        accuracy,
+        completed,
+        stars,
+        meetsRequirements: completed,
+      });
 
       // Check for achievements
       await checkAchievements(
@@ -382,15 +417,18 @@ export default function LessonPracticePage() {
         userStats
       );
 
-      // TODO: Save lesson progress when auth is implemented
-      // await lessonAPI.saveLessonProgress({
-      //   lessonId: lesson.id,
-      //   wpm,
-      //   accuracy,
-      //   completed: accuracy >= lesson.minAccuracy && wpm >= lesson.targetWpm
-      // });
-      // Save to backend (requires auth)
-      // await lessonAPI.saveLessonProgress({ lessonId: lesson.id, wpm, accuracy, completed });
+      // Save to backend when online/authenticated; fallback mode keeps local storage only
+      if (!isFallback) {
+        const response = await lessonAPI.saveLessonProgress({
+          lessonId: lesson.id,
+          wpm,
+          accuracy,
+          completed,
+        });
+        console.log('[Lesson] Progress saved successfully:', response);
+      } else {
+        console.log('[Lesson] Fallback mode - progress saved to localStorage');
+      }
 
       // Update user stats for next achievement check
       if (completed) {
@@ -402,13 +440,11 @@ export default function LessonPracticePage() {
         }));
       }
 
-      if (mistakes.length > 0) {
-        setView('analysis');
-      } else {
-        router.push('/learn');
-      }
+      // Stay on results screen - user can choose next action
+      console.log('[Lesson] Progress save completed, staying on results screen');
     } catch (err) {
-      console.error('Failed to save progress:', err);
+      console.error('[Lesson] Failed to save progress:', err);
+      alert('Failed to save your progress. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -416,9 +452,19 @@ export default function LessonPracticePage() {
 
   const calculateStars = () => {
     if (!lesson) return 0;
-    if (accuracy < lesson.minAccuracy || wpm < lesson.targetWpm) return 0;
+    // Reduce minimum accuracy requirement by 10 percentage points
+    const adjustedMinAccuracy = Math.max(0, lesson.minAccuracy - 10);
+
+    // Must meet adjusted minimum requirements to get any stars
+    if (accuracy < adjustedMinAccuracy || wpm < lesson.targetWpm) return 0;
+
+    // 3 stars: 150%+ target WPM and 98%+ accuracy
     if (wpm >= lesson.targetWpm * 1.5 && accuracy >= 98) return 3;
+
+    // 2 stars: 120%+ target WPM and 95%+ accuracy
     if (wpm >= lesson.targetWpm * 1.2 && accuracy >= 95) return 2;
+
+    // 1 star: meet minimum requirements
     return 1;
   };
 
@@ -604,7 +650,7 @@ export default function LessonPracticePage() {
                   <Trophy className="text-yellow-500" size={20} />
                   <span className="font-semibold">Min Accuracy</span>
                 </div>
-                <p className="text-3xl font-bold">{lesson.minAccuracy}%</p>
+                <p className="text-3xl font-bold">{Math.max(0, lesson.minAccuracy - 10)}%</p>
               </div>
               <div className="bg-card border rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -791,7 +837,9 @@ export default function LessonPracticePage() {
                 <Target className="w-6 h-6 text-green-600 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground mb-1">Accuracy</p>
                 <p className="text-4xl font-bold">{accuracy.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground mt-1">Target: {lesson.minAccuracy}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Target: {Math.max(0, lesson.minAccuracy - 10)}%
+                </p>
               </motion.div>
 
               <motion.div
@@ -837,7 +885,7 @@ export default function LessonPracticePage() {
               </motion.div>
             )}
 
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -846,11 +894,28 @@ export default function LessonPracticePage() {
                   setCurrentIndex(0);
                   setMistakes([]);
                 }}
+                disabled={isSaving}
               >
                 Try Again
               </Button>
-              <Button onClick={handleSaveProgress} disabled={isSaving}>
-                {isSaving ? 'Saving...' : mistakes.length > 0 ? 'View Analysis' : 'Continue'}
+              {mistakes.length > 0 && !isSaving && (
+                <Button variant="outline" onClick={() => setView('analysis')}>
+                  View Mistake Analysis
+                </Button>
+              )}
+              <Button
+                onClick={() => router.push('/learn')}
+                disabled={isSaving}
+                className="min-w-[140px]"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Next Lesson'
+                )}
               </Button>
             </div>
           </motion.div>
