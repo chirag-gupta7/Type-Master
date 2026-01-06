@@ -70,7 +70,8 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
     const userId = req.user?.userId;
 
     // Try to find by UUID first, then by title (for slug-like IDs)
-    let lesson = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lesson: any = null;
 
     // Check if it's a valid UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
