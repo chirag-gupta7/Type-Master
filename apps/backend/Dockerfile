@@ -6,7 +6,7 @@ FROM base AS deps
 WORKDIR /app
 
 COPY apps/backend/package*.json ./
-RUN npm ci
+RUN npm install
 
 # Build the source code
 FROM base AS builder
