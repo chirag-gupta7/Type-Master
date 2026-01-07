@@ -18,7 +18,7 @@ import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
-import { authAPI, lessonAPI, mistakeAPI } from '@/lib/api';
+import { lessonAPI, mistakeAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
 
