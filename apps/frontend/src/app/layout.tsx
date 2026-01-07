@@ -1,4 +1,3 @@
-import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -8,6 +7,7 @@ import { Navbar } from '@/components/Navbar';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { ThemeApplicator } from '@/components/ThemeApplicator';
 import { PageLoadingIndicator } from '@/components/PageLoadingIndicator';
+import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -31,8 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <AchievementProvider>
             <ThemeApplicator />
-            <PageLoadingIndicator />
-            <Suspense fallback={<div className="h-16 border-b" />}>
+            {/* 2. Wrap components that use router hooks in Suspense */}
+            <Suspense fallback={<div className="h-1 bg-primary/20" />}>
+              <PageLoadingIndicator />
               <Navbar />
             </Suspense>
             <ThemeSelector />
