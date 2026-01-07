@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AchievementProvider>
             <ThemeApplicator />
             <PageLoadingIndicator />
-            <Navbar />
+            <Suspense fallback={<div className="h-16 border-b" />}>
+              <Navbar />
+            </Suspense>
             <ThemeSelector />
             <main>{children}</main>
           </AchievementProvider>

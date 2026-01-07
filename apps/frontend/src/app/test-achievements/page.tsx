@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useAchievements } from '@/context/AchievementContext';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Target, Star, Zap } from 'lucide-react';
@@ -19,7 +19,7 @@ type Milestone = {
  * This page allows manual testing of the achievement system
  * without needing to complete actual lessons.
  */
-export default function TestAchievementsPage() {
+function TestAchievementsContent() {
   const { showAchievement, showMilestone } = useAchievements();
   const router = useRouter();
   const [achievementCount, setAchievementCount] = useState(0);
@@ -356,5 +356,13 @@ export default function TestAchievementsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TestAchievementsPage() {
+  return (
+    <Suspense fallback={<div>Loading test tools...</div>}>
+      <TestAchievementsContent />
+    </Suspense>
   );
 }
