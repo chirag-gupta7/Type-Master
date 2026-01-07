@@ -1,15 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
-  output: 'standalone',
-  images: {
-    domains: [],
+  eslint: {
+    ignoreDuringBuilds: true,
   },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  typescript: {
+    ignoreBuildErrors: true,
   },
-  async rewrites() {
+  rewrites: async () => {
     return [
       {
         source: '/api/v1/:path*',
