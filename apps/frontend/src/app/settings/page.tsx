@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { userAPI } from '@/lib/api';
 
-export default function SettingsPage() {
+function SettingsContent() {
   const { theme, setTheme } = useTheme();
   const [username, setUsername] = useState('');
   const [image, setImage] = useState('');
@@ -13,12 +13,10 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Load user profile
   useEffect(() => {
     async function loadProfile() {
       try {
@@ -59,7 +57,6 @@ export default function SettingsPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
 
-      {/* Profile Settings */}
       <div className="bg-card border rounded-lg p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Profile</h2>
         <form onSubmit={handleProfileUpdate}>
@@ -73,7 +70,7 @@ export default function SettingsPage() {
               value={image}
               onChange={(e) => setImage(e.target.value)}
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
-              placeholder="[https://example.com/your-image.png](https://example.com/your-image.png)"
+              placeholder="https://example.com/your-image.png"
             />
           </div>
           <div className="mb-4">
@@ -108,7 +105,6 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      {/* Theme Settings */}
       <div className="bg-card border rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Appearance</h2>
         <div className="space-y-2">
@@ -139,5 +135,15 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={<div className="container mx-auto px-4 py-8 text-center">Loading settings...</div>}
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }
