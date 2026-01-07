@@ -1,13 +1,13 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { authAPI } from '@/lib/api';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -32,7 +32,6 @@ export default function RegisterPage() {
     }
 
     try {
-      // Register the user through the backend
       await authAPI.register({ email, username, password });
       setSuccessMessage('Account created successfully! Signing you in...');
     } catch (err) {
@@ -42,7 +41,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Sign in with NextAuth - it will automatically get the backend JWT token
     const result = await signIn('credentials', {
       redirect: false,
       email,
@@ -185,5 +183,15 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }
