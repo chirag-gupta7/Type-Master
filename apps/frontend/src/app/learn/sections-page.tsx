@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
+import { lessonAPI } from '@/lib/api';
 import {
   AlertTriangle,
   Check,
@@ -141,16 +142,26 @@ export default function LearnPage() {
   useEffect(() => {
     async function fetchLessons() {
       try {
-        const response = await fetch('http://localhost:5000/api/v1/lessons');
-        const data = await response.json();
+        const data = await lessonAPI.getAllLessons();
 
         // Group lessons by section
         const lessonsBySection: Record<number, Lesson[]> = {};
-        data.lessons.forEach((lesson: Lesson) => {
-          if (!lessonsBySection[lesson.section]) {
-            lessonsBySection[lesson.section] = [];
+        const fetchedLessons = data.lessons as Array<
+          Lesson & { section?: number; isCheckpoint?: boolean }
+        >;
+
+        fetchedLessons.forEach((lesson) => {
+          const sectionId = lesson.section ?? 0;
+          const normalizedLesson: Lesson = {
+            ...lesson,
+            section: sectionId,
+            isCheckpoint: lesson.isCheckpoint ?? false,
+          };
+
+          if (!lessonsBySection[sectionId]) {
+            lessonsBySection[sectionId] = [];
           }
-          lessonsBySection[lesson.section].push(lesson);
+          lessonsBySection[sectionId].push(normalizedLesson);
         });
 
         // Create section data
