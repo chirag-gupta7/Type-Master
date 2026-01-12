@@ -9,8 +9,7 @@ import { getCache, setCache, invalidateCache, clearCache, DEFAULT_CACHE_TTL } fr
 // Prefer explicit public API URL; fall back to the current origin so Vercel deployments
 // don't accidentally point to localhost.
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' ? window.location.origin : '');
+  process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 const API_VERSION = 'v1';
 
 interface FetchOptions extends RequestInit {
