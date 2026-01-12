@@ -23,9 +23,26 @@ const API_VERSION = process.env.API_VERSION || 'v1';
 
 // Middleware
 app.use(helmet());
+
+const rawOrigins = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000';
+const allowedOrigins = rawOrigins
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow same-origin / server-to-server
+      if (allowedOrigins.includes('*')) return callback(null, true);
+      const isAllowed = allowedOrigins.some((allowed) => {
+        if (allowed === origin) return true;
+        if (allowed.endsWith('.vercel.app')) return origin.endsWith('.vercel.app');
+        return false;
+      });
+      if (isAllowed) return callback(null, true);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
   })
 );
