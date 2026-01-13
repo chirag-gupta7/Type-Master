@@ -5,11 +5,12 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { prisma } from '@/lib/auth/prisma';
+import { getApiBaseUrl, API_VERSION } from '@/lib/apiBase';
 
 const authSecret = process.env.NEXTAUTH_SECRET;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE_URL = getApiBaseUrl();
 
 type ExtendedUser = {
   id: string;
@@ -96,7 +97,7 @@ const requestBackendToken = async (payload: TokenRequestPayload): Promise<string
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+    const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/auth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -196,8 +197,6 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password');
         }
 
-        // After successful authentication, get the JWT from localStorage
-        // which was set by the authAPI.login() call in the login page
         return {
           id: user.id,
           email: user.email,

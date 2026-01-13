@@ -4,13 +4,10 @@
  */
 
 import { getSession } from 'next-auth/react';
+import { getApiBaseUrl, API_VERSION } from './apiBase';
 import { getCache, setCache, invalidateCache, clearCache, DEFAULT_CACHE_TTL } from './cache';
 
-// Prefer explicit public API URL; fall back to the current origin so Vercel deployments
-// don't accidentally point to localhost.
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-const API_VERSION = 'v1';
+const API_BASE_URL = getApiBaseUrl();
 
 interface FetchOptions extends RequestInit {
   cacheKey?: string;
