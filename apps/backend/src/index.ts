@@ -37,7 +37,8 @@ app.use(
       if (allowedOrigins.includes('*')) return callback(null, true);
       const isAllowed = allowedOrigins.some((allowed) => {
         if (allowed === origin) return true;
-        if (allowed.endsWith('.vercel.app')) return origin.endsWith('.vercel.app');
+        // Only allow wildcard matching if the config explicitly allows a vercel domain
+        if (allowed.includes('.vercel.app') && origin.endsWith('.vercel.app')) return true;
         return false;
       });
       if (isAllowed) return callback(null, true);

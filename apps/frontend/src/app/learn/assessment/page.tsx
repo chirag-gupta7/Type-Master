@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { getApiBaseUrl, API_VERSION } from '@/lib/apiBase';
 import {
   Clock,
   Target,
@@ -89,7 +90,7 @@ export default function AssessmentPage() {
         // Try to fetch from API
         try {
           const token = localStorage.getItem('accessToken');
-          const response = await fetch('http://localhost:5000/api/v1/assessment/start', {
+          const response = await fetch(`${getApiBaseUrl()}/api/${API_VERSION}/assessment/start`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -109,11 +110,14 @@ export default function AssessmentPage() {
 
           // Try to fetch latest assessment
           try {
-            const latestResponse = await fetch('http://localhost:5000/api/v1/assessment/latest', {
-              headers: {
-                ...(token && { Authorization: `Bearer ${token}` }),
-              },
-            });
+            const latestResponse = await fetch(
+              `${getApiBaseUrl()}/api/${API_VERSION}/assessment/latest`,
+              {
+                headers: {
+                  ...(token && { Authorization: `Bearer ${token}` }),
+                },
+              }
+            );
 
             if (latestResponse.ok) {
               const latestData = await latestResponse.json();
@@ -146,7 +150,7 @@ export default function AssessmentPage() {
         // For now, use demo user ID - replace with actual auth later
         const userId = 'demo-user-id';
 
-        const response = await fetch('http://localhost:5000/api/v1/assessment/start', {
+        const response = await fetch(`${getApiBaseUrl()}/api/${API_VERSION}/assessment/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId }),
@@ -252,7 +256,7 @@ export default function AssessmentPage() {
       const token = localStorage.getItem('accessToken');
       const userId = sessionUser?.id || 'demo-user-id';
 
-      const response = await fetch('http://localhost:5000/api/v1/assessment/complete', {
+      const response = await fetch(`${getApiBaseUrl()}/api/${API_VERSION}/assessment/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
