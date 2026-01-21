@@ -6,6 +6,7 @@ import { Zap, Feather, Link2, Lock, Play } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/games';
 import { useRouter } from 'next/navigation';
+import { gameAPI } from '@/lib/api';
 
 // Lazy load game components
 const WordBlitz = dynamic(
@@ -72,9 +73,18 @@ const GAMES = [
 
 export default function GamesClient() {
   const router = useRouter();
-  const { currentGame, setCurrentGame, gamesPlayed, isGuest } = useGameStore();
+  const {
+    currentGame,
+    setCurrentGame,
+    gamesPlayed,
+    isGuest,
+    backendGamesPlayed,
+    backendHighScores,
+    setBackendStats,
+  } = useGameStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const setGuestMode = useGameStore((s) => s.setGuestMode);
+  const highScore = useGameStore((s) => s.highScore);
 
   const callbackUrl = useMemo(() => '/games', []);
 
@@ -92,6 +102,43 @@ export default function GamesClient() {
     window.addEventListener('storage', determineMode);
     return () => window.removeEventListener('storage', determineMode);
   }, [setGuestMode]);
+
+  // Fetch persisted game stats when authenticated
+  useEffect(() => {
+    if (isGuest) return;
+
+    const fetchStats = async () => {
+      try {
+        const response = await gameAPI.getStats();
+        if (!response?.success || !response.data) return;
+
+        const highs: Record<'word-blitz' | 'prompt-dash' | 'story-chain', number> = {
+          'word-blitz': 0,
+          'prompt-dash': 0,
+          'story-chain': 0,
+        };
+
+        response.data.gameStats.forEach((stat) => {
+          const key = stat.gameType.toLowerCase().replace('_', '-') as
+            | 'word-blitz'
+            | 'prompt-dash'
+            | 'story-chain';
+          if (highs[key] !== undefined) {
+            highs[key] = Math.max(highs[key], stat.bestScore);
+          }
+        });
+
+        setBackendStats({
+          totalGamesPlayed: response.data.totalGamesPlayed,
+          highs,
+        });
+      } catch (error) {
+        console.warn('Failed to load game stats', error);
+      }
+    };
+
+    fetchStats();
+  }, [isGuest, setBackendStats]);
 
   const handleGameSelect = (gameId: (typeof GAMES)[number]['id']) => {
     if (isGuest && gamesPlayed >= 1) {
@@ -195,11 +242,20 @@ export default function GamesClient() {
           <h2 className="text-xl font-bold mb-4">Your Stats</h2>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-3xl font-bold text-[var(--theme-primary)]">{gamesPlayed}</div>
+              <div className="text-3xl font-bold text-[var(--theme-primary)]">
+                {backendGamesPlayed || gamesPlayed}
+              </div>
               <div className="text-sm text-muted-foreground">Games Played</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-[var(--theme-secondary)]">0</div>
+              <div className="text-3xl font-bold text-[var(--theme-secondary)]">
+                {Math.max(
+                  highScore || 0,
+                  backendHighScores['word-blitz'],
+                  backendHighScores['prompt-dash'],
+                  backendHighScores['story-chain']
+                )}
+              </div>
               <div className="text-sm text-muted-foreground">High Scores</div>
             </div>
             <div className="text-center">

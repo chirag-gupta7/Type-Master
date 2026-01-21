@@ -512,7 +512,7 @@ export const lessonAPI = {
   /**
    * Get learning dashboard with sections, lessons, and progress
    */
-  getLearningDashboard: async () => {
+  getLearningDashboard: async (options?: { skipCache?: boolean }) => {
     return fetchAPI<
       Array<{
         id: number;
@@ -543,8 +543,9 @@ export const lessonAPI = {
         }>;
       }>
     >('/lessons/dashboard', {
-      cacheKey: 'lessons:dashboard',
+      cacheKey: options?.skipCache ? undefined : 'lessons:dashboard',
       cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
     });
   },
 
@@ -582,8 +583,8 @@ export const lessonAPI = {
   /**
    * Get single lesson by ID
    */
-  getLessonById: async (id: string) => {
-    const cacheKey = `lessons:detail:${id}`;
+  getLessonById: async (id: string, options?: { skipCache?: boolean }) => {
+    const cacheKey = options?.skipCache ? undefined : `lessons:detail:${id}`;
     return fetchAPI<{
       lesson: {
         id: string;
@@ -605,7 +606,11 @@ export const lessonAPI = {
           attempts: number;
         }>;
       };
-    }>(`/lessons/${id}`, { cacheKey, cacheTtl: DEFAULT_CACHE_TTL });
+    }>(`/lessons/${id}`, {
+      cacheKey,
+      cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
+    });
   },
 
   /**
@@ -851,6 +856,75 @@ export const achievementAPI = {
       cacheKey: 'achievements:progress',
       cacheTtl: DEFAULT_CACHE_TTL,
     });
+  },
+};
+
+/**
+ * Games API
+ */
+export const gameAPI = {
+  saveScore: async (payload: {
+    gameType: 'WORD_BLITZ' | 'PROMPT_DASH' | 'STORY_CHAIN';
+    score: number;
+    wpm?: number;
+    accuracy?: number;
+    duration?: number;
+    metadata?: Record<string, unknown>;
+  }) => {
+    return fetchAPI<{
+      success: boolean;
+      data: {
+        id: string;
+        userId: string;
+        gameType: string;
+        score: number;
+        wpm: number | null;
+        accuracy: number | null;
+        duration: number | null;
+        metadata: Record<string, unknown> | null;
+      };
+    }>('/games/score', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      // skip cache to avoid stale auth headers
+      skipCache: true,
+    });
+  },
+
+  getStats: async () => {
+    return fetchAPI<{
+      success: boolean;
+      data: {
+        totalGamesPlayed: number;
+        gameStats: Array<{
+          gameType: string;
+          totalGames: number;
+          bestScore: number;
+          avgScore: number;
+        }>;
+      };
+    }>('/games/stats', { cacheKey: 'games:stats', cacheTtl: 60 });
+  },
+
+  getLeaderboard: async (gameType: 'WORD_BLITZ' | 'PROMPT_DASH' | 'STORY_CHAIN') => {
+    const params = new URLSearchParams({ gameType });
+    return fetchAPI<{
+      success: boolean;
+      data: {
+        gameType: string;
+        leaderboard: Array<{
+          rank: number;
+          userId: string;
+          username: string;
+          score: number;
+          wpm: number | null;
+          accuracy: number | null;
+          duration: number | null;
+          createdAt: string;
+        }>;
+        total: number;
+      };
+    }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 });
   },
 };
 

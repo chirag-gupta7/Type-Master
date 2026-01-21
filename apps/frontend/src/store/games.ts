@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { gameAPI } from '@/lib/api';
 
 export type GameType = 'word-blitz' | 'prompt-dash' | 'story-chain';
 
@@ -21,6 +22,8 @@ interface GameState {
   isGuest: boolean;
   gameHistory: GameHistoryEntry[];
   lastWritingFeedback: Record<GameType, string | null>;
+  backendGamesPlayed: number;
+  backendHighScores: Record<GameType, number>;
 
   setCurrentGame: (game: GameType | null) => void;
   setGame: (game: GameType | null) => void;
@@ -32,6 +35,7 @@ interface GameState {
   incrementGamesPlayed: (gameId?: string) => void;
   setWritingFeedback: (gameId: GameType, feedback: string | null) => void;
   setGuestMode: (isGuest: boolean) => void;
+  setBackendStats: (payload: { totalGamesPlayed: number; highs: Record<GameType, number> }) => void;
 }
 
 const INITIAL_STATE = {
@@ -48,6 +52,12 @@ const INITIAL_STATE = {
     'prompt-dash': null,
     'story-chain': null,
   } as Record<GameType, string | null>,
+  backendGamesPlayed: 0,
+  backendHighScores: {
+    'word-blitz': 0,
+    'prompt-dash': 0,
+    'story-chain': 0,
+  } as Record<GameType, number>,
 };
 
 const createHistoryId = (): string => {
@@ -64,6 +74,12 @@ const createHistoryId = (): string => {
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...INITIAL_STATE,
+
+  setBackendStats: ({ totalGamesPlayed, highs }) =>
+    set((state) => ({
+      backendGamesPlayed: totalGamesPlayed,
+      backendHighScores: { ...state.backendHighScores, ...highs },
+    })),
 
   setCurrentGame: (game) => {
     set({ currentGame: game });
@@ -88,7 +104,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   endGame: () => {
-    const { currentGame, score, gameHistory } = get();
+    const { currentGame, score, gameHistory, isGuest } = get();
 
     if (!currentGame) {
       set({ isPlaying: false });
@@ -106,6 +122,34 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPlaying: false,
       gameHistory: [...gameHistory, entry],
     });
+
+    // Persist score for authenticated users
+    if (!isGuest) {
+      const backendTypeMap: Record<GameType, 'WORD_BLITZ' | 'PROMPT_DASH' | 'STORY_CHAIN'> = {
+        'word-blitz': 'WORD_BLITZ',
+        'prompt-dash': 'PROMPT_DASH',
+        'story-chain': 'STORY_CHAIN',
+      };
+
+      const mappedType = backendTypeMap[currentGame];
+      void gameAPI
+        .saveScore({
+          gameType: mappedType,
+          score,
+        })
+        .then(() => {
+          set((state) => ({
+            backendGamesPlayed: state.backendGamesPlayed + 1,
+            backendHighScores: {
+              ...state.backendHighScores,
+              [currentGame]: Math.max(state.backendHighScores[currentGame] || 0, score),
+            },
+          }));
+        })
+        .catch((error) => {
+          console.warn('Failed to persist game score', error);
+        });
+    }
   },
 
   resetGame: () => {

@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -18,7 +18,7 @@ import { VisualKeyboard } from '@/components/VisualKeyboard';
 import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
-import { lessonAPI, mistakeAPI } from '@/lib/api';
+import { achievementAPI, lessonAPI, mistakeAPI } from '@/lib/api';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
 
@@ -75,6 +75,7 @@ export default function LessonPracticePage() {
     sectionsCompleted: [],
   });
   const [userId, setUserId] = useState<string | null>(null);
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
 
   // Typing state
   const [userInput, setUserInput] = useState('');
@@ -118,7 +119,7 @@ export default function LessonPracticePage() {
       setError(null);
       try {
         // First, try to fetch from the API
-        const data = await lessonAPI.getLessonById(lessonId);
+        const data = await lessonAPI.getLessonById(lessonId, { skipCache: true });
         if (!data || !data.lesson) {
           throw new Error('Lesson not found from API');
         }
@@ -228,6 +229,13 @@ export default function LessonPracticePage() {
     fetchUserStats();
   }, [userId]);
 
+  // Keep the hidden input focused while typing
+  useEffect(() => {
+    if (view === 'typing') {
+      hiddenInputRef.current?.focus();
+    }
+  }, [view, currentIndex]);
+
   const handleStart = useCallback(() => {
     setView('typing');
     setStartTime(Date.now());
@@ -236,13 +244,18 @@ export default function LessonPracticePage() {
     setMistakes([]);
     setWpm(0);
     setAccuracy(100);
+    // focus the hidden input to start capturing keystrokes immediately
+    requestAnimationFrame(() => hiddenInputRef.current?.focus());
   }, []);
 
   const handleKeyPress = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (!lesson || !startTime) return;
 
       const key = e.key;
+
+      // Prevent scrolling and keep the hidden input empty
+      e.preventDefault();
 
       // Ignore special keys except Backspace
       if (key.length > 1 && key !== 'Backspace') return;
@@ -405,7 +418,7 @@ export default function LessonPracticePage() {
         meetsRequirements: completed,
       });
 
-      // Check for achievements
+      // Check for achievements (client UI) and persist on backend
       await checkAchievements(
         {
           wpm,
@@ -416,6 +429,14 @@ export default function LessonPracticePage() {
         },
         userStats
       );
+
+      if (!isFallback && userId) {
+        try {
+          await achievementAPI.checkAchievements();
+        } catch (achievementErr) {
+          console.warn('[Lesson] Achievement check failed', achievementErr);
+        }
+      }
 
       // Save to backend when online/authenticated; fallback mode keeps local storage only
       if (!isFallback) {
@@ -745,20 +766,28 @@ export default function LessonPracticePage() {
                         ${status === 'pending' ? 'text-gray-400 dark:text-gray-600' : ''}
                       `}
                     >
-                      {char === ' ' ? 'Â·' : char}
+                      {char === ' ' ? '·' : char}
                     </span>
                   );
                 })}
               </div>
 
-              <textarea
-                autoFocus
-                value={userInput}
-                onKeyDown={handleKeyPress}
-                onChange={() => {}}
-                className="w-full h-32 p-4 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none font-mono text-lg resize-none"
-                placeholder="Start typing here..."
-              />
+              <div
+                className="w-full cursor-text rounded-lg border-2 border-transparent focus-within:border-blue-500 focus-within:outline-none"
+                tabIndex={0}
+                onClick={() => hiddenInputRef.current?.focus()}
+                onFocus={() => hiddenInputRef.current?.focus()}
+              >
+                <input
+                  ref={hiddenInputRef}
+                  aria-label="Typing input"
+                  autoFocus
+                  className="sr-only"
+                  value=""
+                  onKeyDown={handleKeyPress}
+                  onChange={() => {}}
+                />
+              </div>
             </div>
 
             <VisualKeyboard

@@ -10,6 +10,10 @@ interface JWTPayload {
 declare module 'express-serve-static-core' {
   interface Request {
     user?: JWTPayload;
+    /**
+     * Convenience copy for legacy handlers that read req.userId directly.
+     */
+    userId?: string;
   }
 }
 
@@ -33,6 +37,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
       // Try to decode as JWT first
       const decoded = jwt.verify(token, secret) as JWTPayload;
       req.user = decoded;
+      req.userId = decoded.userId;
       next();
     } catch (jwtError) {
       // If JWT verification fails, try to parse as a simple base64-encoded user payload.
@@ -45,6 +50,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
             userId: decoded.userId,
             email: decoded.email,
           };
+          req.userId = decoded.userId;
           next();
         } else {
           throw new AppError(401, 'Invalid token format');
@@ -88,6 +94,7 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
 
     const decoded = jwt.verify(token, secret) as JWTPayload;
     req.user = decoded;
+    req.userId = decoded.userId;
     next();
   } catch (error) {
     // On token error, just continue without setting req.user
