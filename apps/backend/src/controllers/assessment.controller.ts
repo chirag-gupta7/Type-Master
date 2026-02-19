@@ -5,11 +5,11 @@ import { logger } from '../utils/logger';
 
 // Validation schemas
 const startAssessmentSchema = z.object({
-  userId: z.string(),
+  userId: z.string().optional(),
 });
 
 const completeAssessmentSchema = z.object({
-  userId: z.string(),
+  userId: z.string().optional(),
   wpm: z.number().min(0),
   accuracy: z.number().min(0).max(100),
   mistakesByKey: z.record(z.number()),
@@ -23,7 +23,18 @@ const completeAssessmentSchema = z.object({
  */
 export const startAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { userId } = startAssessmentSchema.parse(req.body);
+    const { userId: bodyUserId } = startAssessmentSchema.parse(req.body);
+    const authUserId = req.userId;
+
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (bodyUserId && bodyUserId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const userId = authUserId;
 
     // Check if user exists
     const user = await prisma.user.findUnique({
@@ -65,8 +76,25 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
  */
 export const completeAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { userId, wpm, accuracy, mistakesByKey, weakFingers, timeSpent } =
-      completeAssessmentSchema.parse(req.body);
+    const {
+      userId: bodyUserId,
+      wpm,
+      accuracy,
+      mistakesByKey,
+      weakFingers,
+      timeSpent,
+    } = completeAssessmentSchema.parse(req.body);
+    const authUserId = req.userId;
+
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (bodyUserId && bodyUserId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const userId = authUserId;
 
     // Determine recommended skill level based on performance
     let recommendedSkillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT' = 'BEGINNER';
@@ -210,18 +238,19 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
 export const getLatestAssessment = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { userId } = req.params;
+    const authUserId = req.userId;
+
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const assessment = await prisma.userSkillAssessment.findFirst({
       where: { userId },
       orderBy: { assessmentDate: 'desc' },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
     });
 
     if (!assessment) {

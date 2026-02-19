@@ -5,13 +5,14 @@ import { logger } from '../utils/logger';
 
 // Validation schemas
 const logMistakeSchema = z.object({
-  userId: z.string(),
   lessonId: z.string(),
-  mistakes: z.array(z.object({
-    keyPressed: z.string(),
-    keyExpected: z.string(),
-    fingerUsed: z.string().optional(),
-  })),
+  mistakes: z.array(
+    z.object({
+      keyPressed: z.string(),
+      keyExpected: z.string(),
+      fingerUsed: z.string().optional(),
+    })
+  ),
 });
 
 /**
@@ -20,11 +21,17 @@ const logMistakeSchema = z.object({
  */
 export const logMistakes = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, lessonId, mistakes } = logMistakeSchema.parse(req.body);
+    const { lessonId, mistakes } = logMistakeSchema.parse(req.body);
+    const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     // Create all mistake records
     const mistakeRecords = await prisma.typingMistake.createMany({
-      data: mistakes.map(m => ({
+      data: mistakes.map((m) => ({
         userId,
         lessonId,
         keyPressed: m.keyPressed,
@@ -74,6 +81,18 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
 export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
+    const authUserId = req.userId;
+
+    if (!authUserId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (userId !== authUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
     const limit = parseInt(req.query.limit as string) || 10;
 
     // Get user's weak keys, sorted by error count
@@ -111,12 +130,12 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
     logger.info(`Retrieved weak key analysis for user: ${userId}`);
 
     res.json({
-      weakKeys: weakKeys.map(wk => ({
+      weakKeys: weakKeys.map((wk) => ({
         key: wk.keyChar,
         errorCount: wk.errorCount,
         lastError: wk.lastError,
       })),
-      fingerErrors: fingerErrors.map(fe => ({
+      fingerErrors: fingerErrors.map((fe) => ({
         finger: fe.fingerUsed,
         count: Number(fe.count),
       })),
@@ -136,6 +155,17 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 export const generatePracticeText = async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
+    const authUserId = req.userId;
+
+    if (!authUserId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (userId !== authUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
 
     // Get top 5 weak keys
     const weakKeys = await prisma.userWeakKeys.findMany({
@@ -153,7 +183,7 @@ export const generatePracticeText = async (req: Request, res: Response): Promise
     }
 
     // Generate practice text focusing on weak keys
-    const keys = weakKeys.map(wk => wk.keyChar);
+    const keys = weakKeys.map((wk) => wk.keyChar);
     const practiceText = generatePracticeContent(keys);
 
     logger.info(`Generated practice text for user: ${userId}`);
@@ -203,7 +233,7 @@ function generatePracticeContent(keys: string[]): string {
   const exercises: string[] = [];
 
   // Exercise 1: Individual key practice
-  exercises.push(keys.map(k => `${k} ${k} ${k} ${k} ${k}`).join(' '));
+  exercises.push(keys.map((k) => `${k} ${k} ${k} ${k} ${k}`).join(' '));
 
   // Exercise 2: Key pairs
   for (let i = 0; i < keys.length; i++) {
@@ -214,12 +244,30 @@ function generatePracticeContent(keys: string[]): string {
 
   // Exercise 3: Keys in common words (if possible)
   const commonWords = [
-    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
-    'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his',
+    'the',
+    'and',
+    'for',
+    'are',
+    'but',
+    'not',
+    'you',
+    'all',
+    'can',
+    'had',
+    'her',
+    'was',
+    'one',
+    'our',
+    'out',
+    'day',
+    'get',
+    'has',
+    'him',
+    'his',
   ];
 
-  const relevantWords = commonWords.filter(word =>
-    keys.some(key => word.includes(key.toLowerCase()))
+  const relevantWords = commonWords.filter((word) =>
+    keys.some((key) => word.includes(key.toLowerCase()))
   );
 
   if (relevantWords.length > 0) {
