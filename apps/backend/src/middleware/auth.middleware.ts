@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { AppError } from './error-handler';
+import { logger } from '../utils/logger';
 
 interface JWTPayload {
   userId: string;
@@ -82,4 +84,38 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
     // Don't reject the request
     next();
   }
+};
+
+/**
+ * Middleware to restrict access to internal services only
+ */
+export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
+  void res;
+  const internalToken = req.headers['x-internal-token'];
+  const secret = process.env.INTERNAL_API_SECRET;
+
+  if (!secret) {
+    logger.error('INTERNAL_API_SECRET is not defined');
+    return next(new AppError(500, 'Internal server error'));
+  }
+
+  if (typeof internalToken !== 'string') {
+    return next(new AppError(401, 'Unauthorized internal request'));
+  }
+
+  try {
+    const internalTokenBuffer = Buffer.from(internalToken);
+    const secretBuffer = Buffer.from(secret);
+
+    if (
+      internalTokenBuffer.length !== secretBuffer.length ||
+      !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
+    ) {
+      return next(new AppError(401, 'Unauthorized internal request'));
+    }
+  } catch (error) {
+    return next(new AppError(401, 'Unauthorized internal request'));
+  }
+
+  next();
 };

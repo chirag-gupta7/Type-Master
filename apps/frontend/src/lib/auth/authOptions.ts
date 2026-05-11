@@ -101,6 +101,7 @@ const requestBackendToken = async (payload: TokenRequestPayload): Promise<string
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Internal-Token': process.env.INTERNAL_API_SECRET || '',
       },
       body: JSON.stringify({
         email: normalizedEmail,
