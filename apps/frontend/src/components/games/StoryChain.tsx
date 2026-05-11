@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
 import { Timer, CornerDownLeft, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { aiAPI } from '@/lib/api';
 
 const FALLBACK_STARTERS = [
   'The dusty old book fell from the shelf, opening to a strange map.',
@@ -48,18 +49,6 @@ export function StoryChain() {
         return;
       }
 
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-      if (!apiKey) {
-        console.error(
-          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-        );
-        setAiFeedback(
-          'Connect an AI key to receive narrative feedback on your story contributions.'
-        );
-        setWritingFeedback('story-chain', null);
-        return;
-      }
-
       setIsFeedbackLoading(true);
 
       try {
@@ -79,41 +68,18 @@ ${combined}
 
 Provide fresh feedback focused on storytelling style, creativity, tone, and clarity.`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemPrompt}\n\n${userQuery}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 250,
-              },
-            }),
-          }
-        );
+        const data = await aiAPI.getFeedback({
+          systemPrompt,
+          userQuery,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 250,
+          },
+        });
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch story feedback');
-        }
-
-        const data = await response.json();
-        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (feedback) {
-          setAiFeedback(feedback);
-          setWritingFeedback('story-chain', feedback);
+        if (data.text) {
+          setAiFeedback(data.text);
+          setWritingFeedback('story-chain', data.text);
         } else {
           setAiFeedback('The storytelling coach could not review this round. Try another story.');
           setWritingFeedback('story-chain', null);
@@ -129,19 +95,6 @@ Provide fresh feedback focused on storytelling style, creativity, tone, and clar
   );
 
   const getAiResponse = async (currentStory: string[]): Promise<string> => {
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-
-    if (!apiKey) {
-      console.error(
-        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-      );
-      // Use fallback
-      if (currentStory.length === 0) {
-        return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
-      }
-      return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
-    }
-
     try {
       const isFirstSentence = currentStory.length === 0;
       const systemPrompt = isFirstSentence
@@ -155,40 +108,17 @@ IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introduc
         ? 'Write an engaging opening sentence for a story.'
         : `Here is the story so far:\n${currentStory.join('\n')}\n\nWrite the next single sentence to continue this story based *specifically* on the last sentence written.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${systemPrompt}\n\n${userQuery}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.8,
-              maxOutputTokens: 150,
-            },
-          }),
-        }
-      );
+      const data = await aiAPI.getFeedback({
+        systemPrompt,
+        userQuery,
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 150,
+        },
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const data = await response.json();
-      const aiSentence = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      if (aiSentence) {
-        return aiSentence;
+      if (data.text) {
+        return data.text;
       }
 
       // Fallback if no response
