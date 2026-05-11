@@ -251,33 +251,48 @@ export const getGameStats = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const availableTypes = await prisma.gameScore.findMany({
-      distinct: ['gameType'],
-      select: { gameType: true },
-    });
+    // Optimization: Use groupBy to fetch all game statistics in fewer database roundtrips.
+    // This reduces the number of queries from 1 + 3*N to 2, regardless of how many game types exist.
+    const [availableTypes, userStats] = await Promise.all([
+      prisma.gameScore.findMany({
+        distinct: ['gameType'],
+        select: { gameType: true },
+      }),
+      prisma.gameScore.groupBy({
+        by: ['gameType'],
+        where: { userId },
+        _count: {
+          _all: true,
+        },
+        _max: {
+          score: true,
+        },
+        _avg: {
+          score: true,
+        },
+      }),
+    ]);
 
-    const stats = await Promise.all(
-      availableTypes.map(async ({ gameType }) => {
-        const [totalGames, bestScore, averages] = await Promise.all([
-          prisma.gameScore.count({ where: { userId, gameType } }),
-          prisma.gameScore.findFirst({
-            where: { userId, gameType },
-            orderBy: { score: 'desc' },
-          }),
-          prisma.gameScore.aggregate({
-            where: { userId, gameType },
-            _avg: { score: true },
-          }),
-        ]);
-
-        return {
-          gameType,
-          totalGames,
-          bestScore: bestScore?.score ?? 0,
-          avgScore: Math.round(averages._avg.score ?? 0),
-        };
-      })
+    const statsMap = new Map(
+      userStats.map((s) => [
+        s.gameType,
+        {
+          totalGames: s._count._all,
+          bestScore: s._max.score ?? 0,
+          avgScore: Math.round(s._avg.score ?? 0),
+        },
+      ])
     );
+
+    const stats = availableTypes.map(({ gameType }) => {
+      const userStat = statsMap.get(gameType);
+      return {
+        gameType,
+        totalGames: userStat?.totalGames ?? 0,
+        bestScore: userStat?.bestScore ?? 0,
+        avgScore: userStat?.avgScore ?? 0,
+      };
+    });
 
     const totalGamesPlayed = stats.reduce((total, stat) => total + stat.totalGames, 0);
 
