@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { AppError } from './error-handler';
+import { logger } from '../utils/logger';
 
 interface JWTPayload {
   userId: string;
@@ -82,4 +84,30 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
     // Don't reject the request
     next();
   }
+};
+
+/**
+ * Middleware to verify internal API secret using timing-safe comparison
+ */
+export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
+  void res;
+  const internalSecret = process.env.INTERNAL_API_SECRET;
+  const providedSecret = req.headers['x-internal-token'] as string;
+
+  if (!internalSecret || !providedSecret) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const secretBuf = Buffer.from(internalSecret);
+  const providedBuf = Buffer.from(providedSecret);
+
+  if (
+    secretBuf.length !== providedBuf.length ||
+    !crypto.timingSafeEqual(secretBuf, providedBuf)
+  ) {
+    logger.warn('Invalid internal token attempt', { ip: req.ip });
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  next();
 };
