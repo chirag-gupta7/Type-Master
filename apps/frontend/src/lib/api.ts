@@ -932,5 +932,46 @@ export const gameAPI = {
   },
 };
 
+/**
+ * AI API Proxy
+ */
+export const aiAPI = {
+  getTypingFeedback: async (payload: {
+    wpm: number;
+    accuracy: number;
+    errors: number;
+    duration: number;
+  }) => {
+    return fetchAPI<{ feedback: string }>('/ai/typing-feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateWritingPrompt: async () => {
+    return fetchAPI<{ prompt: string }>('/ai/writing-prompt', {
+      method: 'GET',
+    });
+  },
+
+  getWritingFeedback: async (payload: {
+    text: string;
+    type: 'prompt-dash' | 'story-chain';
+    priorFeedback?: string | null;
+  }) => {
+    return fetchAPI<{ feedback: string }>('/ai/writing-feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getStoryResponse: async (story: string[]) => {
+    return fetchAPI<{ response: string }>('/ai/story-response', {
+      method: 'POST',
+      body: JSON.stringify({ story }),
+    });
+  },
+};
+
 // Named export for convenience
 export const getTest = testAPI.getTest;

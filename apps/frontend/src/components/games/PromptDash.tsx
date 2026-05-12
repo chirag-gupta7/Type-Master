@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
 import { Timer, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { aiAPI } from '@/lib/api';
 
 const FALLBACK_PROMPTS = [
   'Describe a city hidden in the clouds.',
@@ -40,72 +41,18 @@ export function PromptDash() {
         return;
       }
 
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-      if (!apiKey) {
-        console.error(
-          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-        );
-        setAiFeedback(
-          'Could not connect to the AI coach. Add an API key to receive writing guidance.'
-        );
-        setWritingFeedback('prompt-dash', null);
-        return;
-      }
-
       setIsFeedbackLoading(true);
 
       try {
-        const systemPrompt = `You are a supportive creative-writing coach for a typing practice game. Offer precise, encouraging feedback (2-3 sentences) about the user's writing style, tone, vocabulary, and clarity.
-If prior feedback is provided, compare the current writing to that guidance and highlight any progress or areas that still need work.`;
+        const data = await aiAPI.getWritingFeedback({
+          text: cleaned,
+          type: 'prompt-dash',
+          priorFeedback,
+        });
 
-        const userQuery = priorFeedback
-          ? `Previous feedback you (the coach) gave:
-${priorFeedback}
-
-Current writing sample:
-${cleaned}
-
-Provide updated feedback that references progress relative to the earlier guidance.`
-          : `Current writing sample:
-${cleaned}
-
-Provide fresh feedback focused on writing style, tone, word choice, and narrative clarity.`;
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemPrompt}\n\n${userQuery}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 220,
-              },
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch writing feedback');
-        }
-
-        const data = await response.json();
-        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (feedback) {
-          setAiFeedback(feedback);
-          setWritingFeedback('prompt-dash', feedback);
+        if (data.feedback) {
+          setAiFeedback(data.feedback);
+          setWritingFeedback('prompt-dash', data.feedback);
         } else {
           setAiFeedback('The AI coach could not generate feedback this round. Try another prompt.');
           setWritingFeedback('prompt-dash', null);
@@ -122,53 +69,12 @@ Provide fresh feedback focused on writing style, tone, word choice, and narrativ
 
   const generateNewPrompt = async () => {
     setIsLoading(true);
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-
-    if (!apiKey) {
-      console.error(
-        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-      );
-      // Use fallback prompt
-      setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
-      setIsLoading(false);
-      return;
-    }
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: 'Generate a single creative writing prompt for a typing speed game. The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.',
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.9,
-              maxOutputTokens: 100,
-            },
-          }),
-        }
-      );
+      const data = await aiAPI.generateWritingPrompt();
 
-      if (!response.ok) {
-        throw new Error('Failed to generate prompt');
-      }
-
-      const data = await response.json();
-      const generatedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      if (generatedPrompt) {
-        setPrompt(generatedPrompt);
+      if (data.prompt) {
+        setPrompt(data.prompt);
       } else {
         // Fallback if no prompt generated
         setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
