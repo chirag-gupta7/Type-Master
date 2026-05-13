@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Clock, Target, Zap, ArrowRight } from 'lucide-react';
 import { generateTestText } from '@/lib/textGenerator';
 import ResultsScreen from '@/components/ResultsScreen';
+import { aiAPI } from '@/lib/api';
 // Word Component: Renders each word and handles its state (correct, incorrect, active).
 // It's memoized to prevent re-rendering of words that haven't changed.
 const Word = React.memo(
@@ -197,55 +198,22 @@ const TypingTest: React.FC = () => {
       setIsFeedbackLoading(true);
       setAiFeedback(null);
 
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-
-      if (!apiKey) {
-        console.error(
-          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-        );
-        setIsFeedbackLoading(false);
-        return;
-      }
-
       try {
         const systemPrompt =
           "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
         const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${summaryDuration} seconds\n\nProvide helpful feedback.`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemPrompt}\n\n${userQuery}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 200,
-              },
-            }),
-          }
-        );
+        const data = await aiAPI.getFeedback({
+          systemPrompt,
+          userQuery,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 200,
+          },
+        });
 
-        if (!response.ok) {
-          throw new Error('Failed to get AI feedback');
-        }
-
-        const data = await response.json();
-        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (feedback) {
-          setAiFeedback(feedback);
+        if (data.text) {
+          setAiFeedback(data.text);
         } else {
           setAiFeedback('Could not load AI feedback at this time.');
         }

@@ -108,9 +108,13 @@ const requestBackendToken = async (payload: TokenRequestPayload): Promise<string
     };
     console.log('[API] Token request payload:', requestBody);
 
+    const internalSecret = process.env.INTERNAL_API_SECRET;
     const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/auth/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Token': internalSecret || '',
+      },
       body: JSON.stringify(requestBody),
     });
 
@@ -925,6 +929,38 @@ export const gameAPI = {
         total: number;
       };
     }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 });
+  },
+};
+
+/**
+ * AI API
+ */
+export const aiAPI = {
+  getFeedback: async (payload: {
+    systemPrompt: string;
+    userQuery: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateContent: async (payload: {
+    prompt: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 };
 
