@@ -18,3 +18,13 @@
 **Vulnerability:** Gemini API keys were exposed in the frontend via NEXT_PUBLIC_ environment variables, allowing anyone to intercept the key and use the AI quota.
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
+
+## 2026-05-13 - [Secret Length Timing Leak in internalOnly]
+**Vulnerability:** The `internalOnly` middleware leaked the length of `INTERNAL_API_SECRET` because it performed an explicit length comparison before calling `timingSafeEqual`.
+**Learning:** `timingSafeEqual` requires buffers of equal length. Checking length upfront is common but introduces a timing side-channel that reveals the secret's length.
+**Prevention:** Hash both the input and the secret using a fixed-length algorithm (like SHA-256) before comparison. This ensures buffers are always the same length and prevents length leakage.
+
+## 2026-05-13 - [Insecure Generic AI Proxy]
+**Vulnerability:** Generic AI endpoints allowed clients to provide their own `systemPrompt`, enabling easy prompt injection and potential resource abuse.
+**Learning:** Proxies should have hardcoded, server-side defined system prompts and only accept specific data parameters from the client.
+**Prevention:** Avoid generic "pass-through" AI endpoints. Implement specific, purpose-built endpoints with strict schema validation for AI features.
