@@ -12,124 +12,84 @@ interface AuthRequest extends Request {
 }
 
 /**
+ * Interface for pre-fetched user metrics to optimize achievement checking
+ */
+interface UserMetrics {
+  maxWpm: number;
+  maxAccuracy: number;
+  testCount: number;
+  highAccuracyTestCount: number;
+  completedLessonsCount: number;
+  totalLessonsCount: number;
+  uniqueDaysThisWeek: number;
+}
+
+/**
  * Achievement requirement checkers
  */
 const checkAchievementRequirements = {
   // Speed achievements
-  speedDemon: async (userId: string): Promise<boolean> => {
-    const result = await prisma.testResult.findFirst({
-      where: { userId, wpm: { gte: 50 } },
-    });
-    return !!result;
+  speedDemon: (metrics: UserMetrics): boolean => {
+    return metrics.maxWpm >= 50;
   },
 
-  lightningFast: async (userId: string): Promise<boolean> => {
-    const result = await prisma.testResult.findFirst({
-      where: { userId, wpm: { gte: 80 } },
-    });
-    return !!result;
+  lightningFast: (metrics: UserMetrics): boolean => {
+    return metrics.maxWpm >= 80;
   },
 
-  typingMaster: async (userId: string): Promise<boolean> => {
-    const result = await prisma.testResult.findFirst({
-      where: { userId, wpm: { gte: 100 } },
-    });
-    return !!result;
+  typingMaster: (metrics: UserMetrics): boolean => {
+    return metrics.maxWpm >= 100;
   },
 
   // Accuracy achievements
-  perfectionist: async (userId: string): Promise<boolean> => {
-    const result = await prisma.testResult.findFirst({
-      where: { userId, accuracy: 100 },
-    });
-    return !!result;
+  perfectionist: (metrics: UserMetrics): boolean => {
+    return metrics.maxAccuracy >= 100;
   },
 
-  sharpshooter: async (userId: string): Promise<boolean> => {
-    const results = await prisma.testResult.findMany({
-      where: { userId, accuracy: { gte: 95 } },
-      take: 10,
-    });
-    return results.length >= 10;
+  sharpshooter: (metrics: UserMetrics): boolean => {
+    return metrics.highAccuracyTestCount >= 10;
   },
 
   // Consistency achievements
-  dedicated: async (userId: string): Promise<boolean> => {
-    const count = await prisma.testResult.count({
-      where: { userId },
-    });
-    return count >= 10;
+  dedicated: (metrics: UserMetrics): boolean => {
+    return metrics.testCount >= 10;
   },
 
-  committed: async (userId: string): Promise<boolean> => {
-    const count = await prisma.testResult.count({
-      where: { userId },
-    });
-    return count >= 50;
+  committed: (metrics: UserMetrics): boolean => {
+    return metrics.testCount >= 50;
   },
 
-  unstoppable: async (userId: string): Promise<boolean> => {
-    const count = await prisma.testResult.count({
-      where: { userId },
-    });
-    return count >= 100;
+  unstoppable: (metrics: UserMetrics): boolean => {
+    return metrics.testCount >= 100;
   },
 
   // Learning achievements
-  student: async (userId: string): Promise<boolean> => {
-    const count = await prisma.userLessonProgress.count({
-      where: { userId, completed: true },
-    });
-    return count >= 5;
+  student: (metrics: UserMetrics): boolean => {
+    return metrics.completedLessonsCount >= 5;
   },
 
-  scholar: async (userId: string): Promise<boolean> => {
-    const count = await prisma.userLessonProgress.count({
-      where: { userId, completed: true },
-    });
-    return count >= 20;
+  scholar: (metrics: UserMetrics): boolean => {
+    return metrics.completedLessonsCount >= 20;
   },
 
-  graduateTypist: async (userId: string): Promise<boolean> => {
-    const totalLessons = await prisma.lesson.count();
-    const completedLessons = await prisma.userLessonProgress.count({
-      where: { userId, completed: true },
-    });
-    return completedLessons >= totalLessons;
+  graduateTypist: (metrics: UserMetrics): boolean => {
+    return (
+      metrics.totalLessonsCount > 0 && metrics.completedLessonsCount >= metrics.totalLessonsCount
+    );
   },
 
   // Streak achievements
-  weekWarrior: async (userId: string): Promise<boolean> => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const results = await prisma.testResult.findMany({
-      where: {
-        userId,
-        createdAt: { gte: sevenDaysAgo },
-      },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Check if user has tests on at least 7 different days
-    const uniqueDays = new Set(results.map((r) => r.createdAt.toISOString().split('T')[0]));
-    return uniqueDays.size >= 7;
+  weekWarrior: (metrics: UserMetrics): boolean => {
+    return metrics.uniqueDaysThisWeek >= 7;
   },
 
   // First achievements
-  firstSteps: async (userId: string): Promise<boolean> => {
-    const count = await prisma.testResult.count({
-      where: { userId },
-    });
-    return count >= 1;
+  firstSteps: (metrics: UserMetrics): boolean => {
+    return metrics.testCount >= 1;
   },
 
-  firstLesson: async (userId: string): Promise<boolean> => {
-    const count = await prisma.userLessonProgress.count({
-      where: { userId, completed: true },
-    });
-    return count >= 1;
+  firstLesson: (metrics: UserMetrics): boolean => {
+    return metrics.completedLessonsCount >= 1;
   },
 };
 
@@ -199,16 +159,80 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get all achievements
-    const achievements = await prisma.achievement.findMany();
+    // Optimization: Pre-fetch all necessary user metrics in bulk to avoid N+1 queries
+    // during achievement checking. This reduces database roundtrips from O(N) to O(1).
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Get user's already unlocked achievements
-    const userAchievements = await prisma.userAchievement.findMany({
-      where: { userId },
-      select: { achievementId: true },
-    });
+    const [
+      achievements,
+      userAchievements,
+      testStats,
+      highAccuracyTestCount,
+      completedLessonsCount,
+      totalLessonsCount,
+      recentTests,
+    ] = await Promise.all([
+      prisma.achievement.findMany(),
+      prisma.userAchievement.findMany({
+        where: { userId },
+        select: { achievementId: true },
+      }),
+      prisma.testResult.aggregate({
+        where: { userId },
+        _max: { wpm: true, accuracy: true },
+        _count: { _all: true },
+      }),
+      prisma.testResult.count({
+        where: { userId, accuracy: { gte: 95 } },
+      }),
+      prisma.userLessonProgress.count({
+        where: { userId, completed: true },
+      }),
+      prisma.lesson.count(),
+      prisma.testResult.findMany({
+        where: { userId, createdAt: { gte: sevenDaysAgo } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const metrics: UserMetrics = {
+      maxWpm: testStats._max.wpm || 0,
+      maxAccuracy: testStats._max.accuracy || 0,
+      testCount: testStats._count._all,
+      highAccuracyTestCount,
+      completedLessonsCount,
+      totalLessonsCount,
+      uniqueDaysThisWeek: new Set(recentTests.map((r) => r.createdAt.toISOString().split('T')[0]))
+        .size,
+    };
 
     const unlockedAchievementIds = new Set(userAchievements.map((ua) => ua.achievementId));
+    const achievementsToUnlock: typeof achievements = [];
+
+    // Check each achievement against pre-fetched metrics
+    for (const achievement of achievements) {
+      // Skip if already unlocked
+      if (unlockedAchievementIds.has(achievement.id)) {
+        continue;
+      }
+
+      // Parse requirement
+      try {
+        const requirement = JSON.parse(achievement.requirement);
+        const checkerFn =
+          checkAchievementRequirements[
+            requirement.type as keyof typeof checkAchievementRequirements
+          ];
+
+        if (checkerFn && checkerFn(metrics)) {
+          achievementsToUnlock.push(achievement);
+        }
+      } catch (error) {
+        logger.error(`Error checking achievement ${achievement.id}:`, error);
+      }
+    }
+
     const newlyUnlocked: Array<{
       id: string;
       title: string;
@@ -218,48 +242,29 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
       unlockedAt: string;
     }> = [];
 
-    // Check each achievement
-    for (const achievement of achievements) {
-      // Skip if already unlocked
-      if (unlockedAchievementIds.has(achievement.id)) {
-        continue;
-      }
+    // Award achievements if requirements met
+    if (achievementsToUnlock.length > 0) {
+      // Use a transaction to ensure all achievements are created and returned
+      const now = new Date();
+      await prisma.userAchievement.createMany({
+        data: achievementsToUnlock.map((a) => ({
+          userId,
+          achievementId: a.id,
+          unlockedAt: now,
+        })),
+        skipDuplicates: true,
+      });
 
-      // Parse requirement
-      let requirementMet = false;
-      try {
-        const requirement = JSON.parse(achievement.requirement);
-        const checkerFn =
-          checkAchievementRequirements[
-            requirement.type as keyof typeof checkAchievementRequirements
-          ];
-
-        if (checkerFn) {
-          requirementMet = await checkerFn(userId);
-        }
-      } catch (error) {
-        logger.error(`Error checking achievement ${achievement.id}:`, error);
-        continue;
-      }
-
-      // Award achievement if requirement met
-      if (requirementMet) {
-        const userAchievement = await prisma.userAchievement.create({
-          data: {
-            userId,
-            achievementId: achievement.id,
-          },
-        });
-
+      achievementsToUnlock.forEach((a) => {
         newlyUnlocked.push({
-          id: achievement.id,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          points: achievement.points,
-          unlockedAt: userAchievement.unlockedAt.toISOString(),
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          icon: a.icon,
+          points: a.points,
+          unlockedAt: now.toISOString(),
         });
-      }
+      });
     }
 
     return res.json({
