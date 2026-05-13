@@ -37,5 +37,6 @@ router.post('/refresh', refreshToken);
  * @access  Internal Only
  */
 router.post('/token', internalOnly, authLimiter, getTokenForNextAuthUser);
+router.post('/token', internalOnly, getTokenForNextAuthUser);
 
 export default router;
