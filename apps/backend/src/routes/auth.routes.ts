@@ -36,6 +36,6 @@ router.post('/refresh', refreshToken);
  * @desc    Get backend JWT token for NextAuth authenticated users
  * @access  Internal (NextAuth)
  */
-router.post('/token', internalOnly, authLimiter, getTokenForNextAuthUser);
+router.post('/token', authLimiter, internalOnly, getTokenForNextAuthUser);
 
 export default router;

@@ -91,23 +91,29 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
  */
 export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
   void res;
-  const internalSecret = process.env.INTERNAL_API_SECRET;
-  const providedSecret = req.headers['x-internal-token'] as string;
+  const internalToken = req.headers['x-internal-token'];
+  const secret = process.env.INTERNAL_API_SECRET;
 
-  if (!internalSecret || !providedSecret) {
-    throw new AppError(401, 'Unauthorized');
+  if (!secret) {
+    logger.error('INTERNAL_API_SECRET is not defined');
+    return next(new AppError(500, 'Internal server error'));
   }
 
-  const secretBuf = Buffer.from(internalSecret);
-  const providedBuf = Buffer.from(providedSecret);
+  if (typeof internalToken !== 'string') {
+    logger.warn('Invalid internal token attempt', { ip: req.ip });
+    return next(new AppError(401, 'Unauthorized internal request'));
+  }
+
+  const internalTokenBuffer = Buffer.from(internalToken);
+  const secretBuffer = Buffer.from(secret);
 
   if (
-    secretBuf.length !== providedBuf.length ||
-    !crypto.timingSafeEqual(secretBuf, providedBuf)
+    internalTokenBuffer.length !== secretBuffer.length ||
+    !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
   ) {
     logger.warn('Invalid internal token attempt', { ip: req.ip });
-    throw new AppError(401, 'Unauthorized');
+    return next(new AppError(401, 'Unauthorized internal request'));
   }
 
-  next();
+  return next();
 };

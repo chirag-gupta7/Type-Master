@@ -932,5 +932,74 @@ export const gameAPI = {
   },
 };
 
+/**
+ * AI API Proxy
+ */
+export const aiAPI = {
+  getTypingFeedback: async (payload: {
+    wpm: number;
+    accuracy: number;
+    errors: number;
+    duration: number;
+  }) => {
+    return fetchAPI<{ feedback: string }>('/ai/typing-feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateWritingPrompt: async () => {
+    return fetchAPI<{ prompt: string }>('/ai/writing-prompt', {
+      method: 'GET',
+    });
+  },
+
+  getWritingFeedback: async (payload: {
+    text: string;
+    type: 'prompt-dash' | 'story-chain';
+    priorFeedback?: string | null;
+  }) => {
+    return fetchAPI<{ feedback: string }>('/ai/writing-feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getStoryResponse: async (story: string[]) => {
+    return fetchAPI<{ response: string }>('/ai/story-response', {
+      method: 'POST',
+      body: JSON.stringify({ story }),
+    });
+  },
+
+  // Compatibility methods for main branch changes
+  getFeedback: async (payload: {
+    systemPrompt: string;
+    userQuery: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateContent: async (payload: {
+    prompt: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
 // Named export for convenience
 export const getTest = testAPI.getTest;

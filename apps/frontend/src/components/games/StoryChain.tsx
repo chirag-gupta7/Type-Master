@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
 import { Timer, CornerDownLeft, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { aiAPI } from '@/lib/api';
 
 const FALLBACK_STARTERS = [
   'The dusty old book fell from the shelf, opening to a strange map.',
@@ -48,72 +49,18 @@ export function StoryChain() {
         return;
       }
 
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-      if (!apiKey) {
-        console.error(
-          'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-        );
-        setAiFeedback(
-          'Connect an AI key to receive narrative feedback on your story contributions.'
-        );
-        setWritingFeedback('story-chain', null);
-        return;
-      }
-
       setIsFeedbackLoading(true);
 
       try {
-        const systemPrompt = `You are a collaborative storytelling coach analyzing a user's contributions in a game called Story Chain. Highlight the user's narrative voice, pacing, tone, and how well they build on prior sentences.
-If you are given earlier feedback that you provided, compare the new writing with that guidance and point out improvements or persistent issues.`;
+        const data = await aiAPI.getWritingFeedback({
+          text: combined,
+          type: 'story-chain',
+          priorFeedback,
+        });
 
-        const userQuery = priorFeedback
-          ? `Previous advice you gave the user:
-${priorFeedback}
-
-User's current sentences (only their contributions):
-${combined}
-
-Provide updated feedback referencing progress relative to the earlier advice.`
-          : `User's current sentences in the collaborative story:
-${combined}
-
-Provide fresh feedback focused on storytelling style, creativity, tone, and clarity.`;
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemPrompt}\n\n${userQuery}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 250,
-              },
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch story feedback');
-        }
-
-        const data = await response.json();
-        const feedback = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (feedback) {
-          setAiFeedback(feedback);
-          setWritingFeedback('story-chain', feedback);
+        if (data.feedback) {
+          setAiFeedback(data.feedback);
+          setWritingFeedback('story-chain', data.feedback);
         } else {
           setAiFeedback('The storytelling coach could not review this round. Try another story.');
           setWritingFeedback('story-chain', null);
@@ -129,70 +76,15 @@ Provide fresh feedback focused on storytelling style, creativity, tone, and clar
   );
 
   const getAiResponse = async (currentStory: string[]): Promise<string> => {
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-
-    if (!apiKey) {
-      console.error(
-        'Gemini API key (NEXT_PUBLIC_GEMINI_API_KEY) is not set in environment variables.'
-      );
-      // Use fallback
-      if (currentStory.length === 0) {
-        return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
-      }
-      return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
-    }
-
     try {
-      const isFirstSentence = currentStory.length === 0;
-      const systemPrompt = isFirstSentence
-        ? 'You are starting a collaborative story in a typing game. Generate an engaging opening sentence that sets up an interesting scenario or mystery. Keep it to a single, concise sentence. Do not add any preamble. Just write the sentence.'
-        : `You are a creative and engaging storyteller collaborating with a user in a typing game called Story Chain.
-The user provides a sentence, and your task is to write the *very next* sentence to continue the narrative smoothly and interestingly.
-Focus on building upon the user's last sentence. Be imaginative but keep the story coherent.
-IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introductory phrases like "Okay, here's the next part:", "Continuing the story:", or any other text outside the single story sentence. Just provide the next sentence directly.`;
+      const data = await aiAPI.getStoryResponse(currentStory);
 
-      const userQuery = isFirstSentence
-        ? 'Write an engaging opening sentence for a story.'
-        : `Here is the story so far:\n${currentStory.join('\n')}\n\nWrite the next single sentence to continue this story based *specifically* on the last sentence written.`;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${systemPrompt}\n\n${userQuery}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.8,
-              maxOutputTokens: 150,
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const data = await response.json();
-      const aiSentence = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      if (aiSentence) {
-        return aiSentence;
+      if (data.response) {
+        return data.response;
       }
 
       // Fallback if no response
-      if (isFirstSentence) {
+      if (currentStory.length === 0) {
         return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
       }
       return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
