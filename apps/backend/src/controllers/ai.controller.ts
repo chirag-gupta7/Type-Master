@@ -82,7 +82,7 @@ export const getTypingFeedback = async (req: Request, res: Response, next: NextF
 /**
  * Generate a new creative writing prompt
  */
-export const generateWritingPrompt = async (req: Request, res: Response, next: NextFunction) => {
+export const generateWritingPrompt = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const systemPrompt = 'Generate a single creative writing prompt for a typing speed game.';
     const userQuery = 'The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.';
