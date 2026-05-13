@@ -932,5 +932,37 @@ export const gameAPI = {
   },
 };
 
+/**
+ * AI API
+ */
+export const aiAPI = {
+  getFeedback: async (payload: {
+    systemPrompt: string;
+    userQuery: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateContent: async (payload: {
+    prompt: string;
+    generationConfig?: {
+      temperature?: number;
+      maxOutputTokens?: number;
+    };
+  }) => {
+    return fetchAPI<{ text: string }>('/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
 // Named export for convenience
 export const getTest = testAPI.getTest;
