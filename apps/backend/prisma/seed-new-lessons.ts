@@ -198,8 +198,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'for (let i = 0; i < 10; i++) { const squared = i * i; if (squared % 2 === 0) { console.log("even", squared); } else { console.log("odd", squared); } }
-      const items = ["alpha", "beta", "gamma"]; items.forEach((item) => console.log(item));',
+      'for (let i = 0; i < 10; i++) { const squared = i * i; if (squared % 2 === 0) { console.log("even", squared); } else { console.log("odd", squared); } } const items = ["alpha", "beta", "gamma"]; items.forEach((item) => console.log(item));',
   },
   {
     level: 212,
@@ -215,8 +214,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'async function fetchUser(id: number) { const res = await fetch(`/api/user/${id}`); if (!res.ok) throw new Error("failed"); return res.json(); }
-      fetchUser(7).then((user) => console.log(user.name)).catch((err) => console.error(err));',
+      'async function fetchUser(id: number) { const res = await fetch(`/api/user/${id}`); if (!res.ok) throw new Error("failed"); return res.json(); } fetchUser(7).then((user) => console.log(user.name)).catch((err) => console.error(err));',
   },
   {
     level: 213,
@@ -232,16 +230,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'numbers = [1, 2, 3, 4, 5]
-for n in numbers:
-    doubled = n * 2
-    if doubled % 3 == 0:
-        print("triple", doubled)
-    else:
-        print("plain", doubled)
-
-squares = [n * n for n in range(1, 8)]
-print(squares)',
+      'numbers = [1, 2, 3, 4, 5]\nfor n in numbers:\n    doubled = n * 2\n    if doubled % 3 == 0:\n        print("triple", doubled)\n    else:\n        print("plain", doubled)\n\nsquares = [n * n for n in range(1, 8)]\nprint(squares)',
   },
   {
     level: 214,
@@ -257,13 +246,7 @@ print(squares)',
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'def summarize(scores):
-    total = sum(scores.values())
-    average = total / len(scores)
-    return {"total": total, "average": average}
-
-scores = {"alice": 88, "bob": 92, "carlos": 81}
-print(summarize(scores))',
+      'def summarize(scores):\n    total = sum(scores.values())\n    average = total / len(scores)\n    return {"total": total, "average": average}\n\nscores = {"alice": 88, "bob": 92, "carlos": 81}\nprint(summarize(scores))',
   },
   {
     level: 215,
@@ -311,9 +294,7 @@ print(summarize(scores))',
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'const profile = { name: "Ava", skills: ["typing", "javascript"], links: { site: "https://example.com", github: "https://github.com/ava" } };
-const { name, skills, links } = profile;
-console.log(name, skills.join(", "), links.site);',
+      'const profile = { name: "Ava", skills: ["typing", "javascript"], links: { site: "https://example.com", github: "https://github.com/ava" } }; const { name, skills, links } = profile; console.log(name, skills.join(", "), links.site);',
   },
   {
     level: 218,
@@ -329,19 +310,7 @@ console.log(name, skills.join(", "), links.site);',
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'from dataclasses import dataclass
-
-@dataclass
-class Lesson:
-    id: int
-    title: str
-    wpm: int
-    accuracy: int
-
-def describe(lesson: Lesson) -> str:
-    return f"{lesson.title} targets {lesson.wpm} wpm at {lesson.accuracy}% accuracy"
-
-print(describe(Lesson(1, "Home Row", 25, 95)))',
+      'from dataclasses import dataclass\n\n@dataclass\nclass Lesson:\n    id: int\n    title: str\n    wpm: int\n    accuracy: int\n\ndef describe(lesson: Lesson) -> str:\n    return f"{lesson.title} targets {lesson.wpm} wpm at {lesson.accuracy}% accuracy"\n\nprint(describe(Lesson(1, "Home Row", 25, 95)))',
   },
   {
     level: 219,
@@ -357,10 +326,7 @@ print(describe(Lesson(1, "Home Row", 25, 95)))',
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'const scores = [55, 63, 72, 91, 88];
-const fast = scores.filter((s) => s > 70).map((s) => s + 5);
-const total = scores.reduce((sum, s) => sum + s, 0);
-console.log({ fast, total, average: total / scores.length });',
+      'const scores = [55, 63, 72, 91, 88]; const fast = scores.filter((s) => s > 70).map((s) => s + 5); const total = scores.reduce((sum, s) => sum + s, 0); console.log({ fast, total, average: total / scores.length });',
   },
   {
     level: 220,
@@ -377,10 +343,7 @@ console.log({ fast, total, average: total / scores.length });',
     unlockAfter: [],
     isCheckpoint: true,
     content:
-      'const api = async () => { const res = await fetch("/api/lessons"); return res.ok ? res.json() : []; };
-layout = """<article><h2>Speed Drills</h2><p>Practice every day.</p></article>"""
-print(api)
-<form><input name="q" /><button>Search</button></form>',
+      'const api = async () => { const res = await fetch("/api/lessons"); return res.ok ? res.json() : []; };\nlayout = """<article><h2>Speed Drills</h2><p>Practice every day.</p></article>"""\nprint(api)\n<form><input name="q" /><button>Search</button></form>',
   },
 ];
 
