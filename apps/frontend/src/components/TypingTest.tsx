@@ -199,21 +199,15 @@ const TypingTest: React.FC = () => {
       setAiFeedback(null);
 
       try {
-        const systemPrompt =
-          "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-        const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${summaryDuration} seconds\n\nProvide helpful feedback.`;
-
-        const data = await aiAPI.getFeedback({
-          systemPrompt,
-          userQuery,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 200,
-          },
+        const data = await aiAPI.getTypingFeedback({
+          wpm,
+          accuracy,
+          errors,
+          duration: summaryDuration,
         });
 
-        if (data.text) {
-          setAiFeedback(data.text);
+        if (data.feedback) {
+          setAiFeedback(data.feedback);
         } else {
           setAiFeedback('Could not load AI feedback at this time.');
         }
