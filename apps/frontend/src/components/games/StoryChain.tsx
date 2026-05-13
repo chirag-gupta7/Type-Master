@@ -58,37 +58,9 @@ export function StoryChain() {
           priorFeedback,
         });
 
-<<<<<<< HEAD
         if (data.feedback) {
           setAiFeedback(data.feedback);
           setWritingFeedback('story-chain', data.feedback);
-=======
-        const userQuery = priorFeedback
-          ? `Previous advice you gave the user:
-${priorFeedback}
-
-User's current sentences (only their contributions):
-${combined}
-
-Provide updated feedback referencing progress relative to the earlier advice.`
-          : `User's current sentences in the collaborative story:
-${combined}
-
-Provide fresh feedback focused on storytelling style, creativity, tone, and clarity.`;
-
-        const data = await aiAPI.getFeedback({
-          systemPrompt,
-          userQuery,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 250,
-          },
-        });
-
-        if (data.text) {
-          setAiFeedback(data.text);
-          setWritingFeedback('story-chain', data.text);
->>>>>>> origin/main
         } else {
           setAiFeedback('The storytelling coach could not review this round. Try another story.');
           setWritingFeedback('story-chain', null);
@@ -107,26 +79,8 @@ Provide fresh feedback focused on storytelling style, creativity, tone, and clar
     try {
       const data = await aiAPI.getStoryResponse(currentStory);
 
-<<<<<<< HEAD
       if (data.response) {
         return data.response;
-=======
-      const userQuery = isFirstSentence
-        ? 'Write an engaging opening sentence for a story.'
-        : `Here is the story so far:\n${currentStory.join('\n')}\n\nWrite the next single sentence to continue this story based *specifically* on the last sentence written.`;
-
-      const data = await aiAPI.getFeedback({
-        systemPrompt,
-        userQuery,
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 150,
-        },
-      });
-
-      if (data.text) {
-        return data.text;
->>>>>>> origin/main
       }
 
       // Fallback if no response

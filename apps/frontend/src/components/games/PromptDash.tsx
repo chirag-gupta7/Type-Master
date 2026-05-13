@@ -50,37 +50,9 @@ export function PromptDash() {
           priorFeedback,
         });
 
-<<<<<<< HEAD
         if (data.feedback) {
           setAiFeedback(data.feedback);
           setWritingFeedback('prompt-dash', data.feedback);
-=======
-        const userQuery = priorFeedback
-          ? `Previous feedback you (the coach) gave:
-${priorFeedback}
-
-Current writing sample:
-${cleaned}
-
-Provide updated feedback that references progress relative to the earlier guidance.`
-          : `Current writing sample:
-${cleaned}
-
-Provide fresh feedback focused on writing style, tone, word choice, and narrative clarity.`;
-
-        const data = await aiAPI.getFeedback({
-          systemPrompt,
-          userQuery,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 220,
-          },
-        });
-
-        if (data.text) {
-          setAiFeedback(data.text);
-          setWritingFeedback('prompt-dash', data.text);
->>>>>>> origin/main
         } else {
           setAiFeedback('The AI coach could not generate feedback this round. Try another prompt.');
           setWritingFeedback('prompt-dash', null);
@@ -99,24 +71,10 @@ Provide fresh feedback focused on writing style, tone, word choice, and narrativ
     setIsLoading(true);
 
     try {
-<<<<<<< HEAD
       const data = await aiAPI.generateWritingPrompt();
 
       if (data.prompt) {
         setPrompt(data.prompt);
-=======
-      const data = await aiAPI.generateContent({
-        prompt:
-          'Generate a single creative writing prompt for a typing speed game. The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.',
-        generationConfig: {
-          temperature: 0.9,
-          maxOutputTokens: 100,
-        },
-      });
-
-      if (data.text) {
-        setPrompt(data.text);
->>>>>>> origin/main
       } else {
         // Fallback if no prompt generated
         setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
