@@ -79,88 +79,47 @@ export const getTypingFeedback = async (req: Request, res: Response, next: NextF
   }
 };
 
-/**
- * Generate a new creative writing prompt
- */
-export const generateWritingPrompt = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const systemPrompt = 'Generate a single creative writing prompt for a typing speed game.';
-    const userQuery = 'The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.';
-
-    const prompt = await callGemini(systemPrompt, userQuery, 100, 0.9);
-    res.json({ prompt });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get feedback for creative writing (Prompt Dash or Story Chain)
- */
-export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { text, type, priorFeedback } = req.body;
-
-    if (!text) {
-      throw new AppError(400, 'No text provided for analysis');
-    }
-
-    let systemPrompt = '';
-    if (type === 'story-chain') {
-      systemPrompt = `You are a collaborative storytelling coach analyzing a user's contributions in a game called Story Chain. Highlight the user's narrative voice, pacing, tone, and how well they build on prior sentences. If you are given earlier feedback that you provided, compare the new writing with that guidance and highlight any progress or areas that still need work.`;
-    } else {
-      systemPrompt = `You are a supportive creative-writing coach for a typing practice game. Offer precise, encouraging feedback (2-3 sentences) about the user's writing style, tone, vocabulary, and clarity. If prior feedback is provided, compare the current writing to that guidance and highlight any progress or areas that still need work.`;
-    }
-
-    const userQuery = priorFeedback
-      ? `Previous feedback: ${priorFeedback}\n\nCurrent writing: ${text}\n\nProvide updated feedback referencing progress.`
-      : `Current writing: ${text}\n\nProvide fresh feedback focused on style and clarity.`;
-
-    const feedback = await callGemini(systemPrompt, userQuery, 250, 0.7);
-    res.json({ feedback });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get the next sentence in a collaborative story
- */
-export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { story } = req.body; // Array of sentences
-    const isFirstSentence = !story || story.length === 0;
-
-    const systemPrompt = isFirstSentence
-      ? 'You are starting a collaborative story in a typing game. Generate an engaging opening sentence that sets up an interesting scenario or mystery. Keep it to a single, concise sentence. Do not add any preamble. Just write the sentence.'
-      : `You are a creative and engaging storyteller collaborating with a user in a typing game called Story Chain. The user provides a sentence, and your task is to write the *very next* sentence to continue the narrative smoothly and interestingly. Focus on building upon the user's last sentence. Be imaginative but keep the story coherent. IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introductory phrases. Just provide the next sentence directly.`;
-
-    const userQuery = isFirstSentence
-      ? 'Write an engaging opening sentence for a story.'
-      : `Story so far:\n${story.join('\n')}\n\nWrite the next single sentence.`;
-
-    const response = await callGemini(systemPrompt, userQuery, 150, 0.8);
-    res.json({ response });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Compatibility exports for main branch changes
-export const getAiFeedback = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { systemPrompt, userQuery, generationConfig } = req.body;
-    const text = await callGemini(systemPrompt, userQuery, generationConfig?.maxOutputTokens, generationConfig?.temperature);
-    res.json({ text });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const generateAiContent = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { prompt, generationConfig } = req.body;
-    const text = await callGemini('', prompt, generationConfig?.maxOutputTokens, generationConfig?.temperature);
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      logger.error('GEMINI_API_KEY is not set in backend environment');
+      throw new AppError(500, 'AI Service unavailable');
+    }
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: generationConfig || {
+          temperature: 0.9,
+          maxOutputTokens: 200,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      logger.error('Gemini API error', { errorData });
+      throw new AppError(502, 'Failed to generate AI content');
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
     res.json({ text });
   } catch (error) {
     next(error);

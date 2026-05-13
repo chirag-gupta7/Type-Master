@@ -79,8 +79,21 @@ export function StoryChain() {
     try {
       const data = await aiAPI.getStoryResponse(currentStory);
 
-      if (data.response) {
-        return data.response;
+      const userQuery = isFirstSentence
+        ? 'Write an engaging opening sentence for a story.'
+        : `Here is the story so far:\n${currentStory.join('\n')}\n\nWrite the next single sentence to continue this story based *specifically* on the last sentence written.`;
+
+      const data = await aiAPI.getFeedback({
+        systemPrompt,
+        userQuery,
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 150,
+        },
+      });
+
+      if (data.text) {
+        return data.text;
       }
 
       // Fallback if no response
