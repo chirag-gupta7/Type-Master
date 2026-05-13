@@ -97,11 +97,12 @@ const requestBackendToken = async (payload: TokenRequestPayload): Promise<string
   }
 
   try {
+    const internalSecret = process.env.INTERNAL_API_SECRET;
     const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/auth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Token': process.env.INTERNAL_API_SECRET || '',
+        'X-Internal-Token': internalSecret || '',
       },
       body: JSON.stringify({
         email: normalizedEmail,
