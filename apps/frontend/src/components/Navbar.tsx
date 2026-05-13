@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, Menu, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
@@ -172,15 +173,20 @@ export function Navbar() {
 
             {/* Theme Toggle */}
             {mounted && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="ml-2"
-                aria-label="Toggle theme"
-              >
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="ml-2"
+                    aria-label="Toggle theme"
+                  >
+                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Toggle theme</TooltipContent>
+              </Tooltip>
             )}
           </div>
 
