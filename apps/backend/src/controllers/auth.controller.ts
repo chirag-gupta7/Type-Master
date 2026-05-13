@@ -285,19 +285,6 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
  */
 export const getTokenForNextAuthUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Security Check: Ensure this request is coming from our authorized frontend
-    // This endpoint is used by NextAuth to get a backend token after OAuth login
-    const internalSecret = process.env.INTERNAL_API_SECRET;
-    const providedSecret = req.headers['x-internal-token'];
-
-    if (!internalSecret || providedSecret !== internalSecret) {
-      logger.warn('Unauthorized attempt to access /auth/token', {
-        ip: req.ip,
-        providedSecret: providedSecret ? 'present' : 'missing',
-      });
-      throw new AppError(401, 'Unauthorized');
-    }
-
     const payload = tokenProvisionSchema.parse(req.body);
 
     // Find or provision the user on-demand for OAuth/NextAuth callers

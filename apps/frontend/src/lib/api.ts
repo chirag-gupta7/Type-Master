@@ -71,79 +71,6 @@ const persistBackendToken = (token?: string | null) => {
   localStorage.setItem('accessToken', cleaned);
 };
 
-type TokenRequestPayload = {
-  email?: string | null;
-  name?: string | null;
-  username?: string | null;
-  image?: string | null;
-};
-
-const normalizeEmail = (email?: string | null): string | null => {
-  if (!email) {
-    return null;
-  }
-  const trimmed = email.trim();
-  return trimmed ? trimmed.toLowerCase() : null;
-};
-
-const requestBackendToken = async (payload: TokenRequestPayload): Promise<string | null> => {
-  const normalizedEmail = normalizeEmail(payload.email);
-
-  console.log('[API] Requesting backend token for:', {
-    email: normalizedEmail,
-    hasUsername: !!payload.username,
-  });
-
-  if (!normalizedEmail) {
-    console.error('[API] Cannot request token: no email provided');
-    return null;
-  }
-
-  try {
-    const requestBody = {
-      email: normalizedEmail,
-      name: payload.name ?? null,
-      username: payload.username ?? null,
-      image: payload.image ?? null,
-    };
-    console.log('[API] Token request payload:', requestBody);
-
-    const internalSecret = process.env.INTERNAL_API_SECRET;
-    const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/auth/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Token': internalSecret || '',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    console.log('[API] Token request response:', response.status, response.statusText);
-
-    if (response.ok) {
-      const data = (await response.json()) as { accessToken?: string };
-      const token = sanitizeToken(data.accessToken);
-      if (token && isBackendJwt(token)) {
-        console.log('[API] Received valid backend JWT token');
-        persistBackendToken(token);
-        return token;
-      } else {
-        console.error('[API] Token response invalid:', {
-          hasToken: !!token,
-          isBackendJwt: token ? isBackendJwt(token) : false,
-        });
-      }
-    } else {
-      const errorText = await response.text();
-      console.error('[API] Token request failed:', response.status, errorText);
-    }
-  } catch (error) {
-    console.error('[API] Failed to fetch backend token:', error);
-  }
-
-  return null;
-};
-
 const getAuthToken = async (): Promise<string | null> => {
   if (typeof window === 'undefined') return null;
 
@@ -188,20 +115,7 @@ const getAuthToken = async (): Promise<string | null> => {
     }
   }
 
-  console.log('[API] No valid token found, requesting new token from backend');
-  const refreshedToken = await requestBackendToken({
-    email: session?.user?.email ?? null,
-    name: session?.user?.name ?? null,
-    username: (session?.user as any)?.username ?? null,
-    image: session?.user?.image ?? null,
-  });
-
-  if (refreshedToken) {
-    console.log('[API] Successfully obtained new backend token');
-    return refreshedToken;
-  }
-
-  console.error('[API] Failed to obtain any valid token');
+  console.error('[API] No valid backend token available in session or local storage');
   return null;
 }; /**
  * Generate a backend JWT token by calling the backend auth endpoint

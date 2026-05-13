@@ -96,7 +96,7 @@ export const internalOnly = (req: Request, res: Response, next: NextFunction) =>
 
   if (!secret) {
     logger.error('INTERNAL_API_SECRET is not defined');
-    return next(new AppError(500, 'Internal server error'));
+    return next(new AppError(503, 'Internal auth is not configured'));
   }
 
   if (typeof internalToken !== 'string') {
