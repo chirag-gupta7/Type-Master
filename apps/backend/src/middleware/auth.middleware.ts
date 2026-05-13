@@ -87,7 +87,7 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Middleware to verify internal API secret using timing-safe comparison
+ * Middleware to restrict access to internal services only
  */
 export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
   void res;
@@ -100,20 +100,22 @@ export const internalOnly = (req: Request, res: Response, next: NextFunction) =>
   }
 
   if (typeof internalToken !== 'string') {
-    logger.warn('Invalid internal token attempt', { ip: req.ip });
     return next(new AppError(401, 'Unauthorized internal request'));
   }
 
-  const internalTokenBuffer = Buffer.from(internalToken);
-  const secretBuffer = Buffer.from(secret);
+  try {
+    const internalTokenBuffer = Buffer.from(internalToken);
+    const secretBuffer = Buffer.from(secret);
 
-  if (
-    internalTokenBuffer.length !== secretBuffer.length ||
-    !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
-  ) {
-    logger.warn('Invalid internal token attempt', { ip: req.ip });
+    if (
+      internalTokenBuffer.length !== secretBuffer.length ||
+      !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
+    ) {
+      return next(new AppError(401, 'Unauthorized internal request'));
+    }
+  } catch (error) {
     return next(new AppError(401, 'Unauthorized internal request'));
   }
 
-  return next();
+  next();
 };
