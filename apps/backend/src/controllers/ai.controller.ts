@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/error-handler';
+import { logger } from '../utils/logger';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
 
@@ -12,10 +13,11 @@ const callGemini = async (
   maxTokens: number = 250,
   temperature: number = 0.7
 ) => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not defined');
+    logger.error('GEMINI_API_KEY is not set in backend environment');
+    throw new AppError(500, 'AI Service unavailable');
   }
 
   const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
@@ -41,8 +43,8 @@ const callGemini = async (
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Gemini API error:', errorText);
+    const errorData = await response.json().catch(() => ({}));
+    logger.error('Gemini API error', { errorData });
     throw new AppError(502, 'AI service currently unavailable');
   }
 
@@ -82,7 +84,6 @@ export const getTypingFeedback = async (req: Request, res: Response, next: NextF
  */
 export const generateWritingPrompt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    void req;
     const systemPrompt = 'Generate a single creative writing prompt for a typing speed game.';
     const userQuery = 'The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.';
 
@@ -140,6 +141,27 @@ export const getStoryResponse = async (req: Request, res: Response, next: NextFu
 
     const response = await callGemini(systemPrompt, userQuery, 150, 0.8);
     res.json({ response });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Compatibility exports for main branch changes
+export const getAiFeedback = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { systemPrompt, userQuery, generationConfig } = req.body;
+    const text = await callGemini(systemPrompt, userQuery, generationConfig?.maxOutputTokens, generationConfig?.temperature);
+    res.json({ text });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateAiContent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { prompt, generationConfig } = req.body;
+    const text = await callGemini('', prompt, generationConfig?.maxOutputTokens, generationConfig?.temperature);
+    res.json({ text });
   } catch (error) {
     next(error);
   }

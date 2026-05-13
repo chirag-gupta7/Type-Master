@@ -206,8 +206,22 @@ const TypingTest: React.FC = () => {
           duration: summaryDuration,
         });
 
+<<<<<<< HEAD
         if (data.feedback) {
           setAiFeedback(data.feedback);
+=======
+        const data = await aiAPI.getFeedback({
+          systemPrompt,
+          userQuery,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 200,
+          },
+        });
+
+        if (data.text) {
+          setAiFeedback(data.text);
+>>>>>>> origin/main
         } else {
           setAiFeedback('Could not load AI feedback at this time.');
         }
