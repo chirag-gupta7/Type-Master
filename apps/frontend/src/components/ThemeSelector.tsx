@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Palette, Check } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useThemeStore, THEME_PRESETS, type ThemeColors } from '@/store/theme';
 import { cn } from '@/lib/utils';
 
@@ -37,18 +38,23 @@ export function ThemeSelector() {
   return (
     <div className="fixed top-20 right-4 z-50">
       {/* Floating Button */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow"
-        style={{
-          boxShadow: `0 0 20px ${currentTheme.primary}40`,
-        }}
-        aria-label="Theme Selector"
-      >
-        <Palette className="w-6 h-6 text-white" />
-      </motion.button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsOpen(!isOpen)}
+            className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow"
+            style={{
+              boxShadow: `0 0 20px ${currentTheme.primary}40`,
+            }}
+            aria-label="Theme Selector"
+          >
+            <Palette className="w-6 h-6 text-white" />
+          </motion.button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Change Theme</TooltipContent>
+      </Tooltip>
 
       {/* Theme Picker Dialog */}
       <AnimatePresence>
