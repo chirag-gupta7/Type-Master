@@ -54,7 +54,7 @@ describe('Auth Bypass Vulnerability Reproduction', () => {
       .send({ email: 'victim@example.com' })
       .expect(401);
 
-    expect(response.body.error).toBe('Unauthorized');
+    expect(response.body.error).toBe('Unauthorized internal request');
   });
 
   it('SHOULD be able to get a token when providing the correct internal secret', async () => {

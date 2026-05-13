@@ -44,34 +44,15 @@ export function PromptDash() {
       setIsFeedbackLoading(true);
 
       try {
-        const systemPrompt = `You are a supportive creative-writing coach for a typing practice game. Offer precise, encouraging feedback (2-3 sentences) about the user's writing style, tone, vocabulary, and clarity.
-If prior feedback is provided, compare the current writing to that guidance and highlight any progress or areas that still need work.`;
-
-        const userQuery = priorFeedback
-          ? `Previous feedback you (the coach) gave:
-${priorFeedback}
-
-Current writing sample:
-${cleaned}
-
-Provide updated feedback that references progress relative to the earlier guidance.`
-          : `Current writing sample:
-${cleaned}
-
-Provide fresh feedback focused on writing style, tone, word choice, and narrative clarity.`;
-
-        const data = await aiAPI.getFeedback({
-          systemPrompt,
-          userQuery,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 220,
-          },
+        const data = await aiAPI.getWritingFeedback({
+          text: cleaned,
+          type: 'prompt-dash',
+          priorFeedback,
         });
 
-        if (data.text) {
-          setAiFeedback(data.text);
-          setWritingFeedback('prompt-dash', data.text);
+        if (data.feedback) {
+          setAiFeedback(data.feedback);
+          setWritingFeedback('prompt-dash', data.feedback);
         } else {
           setAiFeedback('The AI coach could not generate feedback this round. Try another prompt.');
           setWritingFeedback('prompt-dash', null);
@@ -90,17 +71,10 @@ Provide fresh feedback focused on writing style, tone, word choice, and narrativ
     setIsLoading(true);
 
     try {
-      const data = await aiAPI.generateContent({
-        prompt:
-          'Generate a single creative writing prompt for a typing speed game. The prompt should be engaging, imaginative, and inspire creative writing. It should be 1-2 sentences long. Examples: "Describe a city hidden in the clouds." or "The ancient artifact began to glow..." Return ONLY the prompt text, nothing else.',
-        generationConfig: {
-          temperature: 0.9,
-          maxOutputTokens: 100,
-        },
-      });
+      const data = await aiAPI.generateWritingPrompt();
 
-      if (data.text) {
-        setPrompt(data.text);
+      if (data.prompt) {
+        setPrompt(data.prompt);
       } else {
         // Fallback if no prompt generated
         setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);

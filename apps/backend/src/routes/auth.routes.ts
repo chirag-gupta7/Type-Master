@@ -6,6 +6,7 @@ import {
   getTokenForNextAuthUser,
 } from '../controllers/auth.controller';
 import { authLimiter } from '../middleware/rate-limiter';
+import { internalOnly } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -33,8 +34,9 @@ router.post('/refresh', refreshToken);
 /**
  * @route   POST /api/v1/auth/token
  * @desc    Get backend JWT token for NextAuth authenticated users
- * @access  Public
+ * @access  Internal Only
  */
-router.post('/token', getTokenForNextAuthUser);
+router.post('/token', internalOnly, authLimiter, getTokenForNextAuthUser);
+router.post('/token', internalOnly, getTokenForNextAuthUser);
 
 export default router;

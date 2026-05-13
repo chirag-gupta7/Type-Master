@@ -52,34 +52,15 @@ export function StoryChain() {
       setIsFeedbackLoading(true);
 
       try {
-        const systemPrompt = `You are a collaborative storytelling coach analyzing a user's contributions in a game called Story Chain. Highlight the user's narrative voice, pacing, tone, and how well they build on prior sentences.
-If you are given earlier feedback that you provided, compare the new writing with that guidance and point out improvements or persistent issues.`;
-
-        const userQuery = priorFeedback
-          ? `Previous advice you gave the user:
-${priorFeedback}
-
-User's current sentences (only their contributions):
-${combined}
-
-Provide updated feedback referencing progress relative to the earlier advice.`
-          : `User's current sentences in the collaborative story:
-${combined}
-
-Provide fresh feedback focused on storytelling style, creativity, tone, and clarity.`;
-
-        const data = await aiAPI.getFeedback({
-          systemPrompt,
-          userQuery,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 250,
-          },
+        const data = await aiAPI.getWritingFeedback({
+          text: combined,
+          type: 'story-chain',
+          priorFeedback,
         });
 
-        if (data.text) {
-          setAiFeedback(data.text);
-          setWritingFeedback('story-chain', data.text);
+        if (data.feedback) {
+          setAiFeedback(data.feedback);
+          setWritingFeedback('story-chain', data.feedback);
         } else {
           setAiFeedback('The storytelling coach could not review this round. Try another story.');
           setWritingFeedback('story-chain', null);
@@ -96,13 +77,7 @@ Provide fresh feedback focused on storytelling style, creativity, tone, and clar
 
   const getAiResponse = async (currentStory: string[]): Promise<string> => {
     try {
-      const isFirstSentence = currentStory.length === 0;
-      const systemPrompt = isFirstSentence
-        ? 'You are starting a collaborative story in a typing game. Generate an engaging opening sentence that sets up an interesting scenario or mystery. Keep it to a single, concise sentence. Do not add any preamble. Just write the sentence.'
-        : `You are a creative and engaging storyteller collaborating with a user in a typing game called Story Chain.
-The user provides a sentence, and your task is to write the *very next* sentence to continue the narrative smoothly and interestingly.
-Focus on building upon the user's last sentence. Be imaginative but keep the story coherent.
-IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introductory phrases like "Okay, here's the next part:", "Continuing the story:", or any other text outside the single story sentence. Just provide the next sentence directly.`;
+      const data = await aiAPI.getStoryResponse(currentStory);
 
       const userQuery = isFirstSentence
         ? 'Write an engaging opening sentence for a story.'
@@ -122,7 +97,7 @@ IMPORTANT: Your response MUST be only a single sentence. Do NOT add any introduc
       }
 
       // Fallback if no response
-      if (isFirstSentence) {
+      if (currentStory.length === 0) {
         return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
       }
       return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
