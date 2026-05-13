@@ -29,44 +29,56 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Create all mistake records
-    const mistakeRecords = await prisma.typingMistake.createMany({
-      data: mistakes.map((m) => ({
-        userId,
-        lessonId,
-        keyPressed: m.keyPressed,
-        keyExpected: m.keyExpected,
-        fingerUsed: m.fingerUsed,
-      })),
-    });
+    // Aggregate mistakes by keyExpected to minimize database calls
+    // This reduces O(n) roundtrips to O(unique_keys) roundtrips
+    const keyMistakeCounts = mistakes.reduce(
+      (acc, mistake) => {
+        acc[mistake.keyExpected] = (acc[mistake.keyExpected] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
-    // Update or create weak keys records
-    for (const mistake of mistakes) {
-      await prisma.userWeakKeys.upsert({
-        where: {
-          userId_keyChar: {
-            userId,
-            keyChar: mistake.keyExpected,
-          },
-        },
-        update: {
-          errorCount: { increment: 1 },
-          lastError: new Date(),
-        },
-        create: {
+    // Perform all database operations in a single transaction for atomicity and performance
+    const [mistakeRecords] = await prisma.$transaction([
+      // 1. Create all individual mistake records in batch
+      prisma.typingMistake.createMany({
+        data: mistakes.map((m) => ({
           userId,
-          keyChar: mistake.keyExpected,
-          errorCount: 1,
-          lastError: new Date(),
-        },
-      });
-    }
+          lessonId,
+          keyPressed: m.keyPressed,
+          keyExpected: m.keyExpected,
+          fingerUsed: m.fingerUsed,
+        })),
+      }),
+      // 2. Batch update weak keys by aggregating counts
+      ...Object.entries(keyMistakeCounts).map(([keyChar, count]) =>
+        prisma.userWeakKeys.upsert({
+          where: {
+            userId_keyChar: {
+              userId,
+              keyChar,
+            },
+          },
+          update: {
+            errorCount: { increment: count },
+            lastError: new Date(),
+          },
+          create: {
+            userId,
+            keyChar,
+            errorCount: count,
+            lastError: new Date(),
+          },
+        })
+      ),
+    ]);
 
     logger.info(`Logged ${mistakes.length} typing mistakes for user: ${userId}`);
 
     res.json({
       message: 'Mistakes logged successfully',
-      count: mistakeRecords.count,
+      count: (mistakeRecords as { count: number }).count,
     });
   } catch (error) {
     logger.error('Error logging mistakes:', error);
