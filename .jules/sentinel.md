@@ -18,3 +18,8 @@
 **Vulnerability:** Gemini API keys were exposed in the frontend via NEXT_PUBLIC_ environment variables, allowing anyone to intercept the key and use the AI quota.
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
+
+## 2026-05-14 - [Insecure Generic AI Proxy Endpoints]
+**Vulnerability:** Generic AI proxy endpoints `/api/v1/ai/feedback` and `/api/v1/ai/generate` allowed clients to provide their own system prompts and arbitrary queries.
+**Learning:** Providing an endpoint that allows client-side control over AI system prompts or unrestricted access to the AI model using the server's API key enables prompt injection and API abuse.
+**Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
