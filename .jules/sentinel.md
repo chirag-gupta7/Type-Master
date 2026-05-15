@@ -18,3 +18,8 @@
 **Vulnerability:** Gemini API keys were exposed in the frontend via NEXT_PUBLIC_ environment variables, allowing anyone to intercept the key and use the AI quota.
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
+
+## 2026-05-15 - Timing Side-Channel in Internal Auth
+**Vulnerability:** The `internalOnly` middleware compared token lengths before using `timingSafeEqual`, leaking the secret length via response timing.
+**Learning:** `timingSafeEqual` requires both buffers to have equal length. If length is checked first and returns early, it creates a timing side-channel.
+**Prevention:** Pre-hash both the input token and the known secret with a fixed-length hash (like SHA-256) before using `timingSafeEqual`.
