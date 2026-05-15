@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats } from './game.controller';
+import { getGameStats, getUserHighScores } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -9,6 +9,7 @@ jest.mock('../utils/prisma', () => ({
     gameScore: {
       findMany: jest.fn(),
       groupBy: jest.fn(),
+      findFirst: jest.fn(),
     },
   },
 }));
@@ -35,7 +36,7 @@ describe('GameController - getGameStats', () => {
   it('should return 401 if userId is missing', async () => {
     mockRequest.userId = undefined;
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(401);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
@@ -66,7 +67,7 @@ describe('GameController - getGameStats', () => {
     (prisma.gameScore.findMany as jest.Mock).mockResolvedValue(mockAvailableTypes);
     (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue(mockUserStats);
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
       distinct: ['gameType'],
@@ -111,9 +112,84 @@ describe('GameController - getGameStats', () => {
   it('should handle errors gracefully', async () => {
     (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch game stats' });
+  });
+});
+
+describe('GameController - getUserHighScores', () => {
+  let mockRequest: Partial<Request & { userId?: string }>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      userId: 'user-123',
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if userId is missing', async () => {
+    mockRequest.userId = undefined;
+
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(401);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should successfully fetch user high scores', async () => {
+    const mockAvailableTypes = [
+      { gameType: GameType.WORD_BLITZ },
+      { gameType: GameType.SPEED_RACE },
+    ];
+
+    const mockBestWordBlitz = {
+      gameType: GameType.WORD_BLITZ,
+      score: 500,
+      wpm: 80,
+      accuracy: 95,
+      duration: 60,
+      createdAt: new Date('2023-01-01'),
+    };
+
+    (prisma.gameScore.findMany as jest.Mock)
+      .mockResolvedValueOnce(mockAvailableTypes)
+      .mockResolvedValueOnce([mockBestWordBlitz]);
+
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledTimes(2);
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: [
+        {
+          gameType: GameType.WORD_BLITZ,
+          score: 500,
+          wpm: 80,
+          accuracy: 95,
+          duration: 60,
+          createdAt: mockBestWordBlitz.createdAt,
+        },
+        {
+          gameType: GameType.SPEED_RACE,
+          score: 0,
+          wpm: null,
+          accuracy: null,
+          duration: null,
+          createdAt: null,
+        },
+      ],
+    });
   });
 });
