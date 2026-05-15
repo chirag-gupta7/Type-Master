@@ -5,14 +5,16 @@ import { logger } from '../utils/logger';
 
 // Validation schemas
 const logMistakeSchema = z.object({
-  lessonId: z.string(),
-  mistakes: z.array(
-    z.object({
-      keyPressed: z.string(),
-      keyExpected: z.string(),
-      fingerUsed: z.string().optional(),
-    })
-  ),
+  lessonId: z.string().uuid('Invalid lesson ID'),
+  mistakes: z
+    .array(
+      z.object({
+        keyPressed: z.string().max(10, 'keyPressed too long'),
+        keyExpected: z.string().max(10, 'keyExpected too long'),
+        fingerUsed: z.string().max(50, 'fingerUsed too long').optional(),
+      })
+    )
+    .max(1000, 'Too many mistakes logged at once'),
 });
 
 /**
