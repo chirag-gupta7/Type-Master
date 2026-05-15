@@ -88,6 +88,7 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
 
 /**
  * Middleware to restrict access to internal services only
+ * Uses hashing to prevent timing side-channels that leak secret length
  */
 export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
   void res;
@@ -104,13 +105,12 @@ export const internalOnly = (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
-    const internalTokenBuffer = Buffer.from(internalToken);
-    const secretBuffer = Buffer.from(secret);
+    // Pre-hash both the input token and the secret to ensure they have the same length
+    // and prevent leaking the secret's length via a timing side-channel.
+    const internalTokenHash = crypto.createHash('sha256').update(internalToken).digest();
+    const secretHash = crypto.createHash('sha256').update(secret).digest();
 
-    if (
-      internalTokenBuffer.length !== secretBuffer.length ||
-      !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
-    ) {
+    if (!crypto.timingSafeEqual(internalTokenHash, secretHash)) {
       return next(new AppError(401, 'Unauthorized internal request'));
     }
   } catch (error) {

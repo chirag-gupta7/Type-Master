@@ -18,3 +18,13 @@
 **Vulnerability:** Gemini API keys were exposed in the frontend via NEXT_PUBLIC_ environment variables, allowing anyone to intercept the key and use the AI quota.
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
+
+## 2026-05-15 - [Timing Attack & API Key Logging]
+**Vulnerability:** Timing side-channel in internal auth and API key exposure in logs.
+**Learning:** Comparing secret lengths before  leaks information. API keys in query parameters are captured by standard logs.
+**Prevention:** Pre-hash secrets with fixed-length digests (SHA-256) before comparison. Pass API keys in headers, not URLs.
+
+## 2026-05-15 - [Timing Attack & API Key Logging]
+**Vulnerability:** Timing side-channel in internal auth and API key exposure in logs.
+**Learning:** Comparing secret lengths before `timingSafeEqual` leaks information. API keys in query parameters are captured by standard logs.
+**Prevention:** Pre-hash secrets with fixed-length digests (SHA-256) before comparison. Pass API keys in headers, not URLs.
