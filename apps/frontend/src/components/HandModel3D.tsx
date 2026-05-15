@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface HandModel3DProps {
   hand: 'left' | 'right';
@@ -63,30 +64,50 @@ export function HandModel3D({
     <div className={`relative ${className}`}>
       {/* Controls */}
       <div className="absolute top-0 right-0 z-10 flex gap-2">
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setRotationY((prev) => (prev + 15) % 360)}
-          className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
-        >
-          <RotateCw className="h-4 w-4 text-cyan-400" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setScale((prev) => Math.min(prev + 0.1, 1.5))}
-          className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
-        >
-          <ZoomIn className="h-4 w-4 text-cyan-400" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setScale((prev) => Math.max(prev - 0.1, 0.7))}
-          className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
-        >
-          <ZoomOut className="h-4 w-4 text-cyan-400" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setRotationY((prev) => (prev + 15) % 360)}
+              className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
+              aria-label="Rotate hand model"
+            >
+              <RotateCw className="h-4 w-4 text-cyan-400" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Rotate Model</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setScale((prev) => Math.min(prev + 0.1, 1.5))}
+              className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
+              aria-label="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4 text-cyan-400" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom In</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setScale((prev) => Math.max(prev - 0.1, 0.7))}
+              className="w-8 h-8 bg-black/50 backdrop-blur-sm border-white/20 hover:bg-white/10"
+              aria-label="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4 text-cyan-400" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom Out</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* 3D Hand Model */}
