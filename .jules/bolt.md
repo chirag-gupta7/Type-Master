@@ -5,3 +5,7 @@
 ## 2025-05-10 - Batching upserts in logMistakes
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
+
+## 2025-05-23 - [Optimizing high-score retrieval with Prisma distinct]
+**Learning:** Fetching the top record per group (e.g., high score per game type) for a specific user can be optimized from N+1 queries to a single query using Prisma's `distinct` and `orderBy`. Prisma requires that the fields in `distinct` MUST match the first fields in `orderBy`.
+**Action:** Use `prisma.model.findMany({ where: { userId }, distinct: ['groupField'], orderBy: [{ groupField: 'asc' }, { sortField: 'desc' }] })` for efficient top-per-group retrieval.
