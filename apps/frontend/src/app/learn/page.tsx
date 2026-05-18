@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { lessonAPI } from '@/lib/api';
@@ -117,7 +117,7 @@ const getLessonSummaryText = (lesson: SectionLesson): string => {
   return 'Typing practice';
 };
 
-export default function LearnPage() {
+function LearnPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -542,5 +542,27 @@ export default function LearnPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function LearnPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h1 className="mb-2 text-4xl font-bold">Learn Touch Typing</h1>
+            <p className="text-muted-foreground">Loading learn page...</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((index) => (
+              <Skeleton key={index} className="h-44 w-full" />
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <LearnPageContent />
+    </Suspense>
   );
 }
