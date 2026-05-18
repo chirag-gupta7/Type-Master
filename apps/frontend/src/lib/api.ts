@@ -5,7 +5,14 @@
 
 import { getSession } from 'next-auth/react';
 import { getApiBaseUrl, API_VERSION } from './apiBase';
-import { getCache, setCache, invalidateCache, clearCache, DEFAULT_CACHE_TTL } from './cache';
+import {
+  getCache,
+  setCache,
+  invalidateCache,
+  invalidateCacheByPrefix,
+  clearCache,
+  DEFAULT_CACHE_TTL,
+} from './cache';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -499,6 +506,91 @@ export const lessonAPI = {
   },
 
   /**
+   * Get section summaries for a practice type
+   */
+  getSectionSummaries: async (practiceType: 'normal' | 'coding' | 'assessment') => {
+    const params = new URLSearchParams({ practiceType });
+    const cacheKey = `lessons:sections:${practiceType}`;
+    return fetchAPI<{
+      practiceType: 'normal' | 'coding' | 'assessment';
+      sections: Array<{
+        sectionId: number;
+        title: string;
+        description: string;
+        totalLessons: number;
+        completedLessons: number;
+        completionPercentage: number;
+        firstLessonId: string | null;
+        firstUnlockedLessonId: string | null;
+        firstUnlockedPage: number;
+        totalPages: number;
+      }>;
+    }>(`/lessons/sections?${params.toString()}`, {
+      cacheKey,
+      cacheTtl: DEFAULT_CACHE_TTL,
+    });
+  },
+
+  /**
+   * Get one fair-distribution page of lessons for a section
+   */
+  getSectionPage: async (sectionId: number, page: number, pageCount = 5) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      pageCount: pageCount.toString(),
+    });
+
+    const cacheKey = `lessons:section:${sectionId}:page:${page}:count:${pageCount}`;
+    return fetchAPI<{
+      section: {
+        id: number;
+        name: string;
+        description: string;
+        totalLessons: number;
+        completedLessons: number;
+        completionPercentage: number;
+      };
+      pagination: {
+        page: number;
+        pageCount: number;
+        totalPages: number;
+        totalLessons: number;
+        startIndex: number;
+        endIndex: number;
+        hasPreviousPage: boolean;
+        hasNextPage: boolean;
+      };
+      lessons: Array<{
+        id: string;
+        level: number;
+        order: number;
+        title: string;
+        description: string;
+        keys: string[];
+        difficulty: string;
+        targetWpm: number;
+        minAccuracy: number;
+        exerciseType: string;
+        content: string;
+        section: number;
+        isCheckpoint: boolean;
+        userProgress: Array<{
+          completed: boolean;
+          bestWpm: number;
+          bestAccuracy: number;
+          stars: number;
+          attempts: number;
+        }>;
+        isUnlocked: boolean;
+        isCompleted: boolean;
+      }>;
+    }>(`/lessons/section/${sectionId}?${params.toString()}`, {
+      cacheKey,
+      cacheTtl: DEFAULT_CACHE_TTL,
+    });
+  },
+
+  /**
    * Get single lesson by ID
    */
   getLessonById: async (id: string, options?: { skipCache?: boolean }) => {
@@ -561,6 +653,10 @@ export const lessonAPI = {
     invalidateCache(`lessons:detail:${data.lessonId}`);
     invalidateCache('lessons:stats');
     invalidateCache('lessons:progress');
+    invalidateCache('lessons:sections:normal');
+    invalidateCache('lessons:sections:coding');
+    invalidateCache('lessons:sections:assessment');
+    invalidateCacheByPrefix('lessons:section:');
 
     console.log('[API] Invalidated lesson caches after progress save');
 
