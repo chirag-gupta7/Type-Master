@@ -142,6 +142,7 @@ function LearnPageContent() {
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   const [sectionPages, setSectionPages] = useState<Record<string, SectionPageResponse>>({});
+  const sectionPagesRef = useRef<Record<string, SectionPageResponse>>({});
   const [pageLoading, setPageLoading] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
@@ -172,7 +173,7 @@ function LearnPageContent() {
     async (sectionId: number, page: number, options?: { shouldPreselect?: boolean }) => {
       const normalizedPage = Math.max(1, Math.min(PAGE_COUNT, page));
       const cacheKey = getSectionPageKey(sectionId, normalizedPage);
-      const cachedPage = sectionPages[cacheKey];
+      const cachedPage = sectionPagesRef.current[cacheKey];
 
       setPageError(null);
       setSelectedSectionId(sectionId);
@@ -189,10 +190,14 @@ function LearnPageContent() {
       setPageLoading(true);
       try {
         const pageData = await lessonAPI.getSectionPage(sectionId, normalizedPage, PAGE_COUNT);
-        setSectionPages((prev) => ({
-          ...prev,
-          [cacheKey]: pageData,
-        }));
+        setSectionPages((prev) => {
+          const next = {
+            ...prev,
+            [cacheKey]: pageData,
+          };
+          sectionPagesRef.current = next;
+          return next;
+        });
 
         if (options?.shouldPreselect) {
           selectLessonForPage(pageData);
@@ -206,7 +211,7 @@ function LearnPageContent() {
         setPageLoading(false);
       }
     },
-    [practice, sectionPages, selectLessonForPage, updateLearnQuery]
+    [practice, selectLessonForPage, updateLearnQuery]
   );
 
   useEffect(() => {
