@@ -153,7 +153,3 @@ export const getStoryResponse = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main
