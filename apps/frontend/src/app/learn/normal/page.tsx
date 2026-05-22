@@ -1,7 +1,5 @@
-'use client';
-
-import LearnPage from '../page';
+import { redirect } from 'next/navigation';
 
 export default function NormalLearnPage() {
-  return <LearnPage />;
+  redirect('/learn?practice=normal');
 }
