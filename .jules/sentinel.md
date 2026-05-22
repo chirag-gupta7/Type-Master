@@ -19,7 +19,7 @@
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
 
-## 2026-05-14 - [Insecure Generic AI Proxy]
-**Vulnerability:** The backend exposed generic endpoints (`/ai/feedback` and `/ai/generate`) that accepted arbitrary prompts and system instructions from the client.
-**Learning:** Generic AI proxies are dangerous because they allow clients to bypass hardcoded safety guardrails or use the AI quota for unintended purposes (Prompt Injection).
-**Prevention:** Only expose specific, task-oriented AI endpoints with hardcoded system prompts and strictly validated user inputs on the server.
+## 2026-05-14 - [Insecure Generic AI Proxy Endpoints]
+**Vulnerability:** Generic AI proxy endpoints `/api/v1/ai/feedback` and `/api/v1/ai/generate` allowed clients to provide their own system prompts and arbitrary queries.
+**Learning:** Providing an endpoint that allows client-side control over AI system prompts or unrestricted access to the AI model using the server's API key enables prompt injection and API abuse.
+**Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
