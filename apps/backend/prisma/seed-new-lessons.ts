@@ -198,7 +198,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'for (let i = 0; i < 10; i++) { const squared = i * i; if (squared % 2 === 0) { console.log("even", squared); } else { console.log("odd", squared); } } const items = ["alpha", "beta", "gamma"]; items.forEach((item) => console.log(item));',
+      'for (let i = 0; i < 10; i++) { const squared = i * i; if (squared % 2 === 0) { console.log("even", squared); } else { console.log("odd", squared); } }\nconst items = ["alpha", "beta", "gamma"]; items.forEach((item) => console.log(item));',
   },
   {
     level: 212,
@@ -214,7 +214,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'async function fetchUser(id: number) { const res = await fetch(`/api/user/${id}`); if (!res.ok) throw new Error("failed"); return res.json(); } fetchUser(7).then((user) => console.log(user.name)).catch((err) => console.error(err));',
+      'async function fetchUser(id: number) { const res = await fetch(`/api/user/${id}`); if (!res.ok) throw new Error("failed"); return res.json(); }\nfetchUser(7).then((user) => console.log(user.name)).catch((err) => console.error(err));',
   },
   {
     level: 213,
@@ -294,7 +294,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'const profile = { name: "Ava", skills: ["typing", "javascript"], links: { site: "https://example.com", github: "https://github.com/ava" } }; const { name, skills, links } = profile; console.log(name, skills.join(", "), links.site);',
+      'const profile = { name: "Ava", skills: ["typing", "javascript"], links: { site: "https://example.com", github: "https://github.com/ava" } };\nconst { name, skills, links } = profile;\nconsole.log(name, skills.join(", "), links.site);',
   },
   {
     level: 218,
@@ -326,7 +326,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'const scores = [55, 63, 72, 91, 88]; const fast = scores.filter((s) => s > 70).map((s) => s + 5); const total = scores.reduce((sum, s) => sum + s, 0); console.log({ fast, total, average: total / scores.length });',
+      'const scores = [55, 63, 72, 91, 88];\nconst fast = scores.filter((s) => s > 70).map((s) => s + 5);\nconst total = scores.reduce((sum, s) => sum + s, 0);\nconsole.log({ fast, total, average: total / scores.length });',
   },
   {
     level: 220,
