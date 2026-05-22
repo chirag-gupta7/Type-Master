@@ -310,7 +310,7 @@ const codeSyntaxLessons = [
     targetFingers: commonFingers,
     unlockAfter: [],
     content:
-      'from dataclasses import dataclass\n\n@dataclass\nclass Lesson:\n    id: int\n    title: str\n    wpm: int\n    accuracy: int\n\ndef describe(lesson: Lesson) -> str:\n    return f"{lesson.title} targets {lesson.wpm} wpm at {lesson.accuracy}% accuracy"\n\nprint(describe(Lesson(1, "Home Row", 25, 95)))',
+      'from dataclasses import dataclass\n\n@dataclass\nclass Lesson:\n    id: int\n    title: str\n    wpm: int\n    accuracy: int\n\n\ndef describe(lesson: Lesson) -> str:\n    return f"{lesson.title} targets {lesson.wpm} wpm at {lesson.accuracy}% accuracy"\n\nprint(describe(Lesson(1, "Home Row", 25, 95)))',
   },
   {
     level: 219,
