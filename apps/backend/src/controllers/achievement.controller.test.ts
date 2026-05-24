@@ -35,19 +35,6 @@ jest.mock('../utils/logger', () => ({
   },
 }));
 
-  beforeEach(() => {
-    jsonMock = jest.fn();
-    statusMock = jest.fn().mockReturnThis();
-    mockResponse = {
-      json: jsonMock,
-      status: statusMock,
-    };
-    mockRequest = {
-      userId: 'user-123',
-    };
-    jest.clearAllMocks();
-  });
-
 describe('AchievementController', () => {
   let mockRequest: Partial<Request & { userId?: string }>;
   let mockResponse: Partial<Response>;
