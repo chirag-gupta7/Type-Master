@@ -48,7 +48,7 @@ export function ThemeSelector() {
             style={{
               boxShadow: `0 0 20px ${currentTheme.primary}40`,
             }}
-            aria-label="Theme Selector"
+            aria-label="Change Theme"
           >
             <Palette className="w-6 h-6 text-white" />
           </motion.button>
@@ -101,6 +101,7 @@ export function ThemeSelector() {
                         background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
                         boxShadow: isActive ? `0 0 20px ${theme.primary}60` : 'none',
                       }}
+                      aria-label={`Select ${theme.name} theme`}
                     >
                       {/* Theme Name */}
                       <div className="text-white text-sm font-medium mb-2">{theme.name}</div>

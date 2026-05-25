@@ -6,6 +6,6 @@ Critical UX and accessibility learnings from working on TypeMaster.
 **Learning:** For a keyboard-heavy application like a typing master, accessibility for screen readers and keyboard users is paramount. A "Skip to content" link allows users to bypass the navigation and jump straight to the typing interface or dashboard.
 **Action:** Always include a skip link in the root layout of web applications with complex navigation.
 
-## 2025-05-22 - [Icon-only Button Tooltips]
-**Learning:** Sighted users often struggle to identify the purpose of abstract icons (like custom 3D controls or theme palettes) without labels. While `aria-label` solves this for screen readers, visual tooltips are necessary for full accessibility.
-**Action:** For new icon-only buttons, and any existing ones touched by a PR, add a descriptive `aria-label` and a corresponding Radix `Tooltip` (using `asChild` to maintain semantic button structure). Wrap the application in a global `TooltipProvider` to support this pattern consistently.
+## 2025-05-20 - [Tooltip for Icon-only Buttons]
+**Learning:** Icon-only buttons (like theme toggles or floating palettes) are great for visual minimalism but poor for discoverability and accessibility. Combining Radix UI Tooltips with descriptive `aria-label` attributes ensures both visual users and screen reader users understand the button's purpose without cluttering the UI.
+**Action:** Always wrap icon-only buttons in a Tooltip and provide a clear `aria-label`. Use `asChild` on the TooltipTrigger to preserve button semantics.
