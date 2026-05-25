@@ -8,4 +8,4 @@ Critical UX and accessibility learnings from working on TypeMaster.
 
 ## 2025-05-22 - [Icon-only Button Tooltips]
 **Learning:** Sighted users often struggle to identify the purpose of abstract icons (like custom 3D controls or theme palettes) without labels. While `aria-label` solves this for screen readers, visual tooltips are necessary for full accessibility.
-**Action:** Every icon-only button must have a descriptive `aria-label` AND a corresponding `Tooltip` (using Radix's `asChild` to maintain semantic button structure). Wrap the application in a global `TooltipProvider` to enable these consistently.
+**Action:** For new icon-only buttons, and any existing ones touched by a PR, add a descriptive `aria-label` and a corresponding Radix `Tooltip` (using `asChild` to maintain semantic button structure). Wrap the application in a global `TooltipProvider` to support this pattern consistently.
