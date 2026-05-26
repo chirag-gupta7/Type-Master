@@ -5,3 +5,7 @@
 ## 2025-05-10 - Batching upserts in logMistakes
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
+
+## 2025-05-24 - Offloading statistics to database aggregation
+**Learning:** Performing calculations like sums and averages in-memory after fetching all records (`findMany`) creates O(N) data transfer and processing overhead. Prisma's `aggregate` feature allows these calculations to happen at the database level, returning only the final results.
+**Action:** For summary or dashboard endpoints, always prefer `aggregate` or `groupBy` over in-memory processing of large datasets.
