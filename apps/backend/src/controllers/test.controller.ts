@@ -1,6 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
+
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
@@ -15,41 +22,11 @@ const createTestResultSchema = z.object({
 });
 
 /**
- * Calculate statistics from test results
- */
-const calculateStats = (
-  tests: Array<{ wpm: number; accuracy: number; createdAt: Date }>
-) => {
-  if (tests.length === 0) {
-    return {
-      averageWpm: 0,
-      averageAccuracy: 0,
-      bestWpm: 0,
-      bestAccuracy: 0,
-      totalTests: 0,
-      recentTests: [],
-    };
-  }
-
-  const wpmValues = tests.map((t) => t.wpm);
-  const accuracyValues = tests.map((t) => t.accuracy);
-
-  return {
-    averageWpm: Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length),
-    averageAccuracy: Math.round(accuracyValues.reduce((a, b) => a + b, 0) / accuracyValues.length),
-    bestWpm: Math.max(...wpmValues),
-    bestAccuracy: Math.max(...accuracyValues),
-    totalTests: tests.length,
-    recentTests: tests.slice(0, 10),
-  };
-};
-
-/**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
  * @access  Private
  */
-export const createTestResult = async (req: Request, res: Response, next: NextFunction) => {
+export const createTestResult = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -91,7 +68,7 @@ export const createTestResult = async (req: Request, res: Response, next: NextFu
  * @desc    Get all tests for authenticated user
  * @access  Private
  */
-export const getUserTests = async (req: Request, res: Response, next: NextFunction) => {
+export const getUserTests = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -146,7 +123,7 @@ export const getUserTests = async (req: Request, res: Response, next: NextFuncti
  * @desc    Get specific test by ID
  * @access  Private
  */
-export const getTestById = async (req: Request, res: Response, next: NextFunction) => {
+export const getTestById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -177,7 +154,7 @@ export const getTestById = async (req: Request, res: Response, next: NextFunctio
  * @desc    Get user statistics
  * @access  Private
  */
-export const getUserStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getUserStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -194,17 +171,36 @@ export const getUserStats = async (req: Request, res: Response, next: NextFuncti
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    const tests = await prisma.testResult.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        wpm: true,
-        accuracy: true,
-        createdAt: true,
-      },
-    });
+    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
+    // This avoids fetching potentially thousands of records into memory just to calculate averages and max values.
+    // We use Promise.all to fetch stats and recent records in parallel.
+    const [aggregateStats, recentTests] = await Promise.all([
+      prisma.testResult.aggregate({
+        where,
+        _count: { _all: true },
+        _avg: { wpm: true, accuracy: true },
+        _max: { wpm: true, accuracy: true },
+      }),
+      prisma.testResult.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          wpm: true,
+          accuracy: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    const stats = calculateStats(tests);
+    const stats = {
+      averageWpm: Math.round(aggregateStats._avg.wpm || 0),
+      averageAccuracy: Math.round(aggregateStats._avg.accuracy || 0),
+      bestWpm: aggregateStats._max.wpm || 0,
+      bestAccuracy: aggregateStats._max.accuracy || 0,
+      totalTests: aggregateStats._count._all,
+      recentTests,
+    };
 
     res.json({
       stats,
