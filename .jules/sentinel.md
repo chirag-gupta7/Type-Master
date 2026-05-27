@@ -24,7 +24,7 @@
 **Learning:** `timingSafeEqual` requires buffers of equal length. Checking length upfront is common but introduces a timing side-channel that reveals the secret's length.
 **Prevention:** Hash both the input and the secret using a fixed-length algorithm (like SHA-256) before comparison. This ensures buffers are always the same length and prevents length leakage.
 
-## 2026-05-13 - [Insecure Generic AI Proxy]
-**Vulnerability:** Generic AI endpoints allowed clients to provide their own `systemPrompt`, enabling easy prompt injection and potential resource abuse.
-**Learning:** Proxies should have hardcoded, server-side defined system prompts and only accept specific data parameters from the client.
-**Prevention:** Avoid generic "pass-through" AI endpoints. Implement specific, purpose-built endpoints with strict schema validation for AI features.
+## 2026-05-14 - [Insecure Generic AI Proxy Endpoints]
+**Vulnerability:** Generic AI proxy endpoints `/api/v1/ai/feedback` and `/api/v1/ai/generate` allowed clients to provide their own system prompts and arbitrary queries.
+**Learning:** Providing an endpoint that allows client-side control over AI system prompts or unrestricted access to the AI model using the server's API key enables prompt injection and API abuse.
+**Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
