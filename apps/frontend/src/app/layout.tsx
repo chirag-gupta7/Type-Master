@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
@@ -17,7 +17,11 @@ export const metadata: Metadata = {
     'Modern typing speed improvement application with real-time WPM tracking, analytics, and progress monitoring.',
   keywords: ['typing', 'typing speed', 'WPM', 'typing test', 'typing practice'],
   authors: [{ name: 'TypeMaster Team' }],
-  viewport: 'width=device-width, initial-scale=1',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: 'white' },
     { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
