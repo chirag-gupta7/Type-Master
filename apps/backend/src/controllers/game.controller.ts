@@ -173,28 +173,34 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const availableTypes = await prisma.gameScore.findMany({
-      distinct: ['gameType'],
-      select: { gameType: true },
+    // Optimization: Use distinct on gameType with findMany and orderBy to fetch
+    // all user high scores in a single database roundtrip instead of N queries.
+    const [availableTypes, userBests] = await Promise.all([
+      prisma.gameScore.findMany({
+        distinct: ['gameType'],
+        select: { gameType: true },
+      }),
+      prisma.gameScore.findMany({
+        where: { userId },
+        distinct: ['gameType'],
+        orderBy: [{ gameType: 'asc' }, { score: 'desc' }],
+      }),
+    ]);
+
+    const bestMap = new Map(userBests.map((score) => [score.gameType, score]));
+
+    const highScores = availableTypes.map(({ gameType }) => {
+      const best = bestMap.get(gameType);
+
+      return {
+        gameType,
+        score: best?.score ?? 0,
+        wpm: best?.wpm ?? null,
+        accuracy: best?.accuracy ?? null,
+        duration: best?.duration ?? null,
+        createdAt: best?.createdAt ?? null,
+      };
     });
-
-    const highScores = await Promise.all(
-      availableTypes.map(async ({ gameType }) => {
-        const best = await prisma.gameScore.findFirst({
-          where: { userId, gameType },
-          orderBy: { score: 'desc' },
-        });
-
-        return {
-          gameType,
-          score: best?.score ?? 0,
-          wpm: best?.wpm ?? null,
-          accuracy: best?.accuracy ?? null,
-          duration: best?.duration ?? null,
-          createdAt: best?.createdAt ?? null,
-        };
-      })
-    );
 
     res.json({
       success: true,
