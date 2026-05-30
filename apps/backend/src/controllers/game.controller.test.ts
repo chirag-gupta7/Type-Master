@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats } from './game.controller';
+import { getGameStats, getUserHighScores } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -9,6 +9,7 @@ jest.mock('../utils/prisma', () => ({
     gameScore: {
       findMany: jest.fn(),
       groupBy: jest.fn(),
+      findFirst: jest.fn(),
     },
   },
 }));
@@ -115,5 +116,131 @@ describe('GameController - getGameStats', () => {
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch game stats' });
+  });
+});
+
+describe('GameController - getUserHighScores', () => {
+  let mockRequest: Partial<Request & { userId?: string }>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      userId: 'user-123',
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if userId is missing', async () => {
+    mockRequest.userId = undefined;
+
+    await getUserHighScores(mockRequest as any, mockResponse as any);
+
+    expect(statusMock).toHaveBeenCalledWith(401);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should successfully fetch and format user high scores', async () => {
+    const mockAvailableTypes = [
+      { gameType: GameType.WORD_BLITZ },
+      { gameType: GameType.SPEED_RACE },
+    ];
+
+    const mockWordBlitzBest = {
+      gameType: GameType.WORD_BLITZ,
+      score: 500,
+      wpm: 60,
+      accuracy: 95,
+      duration: 30,
+      createdAt: new Date('2023-01-01'),
+    };
+
+    const mockSpeedRaceBest = {
+      gameType: GameType.SPEED_RACE,
+      score: 120,
+      wpm: 80,
+      accuracy: 90,
+      duration: 60,
+      createdAt: new Date('2023-01-02'),
+    };
+
+    (prisma.gameScore.findMany as jest.Mock)
+      .mockResolvedValueOnce(mockAvailableTypes)
+      .mockResolvedValueOnce([mockWordBlitzBest, mockSpeedRaceBest]);
+
+    await getUserHighScores(mockRequest as any, mockResponse as any);
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      distinct: ['gameType'],
+      select: { gameType: true },
+    });
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+      distinct: ['gameType'],
+      orderBy: [{ gameType: 'asc' }, { score: 'desc' }],
+    });
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: [
+        {
+          gameType: GameType.WORD_BLITZ,
+          score: 500,
+          wpm: 60,
+          accuracy: 95,
+          duration: 30,
+          createdAt: mockWordBlitzBest.createdAt,
+        },
+        {
+          gameType: GameType.SPEED_RACE,
+          score: 120,
+          wpm: 80,
+          accuracy: 90,
+          duration: 60,
+          createdAt: mockSpeedRaceBest.createdAt,
+        },
+      ],
+    });
+  });
+
+  it('should handle game types with no scores', async () => {
+    const mockAvailableTypes = [{ gameType: GameType.WORD_BLITZ }];
+
+    (prisma.gameScore.findMany as jest.Mock)
+      .mockResolvedValueOnce(mockAvailableTypes)
+      .mockResolvedValueOnce([]);
+
+    await getUserHighScores(mockRequest as any, mockResponse as any);
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: [
+        {
+          gameType: GameType.WORD_BLITZ,
+          score: 0,
+          wpm: null,
+          accuracy: null,
+          duration: null,
+          createdAt: null,
+        },
+      ],
+    });
+  });
+
+  it('should handle errors gracefully', async () => {
+    (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
+
+    await getUserHighScores(mockRequest as any, mockResponse as any);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch high scores' });
   });
 });
