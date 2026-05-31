@@ -356,31 +356,39 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get user statistics
-    const testCount = await prisma.testResult.count({ where: { userId } });
-    const highAccuracyTests = await prisma.testResult.count({
-      where: { userId, accuracy: { gte: 95 } },
-    });
-    const completedLessons = await prisma.userLessonProgress.count({
-      where: { userId, completed: true },
-    });
-    const totalLessons = await prisma.lesson.count();
-
-    // Get best WPM
-    const bestWpmResult = await prisma.testResult.findFirst({
-      where: { userId },
-      orderBy: { wpm: 'desc' },
-      select: { wpm: true },
-    });
-    const bestWpm = bestWpmResult?.wpm || 0;
-
-    // Check for 7-day streak
+    // Optimization: Pre-fetch all necessary user metrics in bulk using Promise.all
+    // to reduce latency from sequential database roundtrips.
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentTests = await prisma.testResult.findMany({
-      where: { userId, createdAt: { gte: sevenDaysAgo } },
-      select: { createdAt: true },
-    });
+
+    const [
+      testCount,
+      highAccuracyTests,
+      completedLessons,
+      totalLessons,
+      bestWpmResult,
+      recentTests,
+    ] = await Promise.all([
+      prisma.testResult.count({ where: { userId } }),
+      prisma.testResult.count({
+        where: { userId, accuracy: { gte: 95 } },
+      }),
+      prisma.userLessonProgress.count({
+        where: { userId, completed: true },
+      }),
+      prisma.lesson.count(),
+      prisma.testResult.findFirst({
+        where: { userId },
+        orderBy: { wpm: 'desc' },
+        select: { wpm: true },
+      }),
+      prisma.testResult.findMany({
+        where: { userId, createdAt: { gte: sevenDaysAgo } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const bestWpm = bestWpmResult?.wpm || 0;
     const uniqueDays = new Set(recentTests.map((r) => r.createdAt.toISOString().split('T')[0]))
       .size;
 

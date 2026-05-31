@@ -5,3 +5,7 @@
 ## 2025-05-10 - Batching upserts in logMistakes
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
+
+## 2025-05-31 - [Reducing latency by parallelizing independent user metrics queries]
+**Learning:** Endpoints that calculate multiple independent user metrics (e.g., total tests, high accuracy tests, lesson completion, best WPM) often execute these queries sequentially using `await`. This results in total latency being the sum of all individual query times. Using `Promise.all` to fetch these metrics in parallel reduces the overall latency to that of the single slowest query.
+**Action:** Identify endpoints that perform multiple sequential database counts or single-record lookups and refactor them to use `Promise.all`.
