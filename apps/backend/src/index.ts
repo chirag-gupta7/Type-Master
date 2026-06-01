@@ -22,6 +22,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const API_VERSION = process.env.API_VERSION || 'v1';
 
+const trustProxyEnv = process.env.TRUST_PROXY;
+if (trustProxyEnv === undefined) {
+  app.set('trust proxy', 1);
+} else if (trustProxyEnv === 'true') {
+  app.set('trust proxy', true);
+} else if (trustProxyEnv === 'false') {
+  app.set('trust proxy', false);
+} else {
+  const parsedTrustProxy = Number.parseInt(trustProxyEnv, 10);
+  app.set('trust proxy', Number.isNaN(parsedTrustProxy) ? 1 : parsedTrustProxy);
+}
+
 // Middleware
 app.use(helmet());
 
