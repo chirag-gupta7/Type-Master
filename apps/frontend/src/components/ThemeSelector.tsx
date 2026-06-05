@@ -48,14 +48,12 @@ export function ThemeSelector() {
             style={{
               boxShadow: `0 0 20px ${currentTheme.primary}40`,
             }}
-            aria-label="Customize Theme"
+            aria-label="Change Theme"
           >
             <Palette className="w-6 h-6 text-white" />
           </motion.button>
         </TooltipTrigger>
-        <TooltipContent side="left">
-          <p>Customize Theme</p>
-        </TooltipContent>
+        <TooltipContent side="left">Change Theme</TooltipContent>
       </Tooltip>
 
       {/* Theme Picker Dialog */}
