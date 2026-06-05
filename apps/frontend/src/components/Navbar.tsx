@@ -54,17 +54,17 @@ export function Navbar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Ctrl+Number shortcuts
       if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
-        e.preventDefault();
-        const index = parseInt(e.key) - 1;
-        if (index < navLinks.length) {
-          window.location.href = navLinks[index].href;
+        const link = navLinks.find((l) => l.shortcut === e.key);
+        if (link) {
+          e.preventDefault();
+          router.push(link.href);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [router]);
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -102,17 +102,26 @@ export function Navbar() {
                   const isActive = pathname === link.href;
                   return (
                     <NavigationMenuItem key={link.href}>
-                      <Link href={link.href} legacyBehavior passHref>
-                        <NavigationMenuLink
-                          className={cn(
-                            navigationMenuTriggerStyle(),
-                            isActive && 'bg-accent/50 text-accent-foreground'
-                          )}
-                          aria-current={isActive ? 'page' : undefined}
-                        >
-                          {link.label}
-                        </NavigationMenuLink>
-                      </Link>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link href={link.href} legacyBehavior passHref>
+                            <NavigationMenuLink
+                              className={cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && 'bg-accent/50 text-accent-foreground'
+                              )}
+                              aria-current={isActive ? 'page' : undefined}
+                            >
+                              {link.label}
+                            </NavigationMenuLink>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {link.label} (Ctrl+{link.shortcut})
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </NavigationMenuItem>
                   );
                 })}
@@ -163,7 +172,9 @@ export function Navbar() {
                     {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Toggle theme</TooltipContent>
+                <TooltipContent>
+                  <p>Toggle {theme === 'dark' ? 'light' : 'dark'} mode</p>
+                </TooltipContent>
               </Tooltip>
             )}
           </div>
