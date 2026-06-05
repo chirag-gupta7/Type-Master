@@ -26,6 +26,143 @@ const saveLessonProgressSchema = z.object({
   completed: z.boolean(),
 });
 
+const DEFAULT_SECTION_PAGE_COUNT = 5;
+const MAX_SECTION_PAGE_COUNT = 5;
+const PRACTICE_TYPE_SCHEMA = z.enum(['normal', 'coding', 'assessment']);
+
+const SECTION_DESCRIPTIONS: Record<number, string> = {
+  1: 'Master the fundamentals and home row keys',
+  2: 'Build fluency with common letter combinations',
+  3: 'Master numbers, symbols, and special characters',
+  4: 'Increase your typing speed with real content',
+  5: 'Achieve expert-level performance',
+  6: 'Master code typing with brackets and operators',
+  7: 'Practice typing common Python keywords and syntax',
+  8: 'Practice typing Java syntax, classes, and methods',
+  9: 'Practice typing C++ syntax, headers, and pointers',
+  10: 'Practice typing C syntax, stdio, and structs',
+  11: 'Improve punctuation precision and symbol timing',
+  12: 'Practice real-world code syntax and structures',
+  13: 'Short speed drills for consistency and rhythm',
+};
+
+export const PRACTICE_SECTION_IDS: Record<z.infer<typeof PRACTICE_TYPE_SCHEMA>, number[]> = {
+  normal: [1, 2, 3, 4, 5, 11, 13],
+  coding: [6, 7, 8, 9, 10, 12],
+  assessment: [],
+};
+
+type PracticeType = z.infer<typeof PRACTICE_TYPE_SCHEMA>;
+
+export const getPracticeSectionIds = (practiceType: PracticeType): number[] => {
+  return PRACTICE_SECTION_IDS[practiceType] ?? [];
+};
+
+export const getFairPageBounds = (
+  totalItems: number,
+  page: number,
+  pageCount: number
+): { startIndex: number; endIndex: number } => {
+  const normalizedTotal = Math.max(0, totalItems);
+  const normalizedPageCount = Math.max(1, pageCount);
+  const normalizedPage = Math.max(1, Math.min(page, normalizedPageCount));
+
+  const baseSize = Math.floor(normalizedTotal / normalizedPageCount);
+  const remainder = normalizedTotal % normalizedPageCount;
+
+  const pagesBefore = normalizedPage - 1;
+  const startIndex = pagesBefore * baseSize + Math.min(pagesBefore, remainder);
+  const currentSize = baseSize + (normalizedPage <= remainder ? 1 : 0);
+  const endIndex = startIndex + currentSize;
+
+  return {
+    startIndex,
+    endIndex,
+  };
+};
+
+export const getPageForIndex = (index: number, totalItems: number, pageCount: number): number => {
+  if (index < 0) return 1;
+
+  const normalizedPageCount = Math.max(1, pageCount);
+  for (let page = 1; page <= normalizedPageCount; page++) {
+    const { startIndex, endIndex } = getFairPageBounds(totalItems, page, normalizedPageCount);
+    if (index >= startIndex && index < endIndex) {
+      return page;
+    }
+  }
+  return normalizedPageCount;
+};
+
+type LessonProgressSummary = {
+  completed: boolean;
+  bestWpm: number;
+  bestAccuracy: number;
+  stars: number;
+  attempts: number;
+};
+
+type LessonForSectionResponse = {
+  id: string;
+  level: number;
+  order: number;
+  title: string;
+  description: string;
+  keys: string[];
+  difficulty: string;
+  targetWpm: number;
+  minAccuracy: number;
+  exerciseType: string;
+  content: string;
+  section: number;
+  isCheckpoint: boolean;
+  userProgress: LessonProgressSummary[];
+  isUnlocked: boolean;
+  isCompleted: boolean;
+};
+
+const buildLessonsWithUnlockState = (
+  lessons: Array<
+    Prisma.LessonGetPayload<{
+      include: {
+        userProgress: {
+          select: {
+            completed: true;
+            bestWpm: true;
+            bestAccuracy: true;
+            stars: true;
+            attempts: true;
+          };
+        };
+      };
+    }>
+  >,
+  userId?: string
+): LessonForSectionResponse[] => {
+  if (!userId) {
+    return lessons.map((lesson) => ({
+      ...lesson,
+      userProgress: [],
+      isUnlocked: true,
+      isCompleted: false,
+    }));
+  }
+
+  let previousCompleted = true;
+  return lessons.map((lesson, index) => {
+    const currentProgress = lesson.userProgress?.[0];
+    const isCompleted = Boolean(currentProgress?.completed);
+    const isUnlocked = index === 0 || previousCompleted;
+    previousCompleted = isCompleted;
+
+    return {
+      ...lesson,
+      isUnlocked,
+      isCompleted,
+    };
+  });
+};
+
 /**
  * @route   GET /api/v1/lessons
  * @desc    Get all lessons with user progress
@@ -549,29 +686,34 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 };
 
 /**
- * @route   GET /api/v1/lessons/section/:sectionId
- * @desc    Get all lessons for a specific section
+ * @route   GET /api/v1/lessons/sections
+ * @desc    Get section summaries for a given practice type
  * @access  Public
  */
-const MIN_SECTION_ID = 1;
-const MAX_SECTION_ID = 10;
-
-export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+export const getSectionSummaries = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { sectionId } = req.params;
     const userId = req.user?.userId;
-    const section = parseInt(sectionId);
+    const practiceType = PRACTICE_TYPE_SCHEMA.catch('normal').parse(req.query.practiceType);
+    const sectionIds = getPracticeSectionIds(practiceType);
 
-    if (isNaN(section) || section < MIN_SECTION_ID || section > MAX_SECTION_ID) {
-      throw new AppError(400, `Section must be between ${MIN_SECTION_ID} and ${MAX_SECTION_ID}`);
+    if (sectionIds.length === 0) {
+      res.json({
+        practiceType,
+        sections: [],
+      });
+      return;
     }
 
     const lessons = await prisma.lesson.findMany({
-      where: { section },
-      orderBy: [{ order: 'asc' }],
-      include: userId
-        ? {
-            userProgress: {
+      where: {
+        section: {
+          in: sectionIds,
+        },
+      },
+      orderBy: [{ section: 'asc' }, { order: 'asc' }],
+      include: {
+        userProgress: userId
+          ? {
               where: { userId },
               select: {
                 completed: true,
@@ -580,40 +722,186 @@ export const getLessonsBySection = async (req: Request, res: Response, next: Nex
                 stars: true,
                 attempts: true,
               },
-            },
-          }
-        : undefined,
+            }
+          : false,
+      },
     });
 
-    // Calculate section progress
-    const totalLessons = lessons.length;
-    let completedLessons = 0;
-    if (userId) {
-      completedLessons = lessons.reduce((count, lesson) => {
-        if (
-          'userProgress' in lesson &&
-          Array.isArray(lesson.userProgress) &&
-          lesson.userProgress.length > 0
-        ) {
-          return count + (lesson.userProgress[0].completed ? 1 : 0);
+    const groupedBySection = lessons.reduce<
+      Record<
+        number,
+        Array<
+          Prisma.LessonGetPayload<{
+            include: {
+              userProgress: {
+                select: {
+                  completed: true;
+                  bestWpm: true;
+                  bestAccuracy: true;
+                  stars: true;
+                  attempts: true;
+                };
+              };
+            };
+          }>
+        >
+      >
+    >((acc, lesson) => {
+      if (!acc[lesson.section]) {
+        acc[lesson.section] = [];
+      }
+      acc[lesson.section].push(lesson);
+      return acc;
+    }, {});
+
+    const sections = sectionIds
+      .map((sectionId) => {
+        const sectionLessons = groupedBySection[sectionId] ?? [];
+        if (!sectionLessons.length) {
+          return null;
         }
-        return count;
-      }, 0);
+
+        const lessonsWithState = buildLessonsWithUnlockState(sectionLessons, userId);
+        const totalLessons = lessonsWithState.length;
+        const completedLessons = lessonsWithState.filter((lesson) => lesson.isCompleted).length;
+        const completionPercentage =
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+        const firstLessonId = lessonsWithState[0]?.id ?? null;
+        const firstUnlockedIncompleteIndex = lessonsWithState.findIndex(
+          (lesson) => lesson.isUnlocked && !lesson.isCompleted
+        );
+        const firstUnlockedIndex =
+          firstUnlockedIncompleteIndex >= 0
+            ? firstUnlockedIncompleteIndex
+            : lessonsWithState.findIndex((lesson) => lesson.isUnlocked);
+        const resolvedUnlockedIndex = firstUnlockedIndex >= 0 ? firstUnlockedIndex : 0;
+        const firstUnlockedLessonId = lessonsWithState[resolvedUnlockedIndex]?.id ?? firstLessonId;
+
+        return {
+          sectionId,
+          title: getSectionName(sectionId),
+          description: getSectionDescription(sectionId),
+          totalLessons,
+          completedLessons,
+          completionPercentage,
+          firstLessonId,
+          firstUnlockedLessonId,
+          firstUnlockedPage: getPageForIndex(
+            resolvedUnlockedIndex,
+            totalLessons,
+            DEFAULT_SECTION_PAGE_COUNT
+          ),
+          totalPages: DEFAULT_SECTION_PAGE_COUNT,
+        };
+      })
+      .filter((section): section is NonNullable<typeof section> => section !== null);
+
+    res.json({
+      practiceType,
+      sections,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/v1/lessons/section/:sectionId
+ * @desc    Get paged lessons for a specific section
+ * @access  Public
+ */
+
+export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sectionId } = req.params;
+    const userId = req.user?.userId;
+    const section = Number.parseInt(sectionId, 10);
+    const page = Number.parseInt(String(req.query.page ?? '1'), 10);
+    const pageCount = Number.parseInt(
+      String(req.query.pageCount ?? DEFAULT_SECTION_PAGE_COUNT),
+      10
+    );
+
+    if (Number.isNaN(section) || section <= 0) {
+      throw new AppError(400, 'Section must be a positive integer');
     }
+
+    if (Number.isNaN(page) || page < 1 || page > DEFAULT_SECTION_PAGE_COUNT) {
+      throw new AppError(400, `Page must be between 1 and ${DEFAULT_SECTION_PAGE_COUNT}`);
+    }
+
+    if (
+      Number.isNaN(pageCount) ||
+      pageCount < 1 ||
+      pageCount > MAX_SECTION_PAGE_COUNT ||
+      pageCount !== DEFAULT_SECTION_PAGE_COUNT
+    ) {
+      throw new AppError(
+        400,
+        `Page count must be exactly ${DEFAULT_SECTION_PAGE_COUNT} for fair distribution`
+      );
+    }
+
+    const lessons = await prisma.lesson.findMany({
+      where: { section },
+      orderBy: [{ order: 'asc' }],
+      include: {
+        userProgress: userId
+          ? {
+              where: { userId },
+              select: {
+                completed: true,
+                bestWpm: true,
+                bestAccuracy: true,
+                stars: true,
+                attempts: true,
+              },
+            }
+          : false,
+      },
+    });
+
+    if (lessons.length === 0) {
+      throw new AppError(404, `Section ${section} not found`);
+    }
+
+    const lessonsWithState = buildLessonsWithUnlockState(lessons, userId);
+    const totalLessons = lessonsWithState.length;
+    const completedLessons = lessonsWithState.filter((lesson) => lesson.isCompleted).length;
     const completionPercentage =
       totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-    logger.info(`Retrieved ${lessons.length} lessons for section ${section}`);
+    const { startIndex, endIndex } = getFairPageBounds(totalLessons, page, pageCount);
+    const pagedLessons = lessonsWithState.slice(startIndex, endIndex);
+
+    logger.info(`Retrieved lessons for section ${section} page ${page}/${pageCount}`, {
+      section,
+      page,
+      pageCount,
+      returned: pagedLessons.length,
+    });
 
     res.json({
       section: {
         id: section,
         name: getSectionName(section),
+        description: getSectionDescription(section),
         totalLessons,
         completedLessons,
         completionPercentage,
       },
-      lessons,
+      pagination: {
+        page,
+        pageCount,
+        totalPages: pageCount,
+        totalLessons,
+        startIndex,
+        endIndex,
+        hasPreviousPage: page > 1,
+        hasNextPage: page < pageCount,
+      },
+      lessons: pagedLessons,
     });
   } catch (error) {
     next(error);
@@ -787,6 +1075,13 @@ function getSectionName(sectionId: number): string {
     8: 'Java Coding',
     9: 'C++ Coding',
     10: 'C Coding',
+    11: 'Advanced Punctuation',
+    12: 'Code Syntax',
+    13: 'Speed Drills',
   };
   return sectionNames[sectionId] || `Section ${sectionId}`;
+}
+
+function getSectionDescription(sectionId: number): string {
+  return SECTION_DESCRIPTIONS[sectionId] || 'Additional lesson content';
 }

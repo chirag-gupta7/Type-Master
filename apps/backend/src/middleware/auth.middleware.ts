@@ -104,13 +104,11 @@ export const internalOnly = (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
-    const internalTokenBuffer = Buffer.from(internalToken);
-    const secretBuffer = Buffer.from(secret);
+    // Hash both tokens to fixed length to prevent timing attacks that leak secret length
+    const tokenHash = crypto.createHash('sha256').update(internalToken).digest();
+    const secretHash = crypto.createHash('sha256').update(secret).digest();
 
-    if (
-      internalTokenBuffer.length !== secretBuffer.length ||
-      !crypto.timingSafeEqual(internalTokenBuffer, secretBuffer)
-    ) {
+    if (!crypto.timingSafeEqual(tokenHash, secretHash)) {
       return next(new AppError(401, 'Unauthorized internal request'));
     }
   } catch (error) {

@@ -85,6 +85,25 @@ export const invalidateCache = (key: string): void => {
 };
 
 /**
+ * Remove cached values that begin with a specific key prefix.
+ */
+export const invalidateCacheByPrefix = (prefix: string): void => {
+  if (!canUseStorage || !storage) return;
+
+  const storagePrefix = buildKey(prefix);
+  const keysToRemove: string[] = [];
+
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index);
+    if (key && key.startsWith(storagePrefix)) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => storage.removeItem(key));
+};
+
+/**
  * Clear every cached value created by this utility.
  */
 export const clearCache = (): void => {
