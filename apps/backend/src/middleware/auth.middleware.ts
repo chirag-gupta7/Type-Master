@@ -88,6 +88,7 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
 
 /**
  * Middleware to restrict access to internal services only
+ * Uses hashing to prevent timing side-channels that leak secret length
  */
 export const internalOnly = (req: Request, res: Response, next: NextFunction) => {
   void res;
