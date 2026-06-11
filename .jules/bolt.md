@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-06-11 - Database-level aggregation for user statistics
+**Learning:** Calculating statistics like averages and maximums in application memory after fetching a large dataset from the database is inefficient (O(N) data transfer and memory usage). Offloading these calculations to the database using Prisma's `aggregate` feature reduces memory pressure and network latency, providing O(1) response times regardless of dataset size.
+**Action:** Always prefer database-level aggregation (`aggregate`, `groupBy`) for statistical calculations over in-memory processing of large result sets.
