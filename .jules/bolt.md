@@ -6,6 +6,6 @@
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
 
-## 2025-05-23 - [Optimizing high-score retrieval with Prisma distinct]
-**Learning:** Fetching the top record per group (e.g., high score per game type) for a specific user can be optimized from N+1 queries to a single query using Prisma's `distinct` and `orderBy`. Prisma requires that the fields in `distinct` MUST match the first fields in `orderBy`.
-**Action:** Use `prisma.model.findMany({ where: { userId }, distinct: ['groupField'], orderBy: [{ groupField: 'asc' }, { sortField: 'desc' }] })` for efficient top-per-group retrieval.
+## 2025-05-24 - Parallelizing bulk metric fetching
+**Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
+**Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
