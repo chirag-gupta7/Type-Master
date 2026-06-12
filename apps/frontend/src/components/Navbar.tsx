@@ -12,6 +12,11 @@ import { useSession, signOut } from 'next-auth/react';
 import { authAPI } from '@/lib/api';
 import { useUiStore } from '../store/ui';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuLink,
@@ -182,9 +187,16 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             {mounted && (
-              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Toggle {theme === 'dark' ? 'light' : 'dark'} mode
+                </TooltipContent>
+              </Tooltip>
             )}
             <Button
               variant="ghost"
