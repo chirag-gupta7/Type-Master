@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-06-13 - [Offloading statistics aggregation to DB]
+**Learning:** Fetching full datasets to calculate summary statistics in Node.js memory is a major bottleneck as the database grows. Prisma's `aggregate` features allow offloading these calculations to the database engine. When refactoring, always remove the now-obsolete in-memory calculation helpers to avoid 'unused variable' TypeScript errors (TS6133).
+**Action:** Use `prisma.model.aggregate` for summary statistics and parallelize it with other data fetches (like recent history) using `Promise.all`.
