@@ -487,23 +487,73 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
-    // Get all lessons with progress
-    const lessonsWithProgress = await prisma.lesson.findMany({
-      orderBy: [{ level: 'asc' }, { order: 'asc' }],
-      include: {
-        userProgress: {
-          where: { userId },
-          select: {
-            completed: true,
-            bestWpm: true,
-            bestAccuracy: true,
-            stars: true,
-            attempts: true,
-            lastAttempt: true,
+    // Define time ranges for queries
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    // Optimization: Parallelize all independent database queries using Promise.all.
+    // This reduces response time from the sum of 4 sequential queries to the duration of the single slowest one.
+    const [lessonsWithProgress, lessonHistory, testActivity, lessonActivity] = await Promise.all([
+      // 1. Get all lessons with progress for skill tree and completion stats
+      prisma.lesson.findMany({
+        orderBy: [{ level: 'asc' }, { order: 'asc' }],
+        include: {
+          userProgress: {
+            where: { userId },
+            select: {
+              completed: true,
+              bestWpm: true,
+              bestAccuracy: true,
+              stars: true,
+              attempts: true,
+              lastAttempt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      // 2. Get historical progress data for WPM improvement chart (last 90 days)
+      prisma.userLessonProgress.findMany({
+        where: {
+          userId,
+          lastAttempt: { gte: ninetyDaysAgo },
+        },
+        include: {
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+              level: true,
+            },
+          },
+        },
+        orderBy: {
+          lastAttempt: 'asc',
+        },
+      }),
+      // 3. Get practice frequency for heat map (last 365 days) - test results
+      prisma.testResult.findMany({
+        where: {
+          userId,
+          createdAt: { gte: oneYearAgo },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+      // 4. Get practice frequency for heat map (last 365 days) - lesson progress
+      prisma.userLessonProgress.findMany({
+        where: {
+          userId,
+          lastAttempt: { gte: oneYearAgo },
+        },
+        select: {
+          lastAttempt: true,
+        },
+      }),
+    ]);
 
     // Calculate completion by level
     const levelStats = lessonsWithProgress.reduce(
@@ -541,29 +591,6 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Get historical progress data for WPM improvement (last 90 days)
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-    const lessonHistory = await prisma.userLessonProgress.findMany({
-      where: {
-        userId,
-        lastAttempt: { gte: ninetyDaysAgo },
-      },
-      include: {
-        lesson: {
-          select: {
-            id: true,
-            title: true,
-            level: true,
-          },
-        },
-      },
-      orderBy: {
-        lastAttempt: 'asc',
-      },
-    });
-
     // Group WPM data by lesson
     const wpmByLesson = lessonHistory.reduce(
       (acc, entry) => {
@@ -593,31 +620,6 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         }
       >
     );
-
-    // Get practice frequency for heat map (last 365 days)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const [testActivity, lessonActivity] = await Promise.all([
-      prisma.testResult.findMany({
-        where: {
-          userId,
-          createdAt: { gte: oneYearAgo },
-        },
-        select: {
-          createdAt: true,
-        },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: {
-          userId,
-          lastAttempt: { gte: oneYearAgo },
-        },
-        select: {
-          lastAttempt: true,
-        },
-      }),
-    ]);
 
     // Combine and count activities by date
     const activityByDate = [...testActivity, ...lessonActivity].reduce(
