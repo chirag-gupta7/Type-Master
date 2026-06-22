@@ -487,23 +487,42 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
-    // Get all lessons with progress
-    const lessonsWithProgress = await prisma.lesson.findMany({
-      orderBy: [{ level: 'asc' }, { order: 'asc' }],
-      include: {
-        userProgress: {
-          where: { userId },
-          select: {
-            completed: true,
-            bestWpm: true,
-            bestAccuracy: true,
-            stars: true,
-            attempts: true,
-            lastAttempt: true,
+    // Optimization: Parallelize core data fetching and derive secondary metrics in-memory.
+    // This reduces the number of database queries from 4 to 2, and executes them concurrently.
+    // Before: 4 sequential/mixed queries. After: 2 parallel queries.
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    const [lessonsWithProgress, testActivity] = await Promise.all([
+      prisma.lesson.findMany({
+        orderBy: [{ level: 'asc' }, { order: 'asc' }],
+        include: {
+          userProgress: {
+            where: { userId },
+            select: {
+              completed: true,
+              bestWpm: true,
+              bestAccuracy: true,
+              stars: true,
+              attempts: true,
+              lastAttempt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.testResult.findMany({
+        where: {
+          userId,
+          createdAt: { gte: oneYearAgo },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+    ]);
 
     // Calculate completion by level
     const levelStats = lessonsWithProgress.reduce(
@@ -541,28 +560,18 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Get historical progress data for WPM improvement (last 90 days)
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-    const lessonHistory = await prisma.userLessonProgress.findMany({
-      where: {
-        userId,
-        lastAttempt: { gte: ninetyDaysAgo },
-      },
-      include: {
+    // Derive lesson history for the last 90 days in-memory
+    const lessonHistory = lessonsWithProgress
+      .filter((l) => l.userProgress[0] && l.userProgress[0].lastAttempt >= ninetyDaysAgo)
+      .map((l) => ({
+        ...l.userProgress[0]!,
         lesson: {
-          select: {
-            id: true,
-            title: true,
-            level: true,
-          },
+          id: l.id,
+          title: l.title,
+          level: l.level,
         },
-      },
-      orderBy: {
-        lastAttempt: 'asc',
-      },
-    });
+      }))
+      .sort((a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime());
 
     // Group WPM data by lesson
     const wpmByLesson = lessonHistory.reduce(
@@ -594,30 +603,12 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       >
     );
 
-    // Get practice frequency for heat map (last 365 days)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const [testActivity, lessonActivity] = await Promise.all([
-      prisma.testResult.findMany({
-        where: {
-          userId,
-          createdAt: { gte: oneYearAgo },
-        },
-        select: {
-          createdAt: true,
-        },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: {
-          userId,
-          lastAttempt: { gte: oneYearAgo },
-        },
-        select: {
-          lastAttempt: true,
-        },
-      }),
-    ]);
+    // Derive lesson activity for the last year in-memory
+    const lessonActivity = lessonsWithProgress
+      .filter((l) => l.userProgress[0] && l.userProgress[0].lastAttempt >= oneYearAgo)
+      .map((l) => ({
+        lastAttempt: l.userProgress[0]!.lastAttempt,
+      }));
 
     // Combine and count activities by date
     const activityByDate = [...testActivity, ...lessonActivity].reduce(
