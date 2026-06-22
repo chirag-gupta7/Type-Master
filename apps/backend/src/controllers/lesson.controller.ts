@@ -432,30 +432,31 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    const [totalLessons, completedProgress, allProgress] = await Promise.all([
+    // Optimization: Use aggregate to compute totals and averages in the database.
+    // This avoids fetching all progress records into memory, significantly improving performance for active users.
+    const [totalLessons, completedProgress, progressStats] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
       }),
-      prisma.userLessonProgress.findMany({
+      prisma.userLessonProgress.aggregate({
         where: { userId },
-        select: {
+        _sum: {
           stars: true,
+        },
+        _avg: {
           bestWpm: true,
           bestAccuracy: true,
+        },
+        _count: {
+          _all: true,
         },
       }),
     ]);
 
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
+    const totalStars = progressStats._sum.stars || 0;
+    const avgWpm = progressStats._avg.bestWpm || 0;
+    const avgAccuracy = progressStats._avg.bestAccuracy || 0;
 
     res.json({
       stats: {
