@@ -290,9 +290,10 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     }
 
     // Optimization: Parallelize independent aggregate and list queries
-    const [totalAchievements, totalPointsAgg, userAchievements, recentUnlocks] = await Promise.all([
-      prisma.achievement.count(),
+    // Further optimization: Consolidate redundant aggregate queries into a single call
+    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
       prisma.achievement.aggregate({
+        _count: { _all: true },
         _sum: { points: true },
       }),
       prisma.userAchievement.findMany({
@@ -315,7 +316,8 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       }),
     ]);
 
-    const totalPoints = totalPointsAgg._sum.points || 0;
+    const totalAchievements = achievementAggregates._count._all;
+    const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
 
@@ -356,18 +358,22 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
     }
 
     // Optimization: Bulk fetch all necessary metrics in parallel to avoid sequential database roundtrips
+    // Further optimization: Consolidate redundant aggregate queries to reduce database load
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const [
-      testCount,
+      testAggregates,
       highAccuracyTests,
       completedLessons,
       totalLessons,
-      bestWpmAgg,
       recentTests,
     ] = await Promise.all([
-      prisma.testResult.count({ where: { userId } }),
+      prisma.testResult.aggregate({
+        where: { userId },
+        _count: { _all: true },
+        _max: { wpm: true },
+      }),
       prisma.testResult.count({
         where: { userId, accuracy: { gte: 95 } },
       }),
@@ -375,17 +381,14 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
         where: { userId, completed: true },
       }),
       prisma.lesson.count(),
-      prisma.testResult.aggregate({
-        where: { userId },
-        _max: { wpm: true },
-      }),
       prisma.testResult.findMany({
         where: { userId, createdAt: { gte: sevenDaysAgo } },
         select: { createdAt: true },
       }),
     ]);
 
-    const bestWpm = bestWpmAgg._max.wpm || 0;
+    const testCount = testAggregates._count._all;
+    const bestWpm = testAggregates._max.wpm || 0;
     const uniqueDays = new Set(recentTests.map((r) => r.createdAt.toISOString().split('T')[0]))
       .size;
 
