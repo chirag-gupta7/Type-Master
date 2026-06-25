@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-05-26 - [Consolidating redundant lesson progress queries]
+**Learning:** When retrieving full user progress for a feature (like a dashboard or skill tree), secondary queries for historical subsets (e.g., "last 90 days") or aggregated counts (e.g., "total completed") can often be derived in-memory. This eliminates redundant database roundtrips for data that is already present in the initial fetch.
+**Action:** Before adding a secondary database query, check if the required data can be filtered or calculated from an existing dataset already fetched in the same request.

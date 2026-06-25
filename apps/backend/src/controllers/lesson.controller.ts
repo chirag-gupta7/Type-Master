@@ -432,14 +432,14 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    const [totalLessons, completedProgress, allProgress] = await Promise.all([
+    // Optimization: Reduced database roundtrips by deriving the completed progress count
+    // in-memory from the 'allProgress' dataset.
+    const [totalLessons, allProgress] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.count({
-        where: { userId, completed: true },
-      }),
       prisma.userLessonProgress.findMany({
         where: { userId },
         select: {
+          completed: true,
           stars: true,
           bestWpm: true,
           bestAccuracy: true,
@@ -447,6 +447,7 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
       }),
     ]);
 
+    const completedLessonsCount = allProgress.filter((p) => p.completed).length;
     const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
     const avgWpm =
       allProgress.length > 0
@@ -460,9 +461,9 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
     res.json({
       stats: {
         totalLessons,
-        completedLessons: completedProgress,
+        completedLessons: completedLessonsCount,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
+          totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0,
         totalStars,
         maxStars: totalLessons * 3,
         averageWpm: Math.round(avgWpm),
@@ -487,23 +488,38 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
-    // Get all lessons with progress
-    const lessonsWithProgress = await prisma.lesson.findMany({
-      orderBy: [{ level: 'asc' }, { order: 'asc' }],
-      include: {
-        userProgress: {
-          where: { userId },
-          select: {
-            completed: true,
-            bestWpm: true,
-            bestAccuracy: true,
-            stars: true,
-            attempts: true,
-            lastAttempt: true,
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    // Optimization: Consolidated multiple database queries into a single parallel fetch.
+    // Historical lesson progress is derived in-memory from the 'lessonsWithProgress' dataset.
+    const [lessonsWithProgress, testActivity] = await Promise.all([
+      prisma.lesson.findMany({
+        orderBy: [{ level: 'asc' }, { order: 'asc' }],
+        include: {
+          userProgress: {
+            where: { userId },
+            select: {
+              completed: true,
+              bestWpm: true,
+              bestAccuracy: true,
+              stars: true,
+              attempts: true,
+              lastAttempt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.testResult.findMany({
+        where: {
+          userId,
+          createdAt: { gte: oneYearAgo },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+    ]);
 
     // Calculate completion by level
     const levelStats = lessonsWithProgress.reduce(
@@ -541,31 +557,29 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Get historical progress data for WPM improvement (last 90 days)
+    // Optimization: Derive historical progress data in-memory for the last 90 days
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    const lessonHistory = await prisma.userLessonProgress.findMany({
-      where: {
-        userId,
-        lastAttempt: { gte: ninetyDaysAgo },
-      },
-      include: {
-        lesson: {
-          select: {
-            id: true,
-            title: true,
-            level: true,
-          },
-        },
-      },
-      orderBy: {
-        lastAttempt: 'asc',
-      },
-    });
+    const derivedLessonHistory = lessonsWithProgress
+      .flatMap((lesson) =>
+        lesson.userProgress
+          .filter((up) => up.lastAttempt >= ninetyDaysAgo)
+          .map((up) => ({
+            bestWpm: up.bestWpm,
+            bestAccuracy: up.bestAccuracy,
+            lastAttempt: up.lastAttempt,
+            lesson: {
+              id: lesson.id,
+              title: lesson.title,
+              level: lesson.level,
+            },
+          }))
+      )
+      .sort((a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime());
 
     // Group WPM data by lesson
-    const wpmByLesson = lessonHistory.reduce(
+    const wpmByLesson = derivedLessonHistory.reduce(
       (acc, entry) => {
         const lessonId = entry.lesson.id;
         if (!acc[lessonId]) {
@@ -594,33 +608,15 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       >
     );
 
-    // Get practice frequency for heat map (last 365 days)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const [testActivity, lessonActivity] = await Promise.all([
-      prisma.testResult.findMany({
-        where: {
-          userId,
-          createdAt: { gte: oneYearAgo },
-        },
-        select: {
-          createdAt: true,
-        },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: {
-          userId,
-          lastAttempt: { gte: oneYearAgo },
-        },
-        select: {
-          lastAttempt: true,
-        },
-      }),
-    ]);
+    // Optimization: Derive lesson activity in-memory for the last year
+    const derivedLessonActivity = lessonsWithProgress.flatMap((lesson) =>
+      lesson.userProgress
+        .filter((up) => up.lastAttempt >= oneYearAgo)
+        .map((up) => ({ lastAttempt: up.lastAttempt }))
+    );
 
     // Combine and count activities by date
-    const activityByDate = [...testActivity, ...lessonActivity].reduce(
+    const activityByDate = [...testActivity, ...derivedLessonActivity].reduce(
       (acc, entry) => {
         const date =
           'createdAt' in entry
