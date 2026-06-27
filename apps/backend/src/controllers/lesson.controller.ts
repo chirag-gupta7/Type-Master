@@ -637,21 +637,40 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       count,
     }));
 
+    // Optimization: Create maps for O(1) lookups to transform the skill tree construction to O(N).
+    const lessonCompletionMap = new Map<string, boolean>();
+    const lessonsByLevelAndOrder = new Map<number, typeof lessonsWithProgress>();
+    const lessonIndexInLevel = new Map<string, number>();
+
+    for (const l of lessonsWithProgress) {
+      lessonCompletionMap.set(l.id, l.userProgress[0]?.completed || false);
+      if (!lessonsByLevelAndOrder.has(l.level)) {
+        lessonsByLevelAndOrder.set(l.level, []);
+      }
+      const levelLessons = lessonsByLevelAndOrder.get(l.level)!;
+      lessonIndexInLevel.set(l.id, levelLessons.length);
+      levelLessons.push(l);
+    }
+
     // Build skill tree structure with dependencies
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+
+      // Optimization: Efficiently find prerequisites without full array scans.
+      let prerequisites: string[] = [];
+
+      if (lesson.order > 1) {
+        // Find the previous lesson in the same level using the O(1) index map.
+        const levelLessons = lessonsByLevelAndOrder.get(lesson.level) || [];
+        const currentIndex = lessonIndexInLevel.get(lesson.id) ?? -1;
+        if (currentIndex > 0) {
+          prerequisites = [levelLessons[currentIndex - 1].id];
+        }
+      } else if (lesson.level > 1) {
+        // Last 3 lessons from previous level (O(1) because slice(-3) is constant size)
+        const prevLevelLessons = lessonsByLevelAndOrder.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
+      }
 
       return {
         id: lesson.id,
@@ -666,9 +685,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId) ?? false)
             : false,
         prerequisites,
       };

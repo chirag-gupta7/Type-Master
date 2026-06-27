@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-06-27 - [Optimizing O(N²) loop in skill tree construction]
+**Learning:** Nested array operations like `.filter()`, `.find()`, and `.map()` inside an outer `.map()` loop create a quadratic O(N²) complexity bottleneck. This is especially impactful in data visualization endpoints that process large sets of related records (e.g., lessons and their prerequisites). Using Map-based indexing transforms these operations into O(N) by providing constant-time lookups for related data.
+**Action:** Always audit loops that perform sub-lookups on the same or related datasets. Pre-calculate indices or Maps to ensure linear time complexity.
