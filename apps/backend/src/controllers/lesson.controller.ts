@@ -432,14 +432,14 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    const [totalLessons, completedProgress, allProgress] = await Promise.all([
+    // Optimization: Consolidate database queries by deriving 'completed' count in-memory
+    // from the same set of records used for other statistics.
+    const [totalLessons, allProgress] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.count({
-        where: { userId, completed: true },
-      }),
       prisma.userLessonProgress.findMany({
         where: { userId },
         select: {
+          completed: true,
           stars: true,
           bestWpm: true,
           bestAccuracy: true,
@@ -447,15 +447,19 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
       }),
     ]);
 
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
+    let completedProgress = 0;
+    let totalStars = 0;
+    let totalWpm = 0;
+    let totalAccuracy = 0;
+
+    for (const p of allProgress) {
+      if (p.completed) completedProgress++;
+      totalStars += p.stars;
+      totalWpm += p.bestWpm;
+      totalAccuracy += p.bestAccuracy;
+    }
+    const avgWpm = allProgress.length > 0 ? totalWpm / allProgress.length : 0;
+    const avgAccuracy = allProgress.length > 0 ? totalAccuracy / allProgress.length : 0;
 
     res.json({
       stats: {
@@ -637,21 +641,43 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       count,
     }));
 
-    // Build skill tree structure with dependencies
+    // O(N) Optimization: Replace nested array scans (filter/find) with Map-based lookups
+    // for lesson completion status, level grouping, and prerequisite checking.
+    const lessonCompletionMap = new Map<string, boolean>();
+    const lessonsByLevelMap = new Map<number, typeof lessonsWithProgress>();
+
+    for (const lesson of lessonsWithProgress) {
+      lessonCompletionMap.set(lesson.id, !!lesson.userProgress[0]?.completed);
+
+      if (!lessonsByLevelMap.has(lesson.level)) {
+        lessonsByLevelMap.set(lesson.level, []);
+      }
+      lessonsByLevelMap.get(lesson.level)?.push(lesson);
+    }
+
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+      let prerequisites: string[] = [];
+
+      if (lesson.order > 1) {
+        // Prerequisite is the lesson with the largest order less than the current lesson in the same level
+        const sameLevelLessons = lessonsByLevelMap.get(lesson.level) || [];
+        const prevInLevel = sameLevelLessons
+          .filter((l) => l.order < lesson.order)
+          .sort((a, b) => b.order - a.order)[0];
+        if (prevInLevel) {
+          prerequisites = [prevInLevel.id];
+        }
+      } else if (lesson.level > 1) {
+        // Prerequisites are the last 3 lessons from the previous level
+        const prevLevelLessons = lessonsByLevelMap.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
+      }
+
+      const isLocked =
+        prerequisites.length > 0
+          ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId))
+          : false;
 
       return {
         id: lesson.id,
@@ -664,12 +690,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         stars: progress?.stars || 0,
         bestWpm: progress?.bestWpm || 0,
         attempts: progress?.attempts || 0,
-        locked:
-          prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
-            : false,
+        locked: isLocked,
         prerequisites,
       };
     });
