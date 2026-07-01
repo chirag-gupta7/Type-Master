@@ -432,14 +432,14 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    const [totalLessons, completedProgress, allProgress] = await Promise.all([
+    // Optimization: Consolidate database queries from 3 to 2 by deriving completion count
+    // and statistics in-memory from a single findMany call.
+    const [totalLessons, allProgress] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.count({
-        where: { userId, completed: true },
-      }),
       prisma.userLessonProgress.findMany({
         where: { userId },
         select: {
+          completed: true,
           stars: true,
           bestWpm: true,
           bestAccuracy: true,
@@ -447,23 +447,27 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
       }),
     ]);
 
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
+    const statsSummary = allProgress.reduce(
+      (acc, p) => {
+        if (p.completed) acc.completedCount++;
+        acc.totalStars += p.stars;
+        acc.sumWpm += p.bestWpm;
+        acc.sumAccuracy += p.bestAccuracy;
+        return acc;
+      },
+      { completedCount: 0, totalStars: 0, sumWpm: 0, sumAccuracy: 0 }
+    );
+
+    const avgWpm = allProgress.length > 0 ? statsSummary.sumWpm / allProgress.length : 0;
+    const avgAccuracy = allProgress.length > 0 ? statsSummary.sumAccuracy / allProgress.length : 0;
 
     res.json({
       stats: {
         totalLessons,
-        completedLessons: completedProgress,
+        completedLessons: statsSummary.completedCount,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
-        totalStars,
+          totalLessons > 0 ? Math.round((statsSummary.completedCount / totalLessons) * 100) : 0,
+        totalStars: statsSummary.totalStars,
         maxStars: totalLessons * 3,
         averageWpm: Math.round(avgWpm),
         averageAccuracy: Math.round(avgAccuracy * 10) / 10,
@@ -487,45 +491,105 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
-    // Get all lessons with progress
-    const lessonsWithProgress = await prisma.lesson.findMany({
-      orderBy: [{ level: 'asc' }, { order: 'asc' }],
-      include: {
-        userProgress: {
-          where: { userId },
-          select: {
-            completed: true,
-            bestWpm: true,
-            bestAccuracy: true,
-            stars: true,
-            attempts: true,
-            lastAttempt: true,
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    // Optimization: Consolidate database queries from 4 to 2 by parallelizing and
+    // deriving historical metrics in-memory from the base lesson dataset.
+    const [lessonsWithProgress, testActivity] = await Promise.all([
+      prisma.lesson.findMany({
+        orderBy: [{ level: 'asc' }, { order: 'asc' }],
+        include: {
+          userProgress: {
+            where: { userId },
+            select: {
+              completed: true,
+              bestWpm: true,
+              bestAccuracy: true,
+              stars: true,
+              attempts: true,
+              lastAttempt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.testResult.findMany({
+        where: {
+          userId,
+          createdAt: { gte: oneYearAgo },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    // Calculate completion by level
-    const levelStats = lessonsWithProgress.reduce(
-      (acc, lesson) => {
-        const levelKey = `level${lesson.level}`;
-        if (!acc[levelKey]) {
-          acc[levelKey] = { total: 0, completed: 0, totalStars: 0, earnedStars: 0 };
+    // Single pass to calculate level stats, historical WPM data, and lesson activity
+    const levelStats: Record<
+      string,
+      { total: number; completed: number; totalStars: number; earnedStars: number }
+    > = {};
+    const activityByDate: Record<string, number> = {};
+    const wpmByLessonMap = new Map<
+      string,
+      {
+        lessonId: string;
+        lessonTitle: string;
+        level: number;
+        data: Array<{ date: string; wpm: number; accuracy: number }>;
+        lastAttempt: Date;
+      }
+    >();
+
+    // Optimization: Use Map-based lookup and pre-grouping to reduce skill tree complexity from O(N^2) to O(N)
+    const lessonMap = new Map(lessonsWithProgress.map((l) => [l.id, l]));
+    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
+
+    for (const lesson of lessonsWithProgress) {
+      // 1. Level stats
+      const levelKey = `level${lesson.level}`;
+      if (!levelStats[levelKey]) {
+        levelStats[levelKey] = { total: 0, completed: 0, totalStars: 0, earnedStars: 0 };
+      }
+      levelStats[levelKey].total++;
+
+      const progress = lesson.userProgress[0];
+      if (progress) {
+        if (progress.completed) levelStats[levelKey].completed++;
+        levelStats[levelKey].totalStars += 3;
+        levelStats[levelKey].earnedStars += progress.stars;
+
+        // 2. WPM History (last 90 days)
+        if (progress.lastAttempt >= ninetyDaysAgo) {
+          wpmByLessonMap.set(lesson.id, {
+            lessonId: lesson.id,
+            lessonTitle: lesson.title,
+            level: lesson.level,
+            lastAttempt: progress.lastAttempt,
+            data: [
+              {
+                date: progress.lastAttempt.toISOString().split('T')[0],
+                wpm: progress.bestWpm,
+                accuracy: progress.bestAccuracy,
+              },
+            ],
+          });
         }
-        acc[levelKey].total++;
-        const progress = lesson.userProgress[0];
-        if (progress?.completed) {
-          acc[levelKey].completed++;
+
+        // 3. Lesson Activity (last 365 days)
+        if (progress.lastAttempt >= oneYearAgo) {
+          const date = progress.lastAttempt.toISOString().split('T')[0];
+          activityByDate[date] = (activityByDate[date] || 0) + 1;
         }
-        acc[levelKey].totalStars += 3;
-        acc[levelKey].earnedStars += progress?.stars || 0;
-        return acc;
-      },
-      {} as Record<
-        string,
-        { total: number; completed: number; totalStars: number; earnedStars: number }
-      >
-    );
+      }
+
+      // 4. Pre-group for skill tree
+      if (!lessonsByLevel.has(lesson.level)) lessonsByLevel.set(lesson.level, []);
+      lessonsByLevel.get(lesson.level)!.push(lesson);
+    }
 
     // Format level completion data
     const completionByLevel = Object.entries(levelStats).map(([level, stats]) => ({
@@ -541,117 +605,34 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Get historical progress data for WPM improvement (last 90 days)
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-    const lessonHistory = await prisma.userLessonProgress.findMany({
-      where: {
-        userId,
-        lastAttempt: { gte: ninetyDaysAgo },
-      },
-      include: {
-        lesson: {
-          select: {
-            id: true,
-            title: true,
-            level: true,
-          },
-        },
-      },
-      orderBy: {
-        lastAttempt: 'asc',
-      },
-    });
-
-    // Group WPM data by lesson
-    const wpmByLesson = lessonHistory.reduce(
-      (acc, entry) => {
-        const lessonId = entry.lesson.id;
-        if (!acc[lessonId]) {
-          acc[lessonId] = {
-            lessonId,
-            lessonTitle: entry.lesson.title,
-            level: entry.lesson.level,
-            data: [],
-          };
-        }
-        acc[lessonId].data.push({
-          date: entry.lastAttempt.toISOString().split('T')[0],
-          wpm: entry.bestWpm,
-          accuracy: entry.bestAccuracy,
-        });
-        return acc;
-      },
-      {} as Record<
-        string,
-        {
-          lessonId: string;
-          lessonTitle: string;
-          level: number;
-          data: Array<{ date: string; wpm: number; accuracy: number }>;
-        }
-      >
-    );
-
-    // Get practice frequency for heat map (last 365 days)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const [testActivity, lessonActivity] = await Promise.all([
-      prisma.testResult.findMany({
-        where: {
-          userId,
-          createdAt: { gte: oneYearAgo },
-        },
-        select: {
-          createdAt: true,
-        },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: {
-          userId,
-          lastAttempt: { gte: oneYearAgo },
-        },
-        select: {
-          lastAttempt: true,
-        },
-      }),
-    ]);
-
-    // Combine and count activities by date
-    const activityByDate = [...testActivity, ...lessonActivity].reduce(
-      (acc, entry) => {
-        const date =
-          'createdAt' in entry
-            ? entry.createdAt.toISOString().split('T')[0]
-            : entry.lastAttempt.toISOString().split('T')[0];
-        acc[date] = (acc[date] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    // Add test activity to activity counts
+    for (const test of testActivity) {
+      const date = test.createdAt.toISOString().split('T')[0];
+      activityByDate[date] = (activityByDate[date] || 0) + 1;
+    }
 
     const practiceFrequency = Object.entries(activityByDate).map(([date, count]) => ({
       date,
       count,
     }));
 
-    // Build skill tree structure with dependencies
+    // Build skill tree structure O(N)
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+      const levelLessons = lessonsByLevel.get(lesson.level) || [];
+
+      let prerequisites: string[] = [];
+      if (lesson.order > 1) {
+        // Find largest order < lesson.order in same level (optimized from slice(-1))
+        const prev = levelLessons.reduce((best, curr) => {
+          if (curr.order < lesson.order && (!best || curr.order > best.order)) return curr;
+          return best;
+        }, null as (typeof lessonsWithProgress)[number] | null);
+        if (prev) prerequisites = [prev.id];
+      } else if (lesson.level > 1) {
+        // Last 3 from previous level
+        prerequisites = (lessonsByLevel.get(lesson.level - 1) || []).slice(-3).map((l) => l.id);
+      }
 
       return {
         id: lesson.id,
@@ -666,9 +647,10 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preId) => {
+                const preReq = lessonMap.get(preId);
+                return preReq?.userProgress[0]?.completed;
+              })
             : false,
         prerequisites,
       };
@@ -676,7 +658,9 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     res.json({
       completionByLevel,
-      wpmByLesson: Object.values(wpmByLesson),
+      wpmByLesson: Array.from(wpmByLessonMap.values()).sort(
+        (a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime()
+      ),
       practiceFrequency,
       skillTree,
     });
