@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-02 - [Optimizing Lesson Statistics and Visualization]
+**Learning:** Endpoints that fetch multiple subsets of the same table (e.g., historical stats, activity counts, and current progress) can be significantly optimized by fetching the most comprehensive dataset once and deriving subsets in-memory. Consolidating database roundtrips and replacing O(N²) dependency checks with Map-based O(N) lookups improves responsiveness.
+**Action:** Before adding new database queries for related metrics, check if the data can be derived from existing parallelized fetches. Use Maps for efficient prerequisite or dependency lookups in complex trees.
