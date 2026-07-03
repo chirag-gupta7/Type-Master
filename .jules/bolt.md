@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-06-03 - In-memory derivation for dashboard visualization
+**Learning:** Dashboard endpoints often perform redundant queries to fetch filtered subsets of user data (e.g., last 90 days of WPM, activity heatmaps) that are already present in a broader 'fetch all progress' query. Consolidating these into one joined query and deriving metrics in-memory significantly reduces database roundtrips. Additionally, $O(N^2)$ hierarchical tree construction (like skill trees) can be optimized to $O(N)$ by leveraging the pre-sorted order of database results (e.g., `ORDER BY level, order`) and using index-based preceding-element lookups.
+**Action:** Always check if a subset of data can be derived from an existing query result before adding new database calls. Use pre-sorted database ordering to achieve $O(N)$ complexity for sequence-dependent logic.
