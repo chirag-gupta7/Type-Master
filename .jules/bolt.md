@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-05 - [Optimizing lesson recommendations with relational filters]
+**Learning:** Using a two-step query process (fetching IDs of completed items and then using 'notIn' to find incomplete ones) is a performance anti-pattern. It increases database roundtrips and memory overhead for large datasets. Prisma's relational filters (like 'none') can merge these into a single, efficient database operation.
+**Action:** When searching for items that lack a specific relationship or state (like "incomplete lessons"), use relational filters like 'none' or 'some' instead of manual ID-based exclusion.

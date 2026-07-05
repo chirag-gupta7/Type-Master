@@ -432,30 +432,28 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    const [totalLessons, completedProgress, allProgress] = await Promise.all([
+    const [totalLessons, completedProgress, progressAggregates] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
       }),
-      prisma.userLessonProgress.findMany({
+      // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate' feature.
+      // This reduces payload from O(N) to O(1) and minimizes application-layer processing.
+      prisma.userLessonProgress.aggregate({
         where: { userId },
-        select: {
+        _sum: {
           stars: true,
+        },
+        _avg: {
           bestWpm: true,
           bestAccuracy: true,
         },
       }),
     ]);
 
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
+    const totalStars = progressAggregates._sum.stars || 0;
+    const avgWpm = progressAggregates._avg.bestWpm || 0;
+    const avgAccuracy = progressAggregates._avg.bestAccuracy || 0;
 
     res.json({
       stats: {
@@ -962,14 +960,6 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
       orderBy: { assessmentDate: 'desc' },
     });
 
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
-
-    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
-
     // Determine starting section based on assessment or default to Section 1
     let startSection = 1;
     if (assessment) {
@@ -978,11 +968,18 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
       else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
     }
 
-    // Find first incomplete lesson in the appropriate section
+    // Optimization: Use a relational filter to find the first incomplete lesson.
+    // This merges the previously separate 'fetch completed IDs' and 'find lesson' queries
+    // into a single database roundtrip, reducing latency and memory usage.
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
         section: { gte: startSection },
-        id: { notIn: Array.from(completedLessonIds) },
+        userProgress: {
+          none: {
+            userId,
+            completed: true,
+          },
+        },
       },
       orderBy: [{ section: 'asc' }, { order: 'asc' }],
     });
