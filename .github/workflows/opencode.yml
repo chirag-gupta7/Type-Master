@@ -26,4 +26,4 @@ jobs:
           model: 'openai/gpt-4o' # Your chosen AI model
           agent: 'developer' # Changed from "review" to "developer"
           token: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # Your API Key secret
+          OPENCODE_ZEN_KEY: ${{ secrets.OPENCODE_ZEN_KEY }} # Your API Key secret
