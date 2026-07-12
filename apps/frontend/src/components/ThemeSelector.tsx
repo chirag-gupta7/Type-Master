@@ -6,7 +6,6 @@ import { Palette, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useThemeStore, THEME_PRESETS, type ThemeColors } from '@/store/theme';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function ThemeSelector() {
   const [isOpen, setIsOpen] = useState(false);

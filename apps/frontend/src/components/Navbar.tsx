@@ -11,8 +11,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { authAPI } from '@/lib/api';
 import { useUiStore } from '../store/ui';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   NavigationMenu,
   NavigationMenuItem,
