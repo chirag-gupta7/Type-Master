@@ -962,14 +962,6 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
       orderBy: { assessmentDate: 'desc' },
     });
 
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
-
-    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
-
     // Determine starting section based on assessment or default to Section 1
     let startSection = 1;
     if (assessment) {
@@ -978,11 +970,19 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
       else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
     }
 
-    // Find first incomplete lesson in the appropriate section
+    // Optimization: Single database query using relation filter.
+    // Instead of fetching all completed lesson IDs and using 'notIn',
+    // we use 'none' to filter for lessons where no 'completed' progress exists for this user.
+    // This reduces database roundtrips and memory overhead (O(1) database roundtrip).
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
         section: { gte: startSection },
-        id: { notIn: Array.from(completedLessonIds) },
+        userProgress: {
+          none: {
+            userId,
+            completed: true,
+          },
+        },
       },
       orderBy: [{ section: 'asc' }, { order: 'asc' }],
     });
