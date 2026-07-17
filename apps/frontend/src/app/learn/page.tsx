@@ -247,7 +247,8 @@ function LearnPageContent() {
         }
 
         const shouldUseInitialSelection =
-          !initialSelectionRef.current.consumed && initialSelectionRef.current.practice === practice;
+          !initialSelectionRef.current.consumed &&
+          initialSelectionRef.current.practice === practice;
 
         const requestedSection = shouldUseInitialSelection
           ? initialSelectionRef.current.sectionId
@@ -404,11 +405,9 @@ function LearnPageContent() {
                           : 'hover:border-primary/40'
                       }`}
                       onClick={() => {
-                        void loadSectionPage(
-                          section.sectionId,
-                          section.firstUnlockedPage || 1,
-                          { shouldPreselect: true }
-                        );
+                        void loadSectionPage(section.sectionId, section.firstUnlockedPage || 1, {
+                          shouldPreselect: true,
+                        });
                       }}
                     >
                       <div className="mb-2 flex items-center justify-between">
@@ -445,8 +444,8 @@ function LearnPageContent() {
                       </p>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {selectedSectionSummary.completedLessons}/{selectedSectionSummary.totalLessons}{' '}
-                      completed
+                      {selectedSectionSummary.completedLessons}/
+                      {selectedSectionSummary.totalLessons} completed
                     </div>
                   </div>
 
@@ -499,17 +498,27 @@ function LearnPageContent() {
                           >
                             <div className="mb-2 flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-xs text-muted-foreground">Level {lesson.level}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Level {lesson.level}
+                                </p>
                                 <h4 className="font-semibold">{lesson.title}</h4>
                               </div>
                               <div className="flex items-center gap-1">
-                                {lesson.isCompleted && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                {!lesson.isUnlocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                                {lesson.isCheckpoint && <Trophy className="h-4 w-4 text-yellow-600" />}
+                                {lesson.isCompleted && (
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                )}
+                                {!lesson.isUnlocked && (
+                                  <Lock className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                {lesson.isCheckpoint && (
+                                  <Trophy className="h-4 w-4 text-yellow-600" />
+                                )}
                               </div>
                             </div>
 
-                            <p className="mb-3 text-sm text-muted-foreground">{getLessonSummaryText(lesson)}</p>
+                            <p className="mb-3 text-sm text-muted-foreground">
+                              {getLessonSummaryText(lesson)}
+                            </p>
 
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">

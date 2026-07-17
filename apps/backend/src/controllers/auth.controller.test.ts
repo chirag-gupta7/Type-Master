@@ -80,10 +80,7 @@ describe('Auth Token Integration', () => {
     });
 
     it('should return 401 for request without secret', async () => {
-      await request(app)
-        .post('/api/v1/auth/token')
-        .send({ email: 'test@example.com' })
-        .expect(401);
+      await request(app).post('/api/v1/auth/token').send({ email: 'test@example.com' }).expect(401);
     });
 
     it('should PROVISION a user for non-existent email if it would be coming from OAuth', async () => {

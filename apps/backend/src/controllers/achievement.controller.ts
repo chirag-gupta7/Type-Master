@@ -359,31 +359,25 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [
-      testCount,
-      highAccuracyTests,
-      completedLessons,
-      totalLessons,
-      bestWpmAgg,
-      recentTests,
-    ] = await Promise.all([
-      prisma.testResult.count({ where: { userId } }),
-      prisma.testResult.count({
-        where: { userId, accuracy: { gte: 95 } },
-      }),
-      prisma.userLessonProgress.count({
-        where: { userId, completed: true },
-      }),
-      prisma.lesson.count(),
-      prisma.testResult.aggregate({
-        where: { userId },
-        _max: { wpm: true },
-      }),
-      prisma.testResult.findMany({
-        where: { userId, createdAt: { gte: sevenDaysAgo } },
-        select: { createdAt: true },
-      }),
-    ]);
+    const [testCount, highAccuracyTests, completedLessons, totalLessons, bestWpmAgg, recentTests] =
+      await Promise.all([
+        prisma.testResult.count({ where: { userId } }),
+        prisma.testResult.count({
+          where: { userId, accuracy: { gte: 95 } },
+        }),
+        prisma.userLessonProgress.count({
+          where: { userId, completed: true },
+        }),
+        prisma.lesson.count(),
+        prisma.testResult.aggregate({
+          where: { userId },
+          _max: { wpm: true },
+        }),
+        prisma.testResult.findMany({
+          where: { userId, createdAt: { gte: sevenDaysAgo } },
+          select: { createdAt: true },
+        }),
+      ]);
 
     const bestWpm = bestWpmAgg._max.wpm || 0;
     const uniqueDays = new Set(recentTests.map((r) => r.createdAt.toISOString().split('T')[0]))

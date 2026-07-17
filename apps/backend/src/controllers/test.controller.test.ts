@@ -43,7 +43,7 @@ describe('TestController - getUserStats', () => {
     const mockAggregates = {
       _avg: { wpm: 75.5, accuracy: 96.2 },
       _max: { wpm: 120, accuracy: 100 },
-      _count: { _all: 15 }
+      _count: { _all: 15 },
     };
 
     const mockRecentTests = [
@@ -76,7 +76,7 @@ describe('TestController - getUserStats', () => {
     (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
       _avg: { wpm: null, accuracy: null },
       _max: { wpm: null, accuracy: null },
-      _count: { _all: 0 }
+      _count: { _all: 0 },
     });
     (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 

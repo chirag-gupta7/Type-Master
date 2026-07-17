@@ -79,14 +79,12 @@ describe('AchievementController - checkAndAwardAchievements', () => {
         icon: 'target',
         requirement: JSON.stringify({ type: 'firstSteps' }),
         points: 10,
-      }
+      },
     ];
     (prisma.achievement.findMany as jest.Mock).mockResolvedValue(mockAchievements);
 
     // 2. Mock user already having 'First Steps'
-    (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([
-      { achievementId: 'ach-2' }
-    ]);
+    (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([{ achievementId: 'ach-2' }]);
 
     // 3. Mock metrics fetching
     (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
@@ -96,9 +94,7 @@ describe('AchievementController - checkAndAwardAchievements', () => {
     (prisma.testResult.count as jest.Mock).mockResolvedValue(2); // highAccuracyTestCount
     (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
     (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
-    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([
-      { createdAt: new Date() }
-    ]);
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([{ createdAt: new Date() }]);
 
     // 4. Mock achievement creation
     (prisma.userAchievement.createMany as jest.Mock).mockResolvedValue({ count: 1 });
@@ -119,20 +115,22 @@ describe('AchievementController - checkAndAwardAchievements', () => {
         expect.objectContaining({
           userId: 'user-123',
           achievementId: 'ach-1',
-        })
+        }),
       ],
       skipDuplicates: true,
     });
 
-    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
-      newlyUnlocked: [
-        expect.objectContaining({
-          id: 'ach-1',
-          title: 'Speed Demon',
-        })
-      ],
-      totalChecked: 2,
-    }));
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        newlyUnlocked: [
+          expect.objectContaining({
+            id: 'ach-1',
+            title: 'Speed Demon',
+          }),
+        ],
+        totalChecked: 2,
+      })
+    );
   });
 
   it('should handle errors during check', async () => {
