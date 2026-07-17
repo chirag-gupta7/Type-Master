@@ -638,20 +638,35 @@ export const getProgressVisualization = async (req: Request, res: Response, next
     }));
 
     // Build skill tree structure with dependencies
-    const skillTree = lessonsWithProgress.map((lesson) => {
+    // OPTIMIZATION: Refactored O(L^2) skill tree construction to O(L).
+    // Before: For every lesson, we did an O(L) .filter on lessonsWithProgress to find prerequisites,
+    // plus a nested O(L) .find inside .every to check if completed. This resulted in O(L^2) complexity.
+    // After: We leverage pre-sorted lessonsWithProgress (sorted by level, order) to do O(1) index-based
+    // lookups for prerequisites, and use a pre-computed Set of completed lesson IDs for O(1) lock checks.
+    const completedLessonIds = new Set(
+      lessonsWithProgress.filter((l) => l.userProgress[0]?.completed).map((l) => l.id)
+    );
+
+    const skillTree = lessonsWithProgress.map((lesson, index) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+
+      let prerequisites: string[] = [];
+      if (lesson.order > 1) {
+        const prev = lessonsWithProgress[index - 1];
+        if (prev && prev.level === lesson.level && prev.order < lesson.order) {
+          prerequisites = [prev.id];
+        }
+      } else if (lesson.level > 1) {
+        const prereqs: string[] = [];
+        // To match the original order (ascending level and order, i.e., last-3rd, last-2nd, last-1st)
+        for (let i = 3; i >= 1; i--) {
+          const prev = lessonsWithProgress[index - i];
+          if (prev && prev.level === lesson.level - 1) {
+            prereqs.push(prev.id);
+          }
+        }
+        prerequisites = prereqs;
+      }
 
       return {
         id: lesson.id,
@@ -666,9 +681,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
             : false,
         prerequisites,
       };

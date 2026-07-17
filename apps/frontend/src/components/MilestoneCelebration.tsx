@@ -102,7 +102,7 @@ export function MilestoneCelebration({ isOpen, onClose, milestone }: MilestoneCe
                   key={i}
                   animate={{
                     y: [-20, -40, -20],
-                    x: [0, (i % 2 === 0 ? 20 : -20), 0],
+                    x: [0, i % 2 === 0 ? 20 : -20, 0],
                     opacity: [0.5, 1, 0.5],
                   }}
                   transition={{
