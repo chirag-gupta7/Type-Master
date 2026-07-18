@@ -114,40 +114,89 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const topScores = await prisma.gameScore.findMany({
+    /*
+     * OPTIMIZATION (Before vs. After):
+     * - Before: Fetched up to `limit` raw game scores, then deduplicated by userId in-memory.
+     *   This was slow, requested redundant scores, and crucially returned fewer than `limit` results
+     *   if users had multiple scores in the top `limit`. Complexity: O(limit) database data retrieval,
+     *   but potentially resulted in leaderboards with size < limit.
+     * - After: Use a two-stage approach:
+     *   1. Perform a fast database-level `groupBy` on `userId` to retrieve exactly the top `limit`
+     *      unique users and their max scores, ordered by `_max.score` descending.
+     *   2. Retrieve full score details (such as user relation and accessory fields) using a targeted
+     *      `findMany` query with an `OR` filter matching the unique `userId` and `score` pairs.
+     *   This ensures the leaderboard ALWAYS contains exactly up to `limit` unique users, uses the index
+     *   for both stages, and avoids O(N) database-to-app data bloat.
+     *   Estimated complexity shift: Time complexity remains O(limit) but is bounded precisely,
+     *   and correctness/space complexity is fully resolved (guarantees exactly `limit` top users).
+     */
+    const userBestScores = await prisma.gameScore.groupBy({
+      by: ['userId'],
       where: {
         gameType: rawType,
       },
+      _max: {
+        score: true,
+      },
       orderBy: {
-        score: 'desc',
+        _max: {
+          score: 'desc',
+        },
       },
       take: limit,
+    });
+
+    if (userBestScores.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          gameType: rawType,
+          leaderboard: [],
+          total: 0,
+        },
+      });
+      return;
+    }
+
+    const topScoresDetails = await prisma.gameScore.findMany({
+      where: {
+        gameType: rawType,
+        OR: userBestScores.map((ub) => ({
+          userId: ub.userId,
+          score: ub._max.score!,
+        })),
+      },
       include: {
         user: withUser,
       },
     });
 
-    const bestByUser = new Map<string, (typeof topScores)[number]>();
-
-    for (const score of topScores) {
-      const current = bestByUser.get(score.userId);
-      if (!current || score.score > current.score) {
-        bestByUser.set(score.userId, score);
+    const detailsByUserId = new Map<string, (typeof topScoresDetails)[number]>();
+    for (const score of topScoresDetails) {
+      const existing = detailsByUserId.get(score.userId);
+      if (!existing || new Date(score.createdAt) > new Date(existing.createdAt)) {
+        detailsByUserId.set(score.userId, score);
       }
     }
 
-    const leaderboard = Array.from(bestByUser.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((score, index) => ({
+    const leaderboard = userBestScores
+      .map((ub) => {
+        const details = detailsByUserId.get(ub.userId);
+        if (!details) return null;
+        return {
+          userId: ub.userId,
+          username: details.user.username,
+          score: ub._max.score!,
+          wpm: details.wpm,
+          accuracy: details.accuracy,
+          duration: details.duration,
+          createdAt: details.createdAt,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .map((entry, index) => ({
         rank: index + 1,
-        userId: score.user.id,
-        username: score.user.username,
-        score: score.score,
-        wpm: score.wpm,
-        accuracy: score.accuracy,
-        duration: score.duration,
-        createdAt: score.createdAt,
+        ...entry,
       }));
 
     res.json({
