@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-19 - [O(L) Skill Tree Construction via Pre-sorted Indices]
+**Learning:** Complex tree/dependency structures built from in-memory arrays can suffer from O(L^2) bottlenecks if prerequisite resolution performs linear scans (`.filter`, `.find`) for every element. When the dataset is pre-sorted (such as by level and order), prerequisites can be resolved in O(1) constant time via index-based offsets, and verification of lock states can be speed up from O(L) to O(1) by using a pre-computed Set of completed elements.
+**Action:** Always leverage the pre-sorted order of retrieved database arrays to perform index-offset lookups instead of sequential nested searches. Use Set and Map lookups to keep state validation constant-time.

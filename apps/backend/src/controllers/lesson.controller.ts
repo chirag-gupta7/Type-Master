@@ -638,18 +638,28 @@ export const getProgressVisualization = async (req: Request, res: Response, next
     }));
 
     // Build skill tree structure with dependencies
-    const skillTree = lessonsWithProgress.map((lesson) => {
+    // OPTIMIZATION:
+    // Before: The original implementation mapped over all lessons (O(L)) and for each lesson performed a .filter()
+    // over all lessons (O(L)), resulting in an O(L^2) time complexity. Additionally, lock state verification scanned
+    // the list sequentially via .find() for each prerequisite, adding more O(L) overhead.
+    // After: We optimize this to O(L) time and space complexity:
+    // 1. Build a Set of completed lesson IDs to perform O(1) checks during lock verification.
+    // 2. Since lessonsWithProgress is pre-sorted by level and order, we can resolve prerequisites in O(1) constant time
+    //    by using index-based lookups.
+    const completedLessonIds = new Set<string>(
+      lessonsWithProgress
+        .filter((l) => l.userProgress[0]?.completed)
+        .map((l) => l.id)
+    );
+
+    const skillTree = lessonsWithProgress.map((lesson, index) => {
       const progress = lesson.userProgress[0];
       const prerequisites =
         lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
+          ? [lessonsWithProgress[index - 1].id]
           : lesson.level > 1
             ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
+                .slice(Math.max(0, index - 3), index)
                 .map((l) => l.id)
             : [];
 
@@ -666,9 +676,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
             : false,
         prerequisites,
       };
