@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores } from './game.controller';
+import { getGameStats, getUserHighScores, getLeaderboard } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -190,6 +190,145 @@ describe('GameController - getUserHighScores', () => {
           createdAt: null,
         },
       ],
+    });
+  });
+});
+
+describe('GameController - getLeaderboard', () => {
+  let mockRequest: Partial<Request>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      query: {},
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 400 if gameType is missing or invalid', async () => {
+    mockRequest.query = { gameType: 'INVALID_TYPE' };
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid or missing game type' });
+  });
+
+  it('should return an empty leaderboard if no scores exist', async () => {
+    mockRequest.query = { gameType: GameType.WORD_BLITZ };
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue([]);
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.groupBy).toHaveBeenCalled();
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        gameType: GameType.WORD_BLITZ,
+        leaderboard: [],
+        total: 0,
+      },
+    });
+  });
+
+  it('should return leaderboard entries with exact rankings and detail mapping', async () => {
+    mockRequest.query = { gameType: GameType.WORD_BLITZ, limit: '2' };
+
+    const mockGrouped = [
+      { userId: 'user-1', _max: { score: 100 } },
+      { userId: 'user-2', _max: { score: 90 } },
+    ];
+
+    const mockDetails = [
+      {
+        id: 'score-1',
+        userId: 'user-1',
+        score: 100,
+        wpm: 60,
+        accuracy: 98,
+        duration: 30,
+        createdAt: new Date('2023-01-02T10:00:00Z'),
+        user: { id: 'user-1', username: 'PlayerOne' },
+      },
+      {
+        id: 'score-2',
+        userId: 'user-2',
+        score: 90,
+        wpm: 55,
+        accuracy: 95,
+        duration: 30,
+        createdAt: new Date('2023-01-02T10:05:00Z'),
+        user: { id: 'user-2', username: 'PlayerTwo' },
+      },
+    ];
+
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue(mockGrouped);
+    (prisma.gameScore.findMany as jest.Mock).mockResolvedValue(mockDetails);
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.groupBy).toHaveBeenCalledWith({
+      by: ['userId'],
+      where: { gameType: GameType.WORD_BLITZ },
+      _max: { score: true },
+      orderBy: { _max: { score: 'desc' } },
+      take: 2,
+    });
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      where: {
+        gameType: GameType.WORD_BLITZ,
+        OR: [
+          { userId: 'user-1', score: 100 },
+          { userId: 'user-2', score: 90 },
+        ],
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        gameType: GameType.WORD_BLITZ,
+        leaderboard: [
+          {
+            rank: 1,
+            userId: 'user-1',
+            username: 'PlayerOne',
+            score: 100,
+            wpm: 60,
+            accuracy: 98,
+            duration: 30,
+            createdAt: mockDetails[0].createdAt,
+          },
+          {
+            rank: 2,
+            userId: 'user-2',
+            username: 'PlayerTwo',
+            score: 90,
+            wpm: 55,
+            accuracy: 95,
+            duration: 30,
+            createdAt: mockDetails[1].createdAt,
+          },
+        ],
+        total: 2,
+      },
     });
   });
 });
