@@ -9,3 +9,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-20 - Database-level Leaderboard Deduplication
+**Learning:** In-memory deduplication of leaderboard query results fetched via simple `findMany` limits (e.g., `take: 100`) is both a performance risk and a correctness bug. If a subset of active users hold multiple top scores, they push out other unique users, resulting in less than the requested limit being displayed. Offloading grouping and sorting to the database via `groupBy` on `userId` first ensures exact and complete unique user results, while a subsequent batched `findMany` query with `OR` fetches full details efficiently.
+**Action:** Avoid raw limit-and-filter patterns for leaderboards. Always use a two-stage `groupBy` and batched `findMany` details query to guarantee correct leaderboard sizes and optimal database indexing.
