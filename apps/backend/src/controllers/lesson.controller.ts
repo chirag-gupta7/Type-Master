@@ -637,21 +637,49 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       count,
     }));
 
-    // Build skill tree structure with dependencies
+    // PERFORMANCE OPTIMIZATION:
+    // Before: O(N^2) complexity due to nested .filter() and .find() on lessonsWithProgress array inside the .map loop.
+    // After: O(N) complexity by using precomputed index Maps and a completed lessons Set for O(1) lookups.
+
+    // 1. Precompute a set of completed lesson IDs for O(1) lookups
+    const completedLessonIds = new Set(
+      lessonsWithProgress
+        .filter((l) => l.userProgress[0]?.completed)
+        .map((l) => l.id)
+    );
+
+    // 2. Group lessons by level for quick prerequisite retrieval
+    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
+    for (const lesson of lessonsWithProgress) {
+      if (!lessonsByLevel.has(lesson.level)) {
+        lessonsByLevel.set(lesson.level, []);
+      }
+      lessonsByLevel.get(lesson.level)!.push(lesson);
+    }
+
+    // 3. Map lesson ID to its index within its level for O(1) index retrieval
+    const lessonIndexInLevel = new Map<string, number>();
+    for (const levelLessons of lessonsByLevel.values()) {
+      levelLessons.forEach((l, idx) => {
+        lessonIndexInLevel.set(l.id, idx);
+      });
+    }
+
+    // Build skill tree structure with dependencies in O(N)
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+
+      let prerequisites: string[] = [];
+      if (lesson.order > 1) {
+        const levelLessons = lessonsByLevel.get(lesson.level) || [];
+        const idx = lessonIndexInLevel.get(lesson.id) ?? -1;
+        if (idx > 0) {
+          prerequisites = [levelLessons[idx - 1].id];
+        }
+      } else if (lesson.level > 1) {
+        const prevLevelLessons = lessonsByLevel.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
+      }
 
       return {
         id: lesson.id,
@@ -666,9 +694,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
             : false,
         prerequisites,
       };
