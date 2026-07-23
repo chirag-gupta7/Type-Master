@@ -9,3 +9,7 @@
 ## 2026-05-15 - [Batching achievement checks with UserMetrics]
 **Learning:** Checking multiple achievements sequentially by querying the database for each condition (N+1 problem) is extremely slow. By aggregating all necessary user statistics (counts, max, averages) in a single parallel batch of queries into a `UserMetrics` object, achievement checkers can be refactored into synchronous, pure functions. This reduces database roundtrips from O(N) to O(1) and simplifies testing.
 **Action:** When evaluating multiple rules against the same user/entity, pre-fetch all potential requirements in one batch and use in-memory logic for the evaluation.
+
+## 2025-05-24 - Parallelizing bulk metric fetching
+**Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
+**Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.

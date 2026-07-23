@@ -7,6 +7,7 @@ import {
   getLearningStats,
   getProgressVisualization,
   getLessonsBySection,
+  getSectionSummaries,
   getCheckpointLessons,
   getRecommendedLesson,
   getLearningDashboard,
@@ -17,6 +18,7 @@ const router = Router();
 // Public routes (show progress if authenticated, but don't require auth)
 router.get('/', optionalAuthenticate, getAllLessons);
 router.get('/checkpoints', optionalAuthenticate, getCheckpointLessons);
+router.get('/sections', optionalAuthenticate, getSectionSummaries);
 router.get('/section/:sectionId', optionalAuthenticate, getLessonsBySection);
 
 // Protected routes (require authentication)
