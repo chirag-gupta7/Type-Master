@@ -15,36 +15,6 @@ const createTestResultSchema = z.object({
 });
 
 /**
- * Calculate statistics from test results
- */
-const calculateStats = (
-  tests: Array<{ wpm: number; accuracy: number; createdAt: Date }>
-) => {
-  if (tests.length === 0) {
-    return {
-      averageWpm: 0,
-      averageAccuracy: 0,
-      bestWpm: 0,
-      bestAccuracy: 0,
-      totalTests: 0,
-      recentTests: [],
-    };
-  }
-
-  const wpmValues = tests.map((t) => t.wpm);
-  const accuracyValues = tests.map((t) => t.accuracy);
-
-  return {
-    averageWpm: Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length),
-    averageAccuracy: Math.round(accuracyValues.reduce((a, b) => a + b, 0) / accuracyValues.length),
-    bestWpm: Math.max(...wpmValues),
-    bestAccuracy: Math.max(...accuracyValues),
-    totalTests: tests.length,
-    recentTests: tests.slice(0, 10),
-  };
-};
-
-/**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
  * @access  Private
@@ -194,17 +164,43 @@ export const getUserStats = async (req: Request, res: Response, next: NextFuncti
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    const tests = await prisma.testResult.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        wpm: true,
-        accuracy: true,
-        createdAt: true,
-      },
-    });
+    // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate' feature.
+    // We parallelize the aggregation and the recent history fetch to minimize total response time.
+    const [aggregates, recentTests] = await Promise.all([
+      prisma.testResult.aggregate({
+        where,
+        _avg: {
+          wpm: true,
+          accuracy: true,
+        },
+        _max: {
+          wpm: true,
+          accuracy: true,
+        },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.testResult.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          wpm: true,
+          accuracy: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    const stats = calculateStats(tests);
+    const stats = {
+      averageWpm: Math.round(aggregates._avg.wpm || 0),
+      averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
+      bestWpm: aggregates._max.wpm || 0,
+      bestAccuracy: aggregates._max.accuracy || 0,
+      totalTests: aggregates._count._all,
+      recentTests,
+    };
 
     res.json({
       stats,

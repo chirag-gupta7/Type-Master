@@ -1,7 +1,5 @@
-'use client';
-
-import LearnPage from '../page';
+import { redirect } from 'next/navigation';
 
 export default function CodingLearnPage() {
-  return <LearnPage />;
+  redirect('/learn?practice=coding');
 }
