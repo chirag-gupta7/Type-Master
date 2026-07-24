@@ -126,7 +126,7 @@ describe('AchievementController', () => {
       expect(prisma.achievement.findMany).toHaveBeenCalled();
       expect(prisma.testResult.aggregate).toHaveBeenCalledWith({
         where: { userId: 'user-123' },
-        _max: { wpm: true, accuracy: true },
+        _max: { wpm: true },
         _count: { _all: true },
       });
 
