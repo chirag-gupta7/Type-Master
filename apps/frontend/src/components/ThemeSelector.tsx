@@ -6,7 +6,6 @@ import { Palette, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useThemeStore, THEME_PRESETS, type ThemeColors } from '@/store/theme';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function ThemeSelector() {
   const [isOpen, setIsOpen] = useState(false);
@@ -49,12 +48,14 @@ export function ThemeSelector() {
             style={{
               boxShadow: `0 0 20px ${currentTheme.primary}40`,
             }}
-            aria-label="Change Theme"
+            aria-label="Open theme picker"
           >
             <Palette className="w-6 h-6 text-white" />
           </motion.button>
         </TooltipTrigger>
-        <TooltipContent side="left">Change Theme</TooltipContent>
+        <TooltipContent side="left">
+          <p>Open theme picker</p>
+        </TooltipContent>
       </Tooltip>
 
       {/* Theme Picker Dialog */}
