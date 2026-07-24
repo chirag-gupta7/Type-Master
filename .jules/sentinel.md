@@ -28,3 +28,8 @@
 **Vulnerability:** Generic AI proxy endpoints `/api/v1/ai/feedback` and `/api/v1/ai/generate` allowed clients to provide their own system prompts and arbitrary queries.
 **Learning:** Providing an endpoint that allows client-side control over AI system prompts or unrestricted access to the AI model using the server's API key enables prompt injection and API abuse.
 **Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
+
+## 2026-05-16 - Timing side-channel in internal auth
+**Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
+**Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
+**Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.

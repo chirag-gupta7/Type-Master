@@ -105,11 +105,13 @@ export const internalOnly = (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
-    // Hash both tokens to fixed length to prevent timing attacks that leak secret length
-    const tokenHash = crypto.createHash('sha256').update(internalToken).digest();
+    // Use SHA-256 to hash both the provided token and the secret.
+    // This ensures that both buffers passed to timingSafeEqual have the same length,
+    // preventing timing attacks that could leak the length of the secret.
+    const internalTokenHash = crypto.createHash('sha256').update(internalToken).digest();
     const secretHash = crypto.createHash('sha256').update(secret).digest();
 
-    if (!crypto.timingSafeEqual(tokenHash, secretHash)) {
+    if (!crypto.timingSafeEqual(internalTokenHash, secretHash)) {
       return next(new AppError(401, 'Unauthorized internal request'));
     }
   } catch (error) {
