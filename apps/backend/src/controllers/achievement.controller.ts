@@ -187,6 +187,7 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
     ]);
 
     const unlockedAchievementIds = new Set(userAchievements.map((ua) => ua.achievementId));
+
     const toUnlock: typeof achievements = [];
 
     // Check each achievement using pre-fetched metrics
