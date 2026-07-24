@@ -5,8 +5,6 @@ import {
   generateWritingPrompt,
   getWritingFeedback,
   getStoryResponse,
-  getAiFeedback,
-  generateAiContent,
 } from '../controllers/ai.controller';
 import rateLimit from 'express-rate-limit';
 
@@ -43,9 +41,5 @@ router.post('/writing-feedback', getWritingFeedback);
  * POST /api/v1/ai/story-response
  */
 router.post('/story-response', getStoryResponse);
-
-// Compatibility routes for main branch changes
-router.post('/feedback', getAiFeedback);
-router.post('/generate', generateAiContent);
 
 export default router;
