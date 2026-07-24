@@ -19,7 +19,17 @@
 **Learning:** Even with "public" AI keys, they should be proxied through the backend to enforce authentication and rate limiting.
 **Prevention:** Never use NEXT_PUBLIC_ for sensitive API keys. Implement a backend proxy for all AI features.
 
+## 2026-05-13 - [Secret Length Timing Leak in internalOnly]
+**Vulnerability:** The `internalOnly` middleware leaked the length of `INTERNAL_API_SECRET` because it performed an explicit length comparison before calling `timingSafeEqual`.
+**Learning:** `timingSafeEqual` requires buffers of equal length. Checking length upfront is common but introduces a timing side-channel that reveals the secret's length.
+**Prevention:** Hash both the input and the secret using a fixed-length algorithm (like SHA-256) before comparison. This ensures buffers are always the same length and prevents length leakage.
+
 ## 2026-05-14 - [Insecure Generic AI Proxy Endpoints]
 **Vulnerability:** Generic AI proxy endpoints `/api/v1/ai/feedback` and `/api/v1/ai/generate` allowed clients to provide their own system prompts and arbitrary queries.
 **Learning:** Providing an endpoint that allows client-side control over AI system prompts or unrestricted access to the AI model using the server's API key enables prompt injection and API abuse.
 **Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
+
+## 2026-05-16 - Timing side-channel in internal auth
+**Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
+**Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
+**Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.

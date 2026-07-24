@@ -20,6 +20,7 @@ const extractGeminiText = (data: GeminiResponse): string | null => {
 
 /**
  * Generic helper to call Gemini API
+ * Securely uses x-goog-api-key header instead of query parameters
  */
 const callGemini = async (
   systemPrompt: string,
