@@ -13,3 +13,7 @@
 ## 2025-05-24 - Parallelizing bulk metric fetching
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-24 - Parallelizing sequential database requests in getWeakKeyAnalysis
+**Learning:** Retrieving metrics sequentially for a single analysis (e.g., fetching user's weak keys, raw SQL finger errors, and recent mistakes consecutively) introduces unnecessary database roundtrip latency bottlenecks (O(3 * T_query)). Combining distinct, independent database queries using Promise.all parallelizes their execution and reduces response time to the single slowest query (O(max(T_query_1, T_query_2, T_query_3))).
+**Action:** Look for independent sequential query chains inside endpoints and wrap them in Promise.all for concurrent resolution.
