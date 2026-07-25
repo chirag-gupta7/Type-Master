@@ -9,3 +9,15 @@
 ## 2025-05-23 - [Optimizing statistical aggregations in test endpoints]
 **Learning:** High-volume tables like 'TestResult' should never be fetched in full for statistical calculations (averages, maximums). Offloading these to Prisma's 'aggregate' feature reduces O(N) data transfer and memory pressure on the application server.
 **Action:** Replace in-memory array calculations (like average or max) with database-level aggregations. Always combine these with 'take' limits for recent records using 'Promise.all' to minimize latency.
+
+## 2025-05-24 - Parallelizing bulk metric fetching
+**Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
+**Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-05-25 - Bulk metrics fetching for achievement logic
+**Learning:** Achievement systems that evaluate requirements using sequential database queries within a loop create a significant performance bottleneck. This can be optimized by fetching all necessary user metrics (counts, aggregates, streaks) in a single batch of parallel queries using `Promise.all` before the evaluation loop.
+**Action:** Identify multi-step evaluation logic and refactor to use pre-fetched data objects, turning asynchronous checks into synchronous ones.
+
+## 2026-05-15 - [Batching achievement checks with UserMetrics]
+**Learning:** Checking multiple achievements sequentially by querying the database for each condition (N+1 problem) is extremely slow. By aggregating all necessary user statistics (counts, max, averages) in a single parallel batch of queries into a `UserMetrics` object, achievement checkers can be refactored into synchronous, pure functions. This reduces database roundtrips from O(N) to O(1) and simplifies testing.
+**Action:** When evaluating multiple rules against the same user/entity, pre-fetch all potential requirements in one batch and use in-memory logic for the evaluation.

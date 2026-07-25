@@ -1,0 +1,29 @@
+name: OpenCode PR Developer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  opencode-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write # Crucial: Allows OpenCode to commit code fixes
+      pull-requests: write # Crucial: Allows OpenCode to comment on the PR
+      issues: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Fetches all history so the AI has context on your branch
+          fetch-depth: 0
+
+      - name: Run OpenCode Developer Agent
+        uses: anomalyco/opencode/github@main
+        env:
+          model: 'openai/gpt-4o' # Your chosen AI model
+          agent: 'developer' # Changed from "review" to "developer"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_ZEN_KEY: ${{ secrets.OPENCODE_ZEN_KEY }} # Your API Key secret

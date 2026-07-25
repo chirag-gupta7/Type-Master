@@ -171,9 +171,9 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate'
-    // and fetch only the 10 most recent tests. This reduces O(N) data transfer and memory usage.
-    const [statsResult, recentTests] = await Promise.all([
+    // Optimization: Use database aggregation to calculate statistics instead of in-memory.
+    // This pushes the computation to the database and reduces data transfer from O(N) to O(1).
+    const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
         _avg: {
@@ -201,11 +201,11 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
     ]);
 
     const stats = {
-      averageWpm: Math.round(statsResult._avg.wpm || 0),
-      averageAccuracy: Math.round(statsResult._avg.accuracy || 0),
-      bestWpm: statsResult._max.wpm || 0,
-      bestAccuracy: statsResult._max.accuracy || 0,
-      totalTests: statsResult._count._all,
+      averageWpm: Math.round(aggregates._avg.wpm || 0),
+      averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
+      bestWpm: aggregates._max.wpm || 0,
+      bestAccuracy: aggregates._max.accuracy || 0,
+      totalTests: aggregates._count._all,
       recentTests,
     };
 
