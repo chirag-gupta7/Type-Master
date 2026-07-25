@@ -4,6 +4,13 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
+
 // Validation schemas
 const createTestResultSchema = z.object({
   wpm: z.number().min(0).max(300, 'WPM seems unrealistic'),
@@ -13,13 +20,6 @@ const createTestResultSchema = z.object({
   duration: z.enum(['30', '60', '180']).transform(Number),
   mode: z.enum(['WORDS', 'TIME', 'QUOTE']).default('WORDS'),
 });
-
-interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    email: string;
-  };
-}
 
 /**
  * @route   POST /api/v1/tests
