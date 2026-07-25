@@ -40,6 +40,14 @@ describe('TestController - getUserStats', () => {
     jest.clearAllMocks();
   });
 
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getUserStats(mockRequest as Request, mockResponse as Response, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
   it('should calculate stats correctly using aggregate', async () => {
     const mockTests = [
       { wpm: 60, accuracy: 95, createdAt: new Date() },
@@ -59,8 +67,8 @@ describe('TestController - getUserStats', () => {
     expect(prisma.testResult.aggregate).toHaveBeenCalled();
     expect(jsonMock).toHaveBeenCalledWith({
       stats: {
-        averageWpm: 60, // (60+70+50)/3
-        averageAccuracy: 95, // (95+98+92)/3
+        averageWpm: 60,
+        averageAccuracy: 95,
         bestWpm: 70,
         bestAccuracy: 98,
         totalTests: 3,

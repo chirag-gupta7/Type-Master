@@ -14,7 +14,6 @@ const createTestResultSchema = z.object({
   mode: z.enum(['WORDS', 'TIME', 'QUOTE']).default('WORDS'),
 });
 
-
 interface AuthRequest extends Request {
   user?: {
     userId: string;
