@@ -9,3 +9,7 @@
 ## 2025-05-24 - [Optimizing "top record per category" queries]
 **Learning:** Fetching the best record (e.g., high score) for multiple categories in a loop creates an N+1 query problem. This can be optimized in Prisma/PostgreSQL using `findMany` with the `distinct` property. When using `distinct: ['category']`, the `orderBy` must start with `category` followed by the sorting criteria (e.g., `score: 'desc'`) to ensure the correct record is picked for each distinct value in a single roundtrip.
 **Action:** Use `distinct` + `orderBy` to resolve N+1 patterns when fetching the "best" or "latest" record per category.
+
+## 2025-05-29 - [Optimizing "Top Record Per Category" N+1 queries]
+**Learning:** Fetching the single best record across multiple categories (e.g., high scores per game type) often leads to N+1 query patterns. This can be optimized into a single database roundtrip using `prisma.model.findMany` with the `distinct` property on the category field, combined with an appropriate `orderBy` (e.g., `score: 'desc'`).
+**Action:** When you need the "winning" record for each group, use `findMany({ distinct: ['field'], orderBy: [...] })` instead of looping `findFirst`.

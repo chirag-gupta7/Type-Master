@@ -8,8 +8,8 @@ jest.mock('../utils/prisma', () => ({
   prisma: {
     gameScore: {
       findMany: jest.fn(),
-      groupBy: jest.fn(),
       findFirst: jest.fn(),
+      groupBy: jest.fn(),
     },
   },
 }));
@@ -36,7 +36,7 @@ describe('GameController - getGameStats', () => {
   it('should return 401 if userId is missing', async () => {
     mockRequest.userId = undefined;
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(401);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
@@ -67,7 +67,7 @@ describe('GameController - getGameStats', () => {
     (prisma.gameScore.findMany as jest.Mock).mockResolvedValue(mockAvailableTypes);
     (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue(mockUserStats);
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
       distinct: ['gameType'],
@@ -112,7 +112,7 @@ describe('GameController - getGameStats', () => {
   it('should handle errors gracefully', async () => {
     (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
 
-    await getGameStats(mockRequest as any, mockResponse as any);
+    await getGameStats(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch game stats' });
@@ -141,24 +141,24 @@ describe('GameController - getUserHighScores', () => {
   it('should return 401 if userId is missing', async () => {
     mockRequest.userId = undefined;
 
-    await getUserHighScores(mockRequest as any, mockResponse as any);
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(401);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
   });
 
-  it('should successfully fetch and format user high scores', async () => {
+  it('should successfully fetch user high scores', async () => {
     const mockAvailableTypes = [
       { gameType: GameType.WORD_BLITZ },
       { gameType: GameType.SPEED_RACE },
     ];
 
-    const mockWordBlitzBest = {
+    const mockBestWordBlitz = {
       gameType: GameType.WORD_BLITZ,
       score: 500,
-      wpm: 60,
+      wpm: 80,
       accuracy: 95,
-      duration: 30,
+      duration: 60,
       createdAt: new Date('2023-01-01'),
     };
 
@@ -170,12 +170,13 @@ describe('GameController - getUserHighScores', () => {
       duration: 60,
       createdAt: new Date('2023-01-02'),
     };
+    };
 
     (prisma.gameScore.findMany as jest.Mock)
       .mockResolvedValueOnce(mockAvailableTypes)
-      .mockResolvedValueOnce([mockWordBlitzBest, mockSpeedRaceBest]);
+      .mockResolvedValueOnce([mockBestWordBlitz, mockSpeedRaceBest]);
 
-    await getUserHighScores(mockRequest as any, mockResponse as any);
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
 
     expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
       distinct: ['gameType'],
@@ -194,10 +195,10 @@ describe('GameController - getUserHighScores', () => {
         {
           gameType: GameType.WORD_BLITZ,
           score: 500,
-          wpm: 60,
+          wpm: 80,
           accuracy: 95,
-          duration: 30,
-          createdAt: mockWordBlitzBest.createdAt,
+          duration: 60,
+          createdAt: mockBestWordBlitz.createdAt,
         },
         {
           gameType: GameType.SPEED_RACE,
@@ -218,7 +219,7 @@ describe('GameController - getUserHighScores', () => {
       .mockResolvedValueOnce(mockAvailableTypes)
       .mockResolvedValueOnce([]);
 
-    await getUserHighScores(mockRequest as any, mockResponse as any);
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
 
     expect(jsonMock).toHaveBeenCalledWith({
       success: true,
@@ -234,11 +235,10 @@ describe('GameController - getUserHighScores', () => {
       ],
     });
   });
-
   it('should handle errors gracefully', async () => {
     (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
 
-    await getUserHighScores(mockRequest as any, mockResponse as any);
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch high scores' });
