@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
@@ -439,9 +439,7 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Optimization: Use database aggregation to calculate learning statistics.
-    // This reduces data transfer from O(N) progress records to O(1) aggregate values.
-    const [totalLessons, completedProgress, aggregates] = await Promise.all([
+    const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
@@ -461,21 +459,16 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
       }),
     ]);
 
-    const totalStars = aggregates._sum.stars || 0;
-    const totalProgressCount = aggregates._count._all;
-    const avgWpm = aggregates._avg.bestWpm || 0;
-    const avgAccuracy = aggregates._avg.bestAccuracy || 0;
-
     res.json({
       stats: {
         totalLessons,
-        completedLessons: completedProgress,
+        completedLessons,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
-        totalStars,
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        totalStars: aggregation._sum.stars || 0,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(avgWpm),
-        averageAccuracy: totalProgressCount > 0 ? Math.round(avgAccuracy * 10) / 10 : 0,
+        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
+        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
       },
     });
   } catch (error) {

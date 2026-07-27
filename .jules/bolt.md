@@ -6,9 +6,9 @@
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
 
-## 2026-05-25 - [Optimizing user statistics with database aggregation]
-**Learning:** Fetching a user's entire history (O(N) data) just to calculate averages and maximums in-memory is a major performance anti-pattern. Prisma's `aggregate` feature allows these calculations to happen at the database level, returning O(1) data. Combining this with a limited `findMany` (e.g., `take: 10`) for recent records using `Promise.all` provides a significant speed boost for power users with many records.
-**Action:** Always prefer database-level aggregation for statistical endpoints. Never fetch full datasets just to perform simple math in Node.js.
+## 2025-05-24 - Offloading statistics to database aggregation
+**Learning:** Performing calculations like sums and averages in-memory after fetching all records (`findMany`) creates O(N) data transfer and processing overhead. Prisma's `aggregate` feature allows these calculations to happen at the database level, returning only the final results.
+**Action:** For summary or dashboard endpoints, always prefer `aggregate` or `groupBy` over in-memory processing of large datasets.
 
 ## 2025-05-23 - [Optimizing statistical aggregations in test endpoints]
 **Learning:** High-volume tables like 'TestResult' should never be fetched in full for statistical calculations (averages, maximums). Offloading these to Prisma's 'aggregate' feature reduces O(N) data transfer and memory pressure on the application server.
@@ -25,3 +25,7 @@
 ## 2026-05-15 - [Batching achievement checks with UserMetrics]
 **Learning:** Checking multiple achievements sequentially by querying the database for each condition (N+1 problem) is extremely slow. By aggregating all necessary user statistics (counts, max, averages) in a single parallel batch of queries into a `UserMetrics` object, achievement checkers can be refactored into synchronous, pure functions. This reduces database roundtrips from O(N) to O(1) and simplifies testing.
 **Action:** When evaluating multiple rules against the same user/entity, pre-fetch all potential requirements in one batch and use in-memory logic for the evaluation.
+
+## 2026-05-25 - [Optimizing user statistics with database aggregation]
+**Learning:** Fetching a user's entire history (O(N) data) just to calculate averages and maximums in-memory is a major performance anti-pattern. Prisma's `aggregate` feature allows these calculations to happen at the database level, returning O(1) data. Combining this with a limited `findMany` (e.g., `take: 10`) for recent records using `Promise.all` provides a significant speed boost for power users with many records.
+**Action:** Always prefer database-level aggregation for statistical endpoints. Never fetch full datasets just to perform simple math in Node.js.
