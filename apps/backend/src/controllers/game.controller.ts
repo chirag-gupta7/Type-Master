@@ -173,9 +173,11 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Optimization: Fetch all high scores in a single query using DISTINCT ON (via Prisma distinct).
-    // We also fetch all available types to ensure we return a result for every game type even if no score exists.
-    const [availableTypes, userHighScores] = await Promise.all([
+    // Optimization: Fetch all available game types and the user's best scores in parallel.
+    // Instead of querying the best score for each game type in a loop (N+1),
+    // we use 'distinct' with 'orderBy' to get all the user's best scores in a single query.
+    // This reduces the number of database roundtrips from 1+N to 2.
+    const [availableTypes, userBests] = await Promise.all([
       prisma.gameScore.findMany({
         distinct: ['gameType'],
         select: { gameType: true },
@@ -187,10 +189,11 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       }),
     ]);
 
-    const userBestMap = new Map(userHighScores.map((s) => [s.gameType, s]));
+    const bestsMap = new Map(userBests.map((b) => [b.gameType, b]));
 
     const highScores = availableTypes.map(({ gameType }) => {
-      const best = userBestMap.get(gameType);
+      const best = bestsMap.get(gameType);
+
       return {
         gameType,
         score: best?.score ?? 0,
