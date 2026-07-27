@@ -109,37 +109,41 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Get user's weak keys, sorted by error count
-    const weakKeys = await prisma.userWeakKeys.findMany({
-      where: { userId },
-      orderBy: { errorCount: 'desc' },
-      take: limit,
-    });
-
-    // Get finger-specific error patterns
-    const fingerErrors = await prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
-      SELECT 
-        "fingerUsed",
-        COUNT(*) as count
-      FROM "typing_mistakes"
-      WHERE "userId" = ${userId}
-        AND "fingerUsed" IS NOT NULL
-      GROUP BY "fingerUsed"
-      ORDER BY count DESC
-    `;
-
-    // Get recent mistakes for context
-    const recentMistakes = await prisma.typingMistake.findMany({
-      where: { userId },
-      orderBy: { timestamp: 'desc' },
-      take: 20,
-      select: {
-        keyPressed: true,
-        keyExpected: true,
-        fingerUsed: true,
-        timestamp: true,
-      },
-    });
+    // OPTIMIZATION: Before vs After
+    // Before: Three sequential queries executed one after another, taking O(T1 + T2 + T3) database roundtrip latency.
+    // After: Using Promise.all, we parallelize all three independent database queries.
+    // This reduces the database-retrieval latency to O(max(T1, T2, T3)), eliminating sequential blocking.
+    const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
+      // 1. Get user's weak keys, sorted by error count
+      prisma.userWeakKeys.findMany({
+        where: { userId },
+        orderBy: { errorCount: 'desc' },
+        take: limit,
+      }),
+      // 2. Get finger-specific error patterns
+      prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
+        SELECT
+          "fingerUsed",
+          COUNT(*) as count
+        FROM "typing_mistakes"
+        WHERE "userId" = ${userId}
+          AND "fingerUsed" IS NOT NULL
+        GROUP BY "fingerUsed"
+        ORDER BY count DESC
+      `,
+      // 3. Get recent mistakes for context
+      prisma.typingMistake.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' },
+        take: 20,
+        select: {
+          keyPressed: true,
+          keyExpected: true,
+          fingerUsed: true,
+          timestamp: true,
+        },
+      }),
+    ]);
 
     logger.info(`Retrieved weak key analysis for user: ${userId}`);
 
