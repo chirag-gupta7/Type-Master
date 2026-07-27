@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
+import { AppError } from '../middleware/error-handler';
+import { logger } from '../utils/logger';
 
 interface AuthRequest extends Request {
   user?: {
@@ -8,8 +10,6 @@ interface AuthRequest extends Request {
     email: string;
   };
 }
-import { AppError } from '../middleware/error-handler';
-import { logger } from '../utils/logger';
 
 // Validation schemas
 const createTestResultSchema = z.object({
@@ -171,15 +171,20 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
-    // This avoids fetching potentially thousands of records into memory just to calculate averages and max values.
-    // We use Promise.all to fetch stats and recent records in parallel.
-    const [aggregateStats, recentTests] = await Promise.all([
+    const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
-        _count: { _all: true },
-        _avg: { wpm: true, accuracy: true },
-        _max: { wpm: true, accuracy: true },
+        _avg: {
+          wpm: true,
+          accuracy: true,
+        },
+        _max: {
+          wpm: true,
+          accuracy: true,
+        },
+        _count: {
+          _all: true,
+        },
       }),
       prisma.testResult.findMany({
         where,
@@ -194,11 +199,11 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
     ]);
 
     const stats = {
-      averageWpm: Math.round(aggregateStats._avg.wpm || 0),
-      averageAccuracy: Math.round(aggregateStats._avg.accuracy || 0),
-      bestWpm: aggregateStats._max.wpm || 0,
-      bestAccuracy: aggregateStats._max.accuracy || 0,
-      totalTests: aggregateStats._count._all,
+      averageWpm: Math.round(aggregates._avg.wpm || 0),
+      averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
+      bestWpm: aggregates._max.wpm || 0,
+      bestAccuracy: aggregates._max.accuracy || 0,
+      totalTests: aggregates._count._all,
       recentTests,
     };
 
