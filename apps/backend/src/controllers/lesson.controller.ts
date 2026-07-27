@@ -1,17 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
+import { prisma } from '../utils/prisma';
+import { AppError } from '../middleware/error-handler';
+import { logger } from '../utils/logger';
 
 interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
   };
-  userId?: string;
 }
-import { prisma } from '../utils/prisma';
-import { AppError } from '../middleware/error-handler';
-import { logger } from '../utils/logger';
 
 type LessonWithProgress = Prisma.LessonGetPayload<{
   include: {
@@ -440,9 +439,7 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate' feature.
-    // This avoids O(N) data transfer and in-memory processing.
-    const [totalLessons, completedLessons, statsAggregation] = await Promise.all([
+    const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
@@ -456,6 +453,9 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
           bestWpm: true,
           bestAccuracy: true,
         },
+        _count: {
+          _all: true,
+        },
       }),
     ]);
 
@@ -465,10 +465,10 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
         completedLessons,
         completionPercentage:
           totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        totalStars: statsAggregation._sum.stars || 0,
+        totalStars: aggregation._sum.stars || 0,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(statsAggregation._avg.bestWpm || 0),
-        averageAccuracy: Math.round((statsAggregation._avg.bestAccuracy || 0) * 10) / 10,
+        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
+        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
       },
     });
   } catch (error) {
