@@ -320,10 +320,8 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Use optimized fetchUserMetrics helper to get all stats in parallel
     const metrics = await fetchUserMetrics(userId);
 
-    // Calculate progress for each achievement type using pre-fetched metrics
     const progress = {
       // Consistency achievements
       dedicated: Math.min((metrics.testCount / 10) * 100, 100),

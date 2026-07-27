@@ -6,6 +6,10 @@
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
 
+## 2025-05-31 - [Reducing latency by parallelizing independent user metrics queries]
+**Learning:** Endpoints that calculate multiple independent user metrics (e.g., total tests, high accuracy tests, lesson completion, best WPM) often execute these queries sequentially using `await`. This results in total latency being the sum of all individual query times. Using `Promise.all` to fetch these metrics in parallel reduces the overall latency to that of the single slowest query.
+**Action:** Identify endpoints that perform multiple sequential database counts or single-record lookups and refactor them to use `Promise.all`.
+
 ## 2025-05-24 - [Optimizing "top record per category" queries]
 **Learning:** Fetching the best record (e.g., high score) for multiple categories in a loop creates an N+1 query problem. This can be optimized in Prisma/PostgreSQL using `findMany` with the `distinct` property. When using `distinct: ['category']`, the `orderBy` must start with `category` followed by the sorting criteria (e.g., `score: 'desc'`) to ensure the correct record is picked for each distinct value in a single roundtrip.
 **Action:** Use `distinct` + `orderBy` to resolve N+1 patterns when fetching the "best" or "latest" record per category.
