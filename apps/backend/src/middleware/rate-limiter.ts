@@ -15,45 +15,14 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
-const extractPrimaryForwardedIp = (value: string): string => {
-  return value.split(',')[0]?.trim() || '';
-};
-
-const getRequestIp = (req: Request): string => {
-  const forwarded = req.headers['x-forwarded-for'];
-
-  if (typeof forwarded === 'string' && forwarded.trim().length > 0) {
-    return extractPrimaryForwardedIp(forwarded);
-  }
-
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    return extractPrimaryForwardedIp(forwarded[0] || '');
-  }
-
+export const getRequestIp = (req: Request): string => {
+  // Rely strictly on Express's secure, built-in req.ip to prevent IP spoofing
   return req.ip || req.socket.remoteAddress || 'unknown';
 };
 
-const getEmailFromBody = (req: Request): string | null => {
-  const body = req.body as { email?: unknown } | undefined;
-  const rawEmail = body?.email;
-
-  if (typeof rawEmail !== 'string') {
-    return null;
-  }
-
-  const normalized = rawEmail.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-};
-
-const getAuthRateLimitKey = (req: Request): string => {
-  const email = getEmailFromBody(req);
+export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
-
-  if (email) {
-    // Prevent one noisy IP from blocking all users on shared networks.
-    return `email:${email}:ip:${ip}`;
-  }
-
+  // Strictly use IP-based identifiers to block credential stuffing and password spraying from a single source
   return `ip:${ip}`;
 };
 
