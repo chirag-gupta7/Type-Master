@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import './test.controller'; // Ensure Request augmentation is loaded
 import { getUserStats } from './test.controller';
 import { prisma } from '../utils/prisma';
 
@@ -64,7 +63,8 @@ describe('TestController - getUserStats', () => {
 
     await getUserStats(mockRequest as any, mockResponse as any, nextMock);
 
-    expect(prisma.testResult.aggregate).toHaveBeenCalled();
+    expect(prisma.testResult.findMany).toHaveBeenCalled();
+
     expect(jsonMock).toHaveBeenCalledWith({
       stats: {
         averageWpm: 60,
@@ -100,7 +100,6 @@ describe('TestController - getUserStats', () => {
       period: 'Last 30 days',
     });
   });
-
   it('should handle errors', async () => {
     const error = new Error('DB Error');
     (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);

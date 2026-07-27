@@ -171,8 +171,6 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Use database aggregation to calculate statistics instead of in-memory.
-    // This pushes the computation to the database and reduces data transfer from O(N) to O(1).
     const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
