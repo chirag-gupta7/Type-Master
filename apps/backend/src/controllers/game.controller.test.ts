@@ -8,8 +8,8 @@ jest.mock('../utils/prisma', () => ({
   prisma: {
     gameScore: {
       findMany: jest.fn(),
-      groupBy: jest.fn(),
       findFirst: jest.fn(),
+      groupBy: jest.fn(),
     },
   },
 }));
@@ -191,5 +191,13 @@ describe('GameController - getUserHighScores', () => {
         },
       ],
     });
+  });
+  it('should handle errors gracefully', async () => {
+    (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
+
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch high scores' });
   });
 });
