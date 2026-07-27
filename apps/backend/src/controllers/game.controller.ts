@@ -173,11 +173,11 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Optimization: Fetch all available game types and the user's best scores in parallel.
-    // Instead of querying the best score for each game type in a loop (N+1),
-    // we use 'distinct' with 'orderBy' to get all the user's best scores in a single query.
-    // This reduces the number of database roundtrips from 1+N to 2.
-    const [availableTypes, userBests] = await Promise.all([
+    // Optimization: Resolve N+1 query pattern by fetching all "best scores" in a single database roundtrip.
+    // Instead of querying findFirst in a loop for each game type, we use 'distinct' combined with 'orderBy'.
+    // In PostgreSQL, using 'distinct' on 'gameType' with 'orderBy' 'score desc' ensures we get the top record per category.
+    // Note: When using distinct, the orderBy must start with the distinct fields to satisfy Postgres/Prisma requirements.
+    const [availableTypes, userBestScores] = await Promise.all([
       prisma.gameScore.findMany({
         distinct: ['gameType'],
         select: { gameType: true },
@@ -185,14 +185,18 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       prisma.gameScore.findMany({
         where: { userId },
         distinct: ['gameType'],
-        orderBy: [{ gameType: 'asc' }, { score: 'desc' }],
+        orderBy: [
+          { gameType: 'asc' }, // Required to be first when using distinct on gameType
+          { score: 'desc' }, // Ensures we get the highest score
+        ],
       }),
     ]);
 
-    const bestsMap = new Map(userBests.map((b) => [b.gameType, b]));
+    // Create a map for O(1) lookup of user's best scores
+    const bestScoresMap = new Map(userBestScores.map((score) => [score.gameType, score]));
 
     const highScores = availableTypes.map(({ gameType }) => {
-      const best = bestsMap.get(gameType);
+      const best = bestScoresMap.get(gameType);
 
       return {
         gameType,
