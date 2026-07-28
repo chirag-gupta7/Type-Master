@@ -139,16 +139,19 @@ userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt] as const)
     );
 
     // Combine data
-    const achievementsWithStatus = achievements.map((achievement) => ({
-      id: achievement.id,
-      title: achievement.title,
-      description: achievement.description,
-      icon: achievement.icon,
-      points: achievement.points,
-      requirement: achievement.requirement,
-      unlocked: userAchievementMap.has(achievement.id),
-      unlockedAt: userAchievementMap.get(achievement.id)?.toISOString() || null,
-    }));
+    const achievementsWithStatus = achievements.map((achievement) => {
+      const unlockedAt = userAchievementMap.get(achievement.id);
+      return {
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon,
+        points: achievement.points,
+        requirement: achievement.requirement,
+        unlocked: !!unlockedAt,
+        unlockedAt: unlockedAt ? unlockedAt.toISOString() : null,
+      };
+    });
 
     return res.json({
       achievements: achievementsWithStatus,

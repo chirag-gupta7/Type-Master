@@ -100,6 +100,30 @@ describe('TestController - getUserStats', () => {
       period: 'Last 30 days',
     });
   });
+
+  it('should respect the days query parameter', async () => {
+    mockRequest.query = { days: '7' };
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+      _avg: { wpm: 0, accuracy: 0 },
+      _max: { wpm: 0, accuracy: 0 },
+      _count: { _all: 0 },
+    });
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getUserStats(mockRequest as any, mockResponse as any, nextMock);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        createdAt: expect.objectContaining({
+          gte: expect.any(Date),
+        }),
+      }),
+    }));
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      period: 'Last 7 days',
+    }));
+  });
+
   it('should handle errors', async () => {
     const error = new Error('DB Error');
     (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);
