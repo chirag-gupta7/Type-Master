@@ -134,8 +134,8 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
         : Promise.resolve([]),
     ]);
 
-    const userAchievementMap = new Map<string, Date>(
-userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt] as const)
+const userAchievementMap = new Map<string, Date>(
+      userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt] as const)
     );
 
     // Combine data
