@@ -6,6 +6,10 @@
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
 
+## 2026-06-01 - Offloading aggregations to the database
+**Learning:** Performing statistical calculations (sum, average) in the application layer by fetching all relevant records into memory creates a significant performance bottleneck in terms of data transfer and memory usage ($O(N)$). Using Prisma's `aggregate` feature allows these calculations to happen natively in the database, returning only the final result.
+**Action:** Replace in-memory `reduce` or `forEach` for statistics with Prisma's `aggregate` or `groupBy` functions. Always handle `null` results from empty datasets using nullish coalescing.
+
 ## 2025-05-31 - [Reducing latency by parallelizing independent user metrics queries]
 **Learning:** Endpoints that calculate multiple independent user metrics (e.g., total tests, high accuracy tests, lesson completion, best WPM) often execute these queries sequentially using `await`. This results in total latency being the sum of all individual query times. Using `Promise.all` to fetch these metrics in parallel reduces the overall latency to that of the single slowest query.
 **Action:** Identify endpoints that perform multiple sequential database counts or single-record lookups and refactor them to use `Promise.all`.

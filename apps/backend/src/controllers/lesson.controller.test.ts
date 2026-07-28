@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-import './lesson.controller'; // Ensure Request augmentation is loaded
 import { getLearningStats } from './lesson.controller';
 import { prisma } from '../utils/prisma';
 
-// Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
     lesson: {
@@ -17,7 +15,6 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
-// Mock Logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -90,5 +87,14 @@ describe('LessonController - getLearningStats', () => {
         averageAccuracy: 0,
       },
     });
+  });
+
+  it('should call next with error if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(expect.any(Error));
+    expect(jsonMock).not.toHaveBeenCalled();
   });
 });

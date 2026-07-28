@@ -439,6 +439,8 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
+// Optimization: Offload statistical calculations to the database using Prisma's aggregate.
+    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
     const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
@@ -458,6 +460,7 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
         },
       }),
     ]);
+
 
     res.json({
       stats: {
