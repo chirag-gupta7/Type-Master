@@ -171,9 +171,9 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-// Optimization: Offload statistical calculations to the database using Prisma's 'aggregate' feature.
-    // This avoids fetching all test results and calculating stats in-memory, which is O(N) in time and memory.
-    // We also parallelize the aggregate and recent tests fetch using Promise.all to minimize latency.
+// Optimization: Offload statistical calculations to the database using Prisma's 'aggregate'
+    // and parallelize it with fetching recent tests using Promise.all.
+    // This avoids loading potentially thousands of records into application memory.
     const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
