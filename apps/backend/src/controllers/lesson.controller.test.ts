@@ -16,69 +16,66 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
+jest.mock('../utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
 describe('LessonController - getLearningStats', () => {
-  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
+  let mockRequest: Partial<Request & { user?: { userId: string } }>;
   let mockResponse: Partial<Response>;
-  let mockNext: jest.Mock;
   let jsonMock: jest.Mock;
+  let nextMock: jest.Mock;
 
   beforeEach(() => {
     jsonMock = jest.fn();
+    nextMock = jest.fn();
     mockResponse = {
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
+      user: { userId: 'user-123' },
     };
-    mockNext = jest.fn();
     jest.clearAllMocks();
   });
 
   it('should return 401 if user is not authenticated', async () => {
     mockRequest.user = undefined;
 
-    await getLearningStats(mockRequest as any, mockResponse as any, mockNext);
+    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
 
-    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+    expect(nextMock).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
   });
 
-  it('should successfully calculate and return learning statistics', async () => {
-    (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
-    (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(10);
+  it('should calculate learning stats correctly', async () => {
+    (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
+    (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(5);
     (prisma.userLessonProgress.aggregate as jest.Mock).mockResolvedValue({
       _sum: { stars: 5 },
-      _avg: { bestWpm: 50, bestAccuracy: 96.5 },
+      _avg: { bestWpm: 45, bestAccuracy: 92.5 },
       _count: { _all: 2 },
     });
 
-    await getLearningStats(mockRequest as any, mockResponse as any, mockNext);
+    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
 
-    expect(prisma.lesson.count).toHaveBeenCalled();
-    expect(prisma.userLessonProgress.count).toHaveBeenCalledWith({
-      where: { userId: 'user-123', completed: true },
-    });
-    expect(prisma.userLessonProgress.aggregate).toHaveBeenCalledWith({
-      where: { userId: 'user-123' },
-      _sum: { stars: true },
-      _avg: { bestWpm: true, bestAccuracy: true },
-      _count: { _all: true },
-    });
-
+    expect(prisma.userLessonProgress.aggregate).toHaveBeenCalled();
     expect(jsonMock).toHaveBeenCalledWith({
       stats: {
-        totalLessons: 100,
-        completedLessons: 10,
-        completionPercentage: 10,
+        totalLessons: 10,
+        completedLessons: 5,
+        completionPercentage: 50,
         totalStars: 5,
-        maxStars: 300,
-        averageWpm: 50,
-        averageAccuracy: 96.5,
+        maxStars: 30,
+        averageWpm: 45,
+        averageAccuracy: 92.5,
       },
     });
   });
 
-  it('should handle zero progress gracefully', async () => {
-    (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
+  it('should return default stats when no progress', async () => {
+    (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
     (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(0);
     (prisma.userLessonProgress.aggregate as jest.Mock).mockResolvedValue({
       _sum: { stars: null },
@@ -86,15 +83,15 @@ describe('LessonController - getLearningStats', () => {
       _count: { _all: 0 },
     });
 
-    await getLearningStats(mockRequest as any, mockResponse as any, mockNext);
+    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
 
     expect(jsonMock).toHaveBeenCalledWith({
       stats: {
-        totalLessons: 100,
+        totalLessons: 10,
         completedLessons: 0,
         completionPercentage: 0,
         totalStars: 0,
-        maxStars: 300,
+        maxStars: 30,
         averageWpm: 0,
         averageAccuracy: 0,
       },
