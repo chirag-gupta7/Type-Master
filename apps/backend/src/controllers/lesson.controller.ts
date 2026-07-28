@@ -461,7 +461,6 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
       }),
     ]);
 
-
     res.json({
       stats: {
         totalLessons,

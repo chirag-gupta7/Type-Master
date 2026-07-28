@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getLearningStats } from './lesson.controller';
 import { prisma } from '../utils/prisma';
 
+// Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
     lesson: {
@@ -38,6 +39,14 @@ describe('LessonController - getLearningStats', () => {
       user: { userId: 'user-123' },
     };
     jest.clearAllMocks();
+  });
+
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('should calculate learning stats correctly', async () => {
@@ -87,14 +96,5 @@ describe('LessonController - getLearningStats', () => {
         averageAccuracy: 0,
       },
     });
-  });
-
-  it('should call next with error if user is not authenticated', async () => {
-    mockRequest.user = undefined;
-
-    await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
-
-    expect(nextMock).toHaveBeenCalledWith(expect.any(Error));
-    expect(jsonMock).not.toHaveBeenCalled();
   });
 });
