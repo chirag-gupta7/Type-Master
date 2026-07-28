@@ -173,28 +173,40 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const availableTypes = await prisma.gameScore.findMany({
-      distinct: ['gameType'],
-      select: { gameType: true },
+    // Optimization: Resolve N+1 query pattern by fetching all "best scores" in a single database roundtrip.
+    // Instead of querying findFirst in a loop for each game type, we use 'distinct' combined with 'orderBy'.
+    // In PostgreSQL, using 'distinct' on 'gameType' with 'orderBy' 'score desc' ensures we get the top record per category.
+    // Note: When using distinct, the orderBy must start with the distinct fields to satisfy Postgres/Prisma requirements.
+    const [availableTypes, userBestScores] = await Promise.all([
+      prisma.gameScore.findMany({
+        distinct: ['gameType'],
+        select: { gameType: true },
+      }),
+      prisma.gameScore.findMany({
+        where: { userId },
+        distinct: ['gameType'],
+        orderBy: [
+          { gameType: 'asc' }, // Required to be first when using distinct on gameType
+          { score: 'desc' }, // Ensures we get the highest score
+        ],
+      }),
+    ]);
+
+    // Create a map for O(1) lookup of user's best scores
+    const bestScoresMap = new Map(userBestScores.map((score) => [score.gameType, score]));
+
+    const highScores = availableTypes.map(({ gameType }) => {
+      const best = bestScoresMap.get(gameType);
+
+      return {
+        gameType,
+        score: best?.score ?? 0,
+        wpm: best?.wpm ?? null,
+        accuracy: best?.accuracy ?? null,
+        duration: best?.duration ?? null,
+        createdAt: best?.createdAt ?? null,
+      };
     });
-
-    const highScores = await Promise.all(
-      availableTypes.map(async ({ gameType }) => {
-        const best = await prisma.gameScore.findFirst({
-          where: { userId, gameType },
-          orderBy: { score: 'desc' },
-        });
-
-        return {
-          gameType,
-          score: best?.score ?? 0,
-          wpm: best?.wpm ?? null,
-          accuracy: best?.accuracy ?? null,
-          duration: best?.duration ?? null,
-          createdAt: best?.createdAt ?? null,
-        };
-      })
-    );
 
     res.json({
       success: true,
