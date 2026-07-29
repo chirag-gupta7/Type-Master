@@ -4,6 +4,13 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
+
 // Validation schemas
 const createTestResultSchema = z.object({
   wpm: z.number().min(0).max(300, 'WPM seems unrealistic'),
@@ -19,7 +26,7 @@ const createTestResultSchema = z.object({
  * @desc    Create a new test result
  * @access  Private
  */
-export const createTestResult = async (req: Request, res: Response, next: NextFunction) => {
+export const createTestResult = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -61,7 +68,7 @@ export const createTestResult = async (req: Request, res: Response, next: NextFu
  * @desc    Get all tests for authenticated user
  * @access  Private
  */
-export const getUserTests = async (req: Request, res: Response, next: NextFunction) => {
+export const getUserTests = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -116,7 +123,7 @@ export const getUserTests = async (req: Request, res: Response, next: NextFuncti
  * @desc    Get specific test by ID
  * @access  Private
  */
-export const getTestById = async (req: Request, res: Response, next: NextFunction) => {
+export const getTestById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -147,7 +154,7 @@ export const getTestById = async (req: Request, res: Response, next: NextFunctio
  * @desc    Get user statistics
  * @access  Private
  */
-export const getUserStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getUserStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -164,16 +171,18 @@ export const getUserStats = async (req: Request, res: Response, next: NextFuncti
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Offload statistical calculations to the database using Prisma's aggregate features.
-    // This reduces the data transferred from potentially thousands of records to a single small object,
-    // and calculates averages/maximums much faster than in-memory JavaScript.
-    // We also fetch only the most recent 10 tests separately for the recentTests list.
-    const [aggregateStats, recentTests] = await Promise.all([
+    const [statsResult, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
-        _avg: { wpm: true, accuracy: true },
-        _max: { wpm: true, accuracy: true },
         _count: { _all: true },
+        _avg: {
+          wpm: true,
+          accuracy: true,
+        },
+        _max: {
+          wpm: true,
+          accuracy: true,
+        },
       }),
       prisma.testResult.findMany({
         where,
@@ -188,11 +197,11 @@ export const getUserStats = async (req: Request, res: Response, next: NextFuncti
     ]);
 
     const stats = {
-      averageWpm: Math.round(aggregateStats._avg.wpm || 0),
-      averageAccuracy: Math.round(aggregateStats._avg.accuracy || 0),
-      bestWpm: aggregateStats._max.wpm || 0,
-      bestAccuracy: aggregateStats._max.accuracy || 0,
-      totalTests: aggregateStats._count._all,
+      averageWpm: Math.round(statsResult._avg.wpm || 0),
+      averageAccuracy: Math.round(statsResult._avg.accuracy || 0),
+      bestWpm: statsResult._max.wpm || 0,
+      bestAccuracy: statsResult._max.accuracy || 0,
+      totalTests: statsResult._count._all,
       recentTests,
     };
 
