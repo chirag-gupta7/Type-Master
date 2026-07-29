@@ -14,17 +14,9 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
-## 2026-06-05 - Offloading statistics to the database
-**Learning:** Performing statistical calculations (average, max, etc.) in-memory after fetching all records from the database is an anti-pattern that causes high memory usage and increased latency as the dataset grows. Prisma's `aggregate` and `count` features allow these calculations to be performed by the database engine, returning only the final results.
-**Action:** Replace in-memory array operations like `.reduce`, `Math.max(...arr)`, and `.length` with Prisma's `aggregate` (`_avg`, `_max`, `_sum`) and `count` functions for any potentially large datasets.
-
-## 2026-06-04 - Offloading statistics to the database
-**Learning:** Computing statistics like average and maximum WPM/accuracy in application memory using `findMany` and `reduce` scales poorly as user data grows. Using Prisma's `aggregate` feature offloads this work to the database, which is more efficient for set-based operations and significantly reduces data transfer.
-**Action:** Use Prisma's `aggregate` or `groupBy` for any statistical calculations on potential large datasets. Combine these with limited `findMany` calls (e.g., for recent items) using `Promise.all` to minimize latency.
-
-## 2026-06-01 - Offloading aggregations to the database
-**Learning:** Performing statistical calculations (sum, average) in the application layer by fetching all relevant records into memory creates a significant performance bottleneck in terms of data transfer and memory usage ($O(N)$). Using Prisma's `aggregate` feature allows these calculations to happen natively in the database, returning only the final result.
-**Action:** Replace in-memory `reduce` or `forEach` for statistics with Prisma's `aggregate` or `groupBy` functions. Always handle `null` results from empty datasets using nullish coalescing.
+## 2026-06-07 - [Optimizing user statistics with database-level aggregation]
+**Learning:** Fetching all user records into application memory to calculate statistics (like average and max WPM) is a major performance anti-pattern that leads to high memory pressure and latency. Prisma's `aggregate` feature allows offloading these computations to the database, significantly improving efficiency and avoiding potential call stack issues with `Math.max(...)` on large arrays.
+**Action:** Use Prisma's `aggregate` (`_avg`, `_max`, `_count`) instead of fetching all records for statistical endpoints. Parallelize aggregation with other related queries using `Promise.all`.
 
 ## 2025-05-31 - [Reducing latency by parallelizing independent user metrics queries]
 **Learning:** Endpoints that calculate multiple independent user metrics (e.g., total tests, high accuracy tests, lesson completion, best WPM) often execute these queries sequentially using `await`. This results in total latency being the sum of all individual query times. Using `Promise.all` to fetch these metrics in parallel reduces the overall latency to that of the single slowest query.
@@ -35,5 +27,5 @@
 **Action:** Use `distinct` + `orderBy` to resolve N+1 patterns when fetching the "best" or "latest" record per category.
 
 ## 2025-05-29 - [Optimizing "Top Record Per Category" N+1 queries]
-**Learning:** Fetching the single best record across multiple categories (e.g., high scores per game type) often leads to N+1 query patterns. This can be optimized into a single database roundtrip using `prisma.model.findMany` with the `distinct` property on the category field, combined with an appropriate `orderBy` (e.g., `score: 'desc'`).
+**Learning:** Fetching the single best record across multiple categories (e.g., high scores per game type) often leads to N+1 query patterns. This can be optimized into a single database roundtrip using `prisma.model.findMany` with the `distinct` property on the category field, combined with an appropriate `orderBy` (e.g., `score: 'desc'`.
 **Action:** When you need the "winning" record for each group, use `findMany({ distinct: ['field'], orderBy: [...] })` instead of looping `findFirst`.
