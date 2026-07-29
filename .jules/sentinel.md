@@ -33,3 +33,8 @@
 **Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
+
+## 2026-07-29 - [CORS Wildcard Bypass on Vercel Preview Deployments]
+**Vulnerability:** A loose wildcard matching check (`allowed.includes('.vercel.app') && origin.endsWith('.vercel.app')`) allowed any arbitrary Vercel deployment (such as `attacker.vercel.app`) to make credentialed CORS requests to the backend.
+**Learning:** Matching `.vercel.app` wildcards opens up the CORS policy to any application hosted on the flat Vercel subdomain namespace. This allows cross-origin data extraction and CSRF-like attacks on endpoints where `credentials: true` is enabled.
+**Prevention:** Always restrict Vercel preview domain wildcards to only those matching your specific project prefix and containing standard Vercel branch or preview suffix patterns (e.g., `-git-` or 8+ character alphanumeric hashes).
