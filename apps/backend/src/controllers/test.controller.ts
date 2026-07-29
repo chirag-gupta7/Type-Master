@@ -171,9 +171,6 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Use aggregate to compute statistics in the database
-    // This avoids fetching all records into memory, reducing memory usage and network overhead.
-    // We parallelize the aggregation and fetching the most recent tests.
     const [statsResult, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
@@ -186,6 +183,7 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
           wpm: true,
           accuracy: true,
         },
+
       }),
       prisma.testResult.findMany({
         where,

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { getUserStats } from './test.controller';
 import { prisma } from '../utils/prisma';
 
@@ -12,7 +12,7 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
-// Mock Logger
+// Mock logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -23,14 +23,17 @@ jest.mock('../utils/logger', () => ({
 describe('TestController - getUserStats', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
-  let nextMock: jest.Mock;
+  let mockNext: NextFunction;
   let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
 
   beforeEach(() => {
     jsonMock = jest.fn();
-    nextMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockNext = jest.fn();
     mockResponse = {
       json: jsonMock,
+      status: statusMock,
     };
     mockRequest = {
       user: { userId: 'user-123', email: 'test@example.com' },
@@ -42,9 +45,9 @@ describe('TestController - getUserStats', () => {
   it('should return 401 if user is not authenticated', async () => {
     mockRequest.user = undefined;
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextMock);
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
-    expect(nextMock).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
   });
 
   it('should successfully fetch and format user statistics using aggregation', async () => {
@@ -62,7 +65,7 @@ describe('TestController - getUserStats', () => {
     (prisma.testResult.aggregate as jest.Mock).mockResolvedValue(mockStatsResult);
     (prisma.testResult.findMany as jest.Mock).mockResolvedValue(mockRecentTests);
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextMock);
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.any(Object),
@@ -98,7 +101,7 @@ describe('TestController - getUserStats', () => {
     (prisma.testResult.aggregate as jest.Mock).mockResolvedValue(mockStatsResult);
     (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextMock);
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
       stats: {
@@ -121,7 +124,7 @@ describe('TestController - getUserStats', () => {
     });
     (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 
-    await getUserStats(mockRequest as any, mockResponse as any, nextMock);
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
 
     expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
@@ -139,8 +142,8 @@ describe('TestController - getUserStats', () => {
     const error = new Error('DB Error');
     (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);
 
-    await getUserStats(mockRequest as any, mockResponse as any, nextMock);
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
 
-    expect(nextMock).toHaveBeenCalledWith(error);
+    expect(mockNext).toHaveBeenCalledWith(error);
   });
 });
