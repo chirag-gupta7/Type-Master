@@ -33,7 +33,7 @@ describe('TestController - getUserStats', () => {
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123' },
+      user: { userId: 'user-123', email: 'test@example.com' },
       query: { days: '30' },
     };
     jest.clearAllMocks();
