@@ -12,7 +12,7 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
-// Mock logger
+// Mock Logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -33,9 +33,9 @@ describe('TestController - getUserStats', () => {
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
-      query: {},
-    } as unknown as Request;
+      user: { userId: 'user-123' },
+      query: { days: '30' },
+    };
     jest.clearAllMocks();
   });
 
@@ -79,7 +79,7 @@ describe('TestController - getUserStats', () => {
     expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
       stats: {
         averageWpm: 70,
-        averageAccuracy: 98, // Math.round(97.5)
+        averageAccuracy: 98,
         bestWpm: 80,
         bestAccuracy: 100,
         totalTests: 2,
@@ -110,5 +110,37 @@ describe('TestController - getUserStats', () => {
         recentTests: [],
       },
     }));
+  });
+
+  it('should respect the days query parameter', async () => {
+    mockRequest.query = { days: '7' };
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+      _avg: { wpm: 0, accuracy: 0 },
+      _max: { wpm: 0, accuracy: 0 },
+      _count: { _all: 0 },
+    });
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getUserStats(mockRequest as any, mockResponse as any, nextMock);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        createdAt: expect.objectContaining({
+          gte: expect.any(Date),
+        }),
+      }),
+    }));
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      period: 'Last 7 days',
+    }));
+  });
+
+  it('should handle errors', async () => {
+    const error = new Error('DB Error');
+    (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);
+
+    await getUserStats(mockRequest as any, mockResponse as any, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(error);
   });
 });
