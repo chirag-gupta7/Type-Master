@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
 // Validation schemas
 const logMistakeSchema = z.object({
   lessonId: z.string().uuid('Invalid lesson ID'),
@@ -21,7 +25,7 @@ const logMistakeSchema = z.object({
  * Log typing mistakes from a lesson attempt
  * POST /api/v1/mistakes/log
  */
-export const logMistakes = async (req: Request, res: Response): Promise<void> => {
+export const logMistakes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { lessonId, mistakes } = logMistakeSchema.parse(req.body);
     const userId = req.userId;
@@ -92,7 +96,7 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
  * Get weak key analysis for a user
  * GET /api/v1/mistakes/analysis/:userId
  */
-export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<void> => {
+export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
@@ -109,37 +113,42 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Get user's weak keys, sorted by error count
-    const weakKeys = await prisma.userWeakKeys.findMany({
-      where: { userId },
-      orderBy: { errorCount: 'desc' },
-      take: limit,
-    });
-
-    // Get finger-specific error patterns
-    const fingerErrors = await prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
-      SELECT 
-        "fingerUsed",
-        COUNT(*) as count
-      FROM "typing_mistakes"
-      WHERE "userId" = ${userId}
-        AND "fingerUsed" IS NOT NULL
-      GROUP BY "fingerUsed"
-      ORDER BY count DESC
-    `;
-
-    // Get recent mistakes for context
-    const recentMistakes = await prisma.typingMistake.findMany({
-      where: { userId },
-      orderBy: { timestamp: 'desc' },
-      take: 20,
-      select: {
-        keyPressed: true,
-        keyExpected: true,
-        fingerUsed: true,
-        timestamp: true,
-      },
-    });
+    /*
+     * OPTIMIZATION: Concurrently execute three independent database queries using Promise.all.
+     * Before: Sequential await calls (Time Complexity: Sum of individual queries, O(3 * DB_Query))
+     * After: Parallel concurrent execution (Time Complexity: Max of individual queries, O(1 * Slowest_DB_Query))
+     */
+    const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
+      // 1. Get user's weak keys, sorted by error count
+      prisma.userWeakKeys.findMany({
+        where: { userId },
+        orderBy: { errorCount: 'desc' },
+        take: limit,
+      }),
+      // 2. Get finger-specific error patterns
+      prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
+        SELECT
+          "fingerUsed",
+          COUNT(*) as count
+        FROM "typing_mistakes"
+        WHERE "userId" = ${userId}
+          AND "fingerUsed" IS NOT NULL
+        GROUP BY "fingerUsed"
+        ORDER BY count DESC
+      `,
+      // 3. Get recent mistakes for context
+      prisma.typingMistake.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' },
+        take: 20,
+        select: {
+          keyPressed: true,
+          keyExpected: true,
+          fingerUsed: true,
+          timestamp: true,
+        },
+      }),
+    ]);
 
     logger.info(`Retrieved weak key analysis for user: ${userId}`);
 
@@ -166,7 +175,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
  * Generate targeted practice text based on weak keys
  * GET /api/v1/mistakes/practice/:userId
  */
-export const generatePracticeText = async (req: Request, res: Response): Promise<void> => {
+export const generatePracticeText = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;

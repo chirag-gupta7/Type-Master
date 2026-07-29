@@ -36,7 +36,7 @@ describe('LessonController - getLearningStats', () => {
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123' },
+      user: { userId: 'user-123', email: 'user@example.com' },
     };
     jest.clearAllMocks();
   });

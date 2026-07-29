@@ -1,3 +1,7 @@
+## 2026-06-10 - Parallelizing weak key analysis fetches
+**Learning:** Sequential database queries on independent datasets are a major cause of server-side latency. Combining these queries into a single concurrent batch with `Promise.all` allows the database engine to utilize parallelism, significantly reducing endpoint response time.
+**Action:** Identify independent `findMany` or `$queryRaw` queries within controllers and parallelize them with `Promise.all`.
+
 ## 2026-06-02 - Database-level aggregation for user statistics
 **Learning:** Fetching an entire history of records to calculate statistics (averages, maximums) in-memory is inefficient and doesn't scale. Using database aggregation (e.g., Prisma's `aggregate`) reduces network traffic and server memory usage from O(N) to O(1).
 **Action:** Offload statistical calculations to the database using Prisma's `aggregate` or `groupBy` features. Parallelize these with any other required fetches using `Promise.all`.
