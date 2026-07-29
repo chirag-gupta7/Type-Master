@@ -167,13 +167,13 @@ export function Navbar() {
                     size="icon"
                     onClick={toggleTheme}
                     className="ml-2"
-                    aria-label="Toggle theme"
+                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
                     {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Toggle {theme === 'dark' ? 'light' : 'dark'} mode</p>
+                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -182,18 +182,35 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             {mounted && (
-              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                  >
+                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
+                </TooltipContent>
+              </Tooltip>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  aria-label="Toggle menu"
+                >
+                  {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{mobileMenuOpen ? 'Close menu' : 'Open menu'}</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
