@@ -21,71 +21,89 @@ jest.mock('../utils/logger', () => ({
 }));
 
 describe('TestController - getUserStats', () => {
-  let mockRequest: any;
-  let mockResponse: any;
-  const nextFunction: NextFunction = jest.fn();
+  let mockRequest: Partial<Request>;
+  let mockResponse: Partial<Response>;
+  let mockNext: NextFunction;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
 
   beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockNext = jest.fn();
     mockResponse = {
-      json: jest.fn(),
-      status: jest.fn().mockReturnThis(),
+      json: jsonMock,
+      status: statusMock,
     };
     mockRequest = {
-      user: { userId: 'user-123' },
-      query: {},
+      user: { userId: 'user-123', email: 'test@example.com' },
+      query: { days: '30' },
     };
     jest.clearAllMocks();
   });
 
-  it('should successfully fetch and calculate user stats', async () => {
-    const mockAggregate = {
-      _avg: { wpm: 70, accuracy: 95 },
-      _max: { wpm: 80, accuracy: 100 },
-      _count: { _all: 3 },
-    };
-    const mockRecentTests = [
-      { wpm: 60, accuracy: 95, createdAt: new Date() },
-      { wpm: 80, accuracy: 90, createdAt: new Date() },
-      { wpm: 70, accuracy: 100, createdAt: new Date() },
-    ];
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
 
-    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue(mockAggregate);
-    (prisma.testResult.findMany as jest.Mock).mockResolvedValue(mockRecentTests);
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextFunction);
-
-    expect(prisma.testResult.aggregate).toHaveBeenCalled();
-    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-      })
-    );
-
-    expect(mockResponse.json).toHaveBeenCalledWith({
-      stats: {
-        averageWpm: 70,
-        averageAccuracy: 95,
-        bestWpm: 80,
-        bestAccuracy: 100,
-        totalTests: 3,
-        recentTests: mockRecentTests,
-      },
-      period: 'Last 30 days',
-    });
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
   });
 
-  it('should handle zero tests', async () => {
-    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+  it('should successfully fetch and format user statistics using aggregation', async () => {
+    const mockRecentTests = [
+      { wpm: 80, accuracy: 100, createdAt: new Date() },
+      { wpm: 60, accuracy: 95, createdAt: new Date() },
+    ];
+
+    const mockStatsResult = {
+      _count: { _all: 2 },
+      _avg: { wpm: 70, accuracy: 97.5 },
+      _max: { wpm: 80, accuracy: 100 },
+    };
+
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue(mockStatsResult);
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue(mockRecentTests);
+
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.any(Object),
+      _count: { _all: true },
+      _avg: { wpm: true, accuracy: true },
+      _max: { wpm: true, accuracy: true },
+    }));
+
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    }));
+
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      stats: {
+        averageWpm: 70,
+        averageAccuracy: 98,
+        bestWpm: 80,
+        bestAccuracy: 100,
+        totalTests: 2,
+        recentTests: mockRecentTests,
+      },
+    }));
+  });
+
+  it('should handle zero tests correctly with aggregation', async () => {
+    const mockStatsResult = {
+      _count: { _all: 0 },
       _avg: { wpm: null, accuracy: null },
       _max: { wpm: null, accuracy: null },
-      _count: { _all: 0 },
-    });
+    };
+
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue(mockStatsResult);
     (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextFunction);
+    await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
-    expect(mockResponse.json).toHaveBeenCalledWith({
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
       stats: {
         averageWpm: 0,
         averageAccuracy: 0,
@@ -94,16 +112,38 @@ describe('TestController - getUserStats', () => {
         totalTests: 0,
         recentTests: [],
       },
-      period: 'Last 30 days',
-    });
+    }));
   });
 
-  it('should call next with error if something fails', async () => {
+  it('should respect the days query parameter', async () => {
+    mockRequest.query = { days: '7' };
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+      _avg: { wpm: 0, accuracy: 0 },
+      _max: { wpm: 0, accuracy: 0 },
+      _count: { _all: 0 },
+    });
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        createdAt: expect.objectContaining({
+          gte: expect.any(Date),
+        }),
+      }),
+    }));
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      period: 'Last 7 days',
+    }));
+  });
+
+  it('should handle errors', async () => {
     const error = new Error('DB Error');
-    (prisma.testResult.aggregate as jest.Mock).mockRejectedValue(error);
+    (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);
 
-    await getUserStats(mockRequest as Request, mockResponse as Response, nextFunction);
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
 
-    expect(nextFunction).toHaveBeenCalledWith(error);
+    expect(mockNext).toHaveBeenCalledWith(error);
   });
 });
