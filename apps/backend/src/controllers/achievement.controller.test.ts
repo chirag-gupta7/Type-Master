@@ -113,6 +113,7 @@ describe('AchievementController', () => {
         _count: { _all: 5 },
       });
       (prisma.testResult.count as jest.Mock).mockResolvedValue(2);
+      (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
       (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
       (prisma.testResult.findMany as jest.Mock).mockResolvedValue([

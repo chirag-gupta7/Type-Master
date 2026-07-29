@@ -170,7 +170,6 @@ describe('GameController - getUserHighScores', () => {
       duration: 60,
       createdAt: new Date('2023-01-02'),
     };
-    };
 
     (prisma.gameScore.findMany as jest.Mock)
       .mockResolvedValueOnce(mockAvailableTypes)

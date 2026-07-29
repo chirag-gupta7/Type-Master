@@ -183,7 +183,6 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
           wpm: true,
           accuracy: true,
         },
-
       }),
       prisma.testResult.findMany({
         where,
