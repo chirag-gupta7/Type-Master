@@ -171,10 +171,9 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    const [statsResult, recentTests] = await Promise.all([
+    const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
-        _count: { _all: true },
         _avg: {
           wpm: true,
           accuracy: true,
@@ -182,6 +181,9 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
         _max: {
           wpm: true,
           accuracy: true,
+        },
+        _count: {
+          _all: true,
         },
       }),
       prisma.testResult.findMany({
@@ -196,17 +198,15 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       }),
     ]);
 
-    const stats = {
-      averageWpm: Math.round(statsResult._avg.wpm || 0),
-      averageAccuracy: Math.round(statsResult._avg.accuracy || 0),
-      bestWpm: statsResult._max.wpm || 0,
-      bestAccuracy: statsResult._max.accuracy || 0,
-      totalTests: statsResult._count._all,
-      recentTests,
-    };
-
     res.json({
-      stats,
+      stats: {
+        averageWpm: Math.round(aggregates._avg.wpm || 0),
+        averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
+        bestWpm: aggregates._max.wpm || 0,
+        bestAccuracy: aggregates._max.accuracy || 0,
+        totalTests: aggregates._count._all,
+        recentTests,
+      },
       period: `Last ${daysNum} days`,
     });
   } catch (error) {

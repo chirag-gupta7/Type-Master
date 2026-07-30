@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2026-06-13 - [Offloading statistics aggregation to DB]
+**Learning:** Fetching full datasets to calculate summary statistics in Node.js memory is a major bottleneck as the database grows. Prisma's `aggregate` features allow offloading these calculations to the database engine. When refactoring, always remove the now-obsolete in-memory calculation helpers to avoid 'unused variable' TypeScript errors (TS6133).
+**Action:** Use `prisma.model.aggregate` for summary statistics and parallelize it with other data fetches (like recent history) using `Promise.all`.
+
 ## 2025-06-12 - [Optimizing User Statistics with DB Aggregation]
 **Learning:** Fetching all historical records (e.g., test results) for a user to calculate summary statistics (average, max, total) in memory leads to O(N) memory and bandwidth usage, which scales poorly as user activity grows. Prisma's `aggregate` feature allows these calculations to be performed at the database layer, returning only the final results. Combining this with a limited `findMany` (e.g., `take: 10`) for "recent history" provides a complete and efficient stats view.
 **Action:** When creating summary or dashboard endpoints, always prefer Prisma `aggregate` or `groupBy` over in-memory calculations for historical data.
