@@ -138,6 +138,33 @@ describe('TestController - getUserStats', () => {
     }));
   });
 
+  it('should filter by duration if provided', async () => {
+    mockRequest.query = { duration: '60', days: '30' };
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+      _avg: { wpm: 70, accuracy: 95 },
+      _max: { wpm: 80, accuracy: 98 },
+      _count: { _all: 2 },
+    });
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          duration: 60,
+        }),
+      })
+    );
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          duration: 60,
+        }),
+      })
+    );
+  });
+
   it('should handle errors', async () => {
     const error = new Error('DB Error');
     (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);
