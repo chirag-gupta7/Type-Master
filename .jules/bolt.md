@@ -1,3 +1,7 @@
+## 2026-07-30 - Parallelizing Independent Database Queries in getWeakKeyAnalysis
+**Learning:** Sequential await operations on multiple independent database queries (such as findMany and $queryRaw) cause latency to be the sum of all individual query times. Using Promise.all executes these queries concurrently, dropping the response latency down to that of the slowest single query.
+**Action:** Always inspect controllers for multiple independent await statements on Prisma queries and wrap them in Promise.all to achieve concurrency.
+
 ## 2026-06-02 - Database-level aggregation for user statistics
 **Learning:** Fetching an entire history of records to calculate statistics (averages, maximums) in-memory is inefficient and doesn't scale. Using database aggregation (e.g., Prisma's `aggregate`) reduces network traffic and server memory usage from O(N) to O(1).
 **Action:** Offload statistical calculations to the database using Prisma's `aggregate` or `groupBy` features. Parallelize these with any other required fetches using `Promise.all`.
