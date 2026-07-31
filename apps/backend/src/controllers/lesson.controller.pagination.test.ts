@@ -1,8 +1,4 @@
-import {
-  getFairPageBounds,
-  getPageForIndex,
-  getPracticeSectionIds,
-} from './lesson.controller';
+import { getFairPageBounds, getPageForIndex, getPracticeSectionIds } from './lesson.controller';
 
 const PAGE_COUNT = 5;
 
