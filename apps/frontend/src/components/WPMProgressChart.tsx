@@ -73,9 +73,7 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
   // Optimization: Memoize and precompute derived chart data (O(N²) -> O(N))
   // Combine all data points by date
   const allDates = useMemo(() => {
-    return Array.from(
-      new Set(data.flatMap((lesson) => lesson.data.map((d) => d.date)))
-    ).sort();
+    return Array.from(new Set(data.flatMap((lesson) => lesson.data.map((d) => d.date)))).sort();
   }, [data]);
 
   // Create chart data with all lessons using O(1) map lookups instead of O(N) array finds
@@ -83,11 +81,11 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
     const lessonDataMaps = new Map<string, Map<string, number>>();
 
     // Pre-compute O(1) lookups for each lesson's date-to-wpm mapping
-    data.forEach(lesson => {
+    data.forEach((lesson) => {
       if (selectedLessons.includes(lesson.lessonId)) {
-         const dateMap = new Map<string, number>();
-         lesson.data.forEach(d => dateMap.set(d.date, d.wpm));
-         lessonDataMaps.set(lesson.lessonTitle, dateMap);
+        const dateMap = new Map<string, number>();
+        lesson.data.forEach((d) => dateMap.set(d.date, d.wpm));
+        lessonDataMaps.set(lesson.lessonTitle, dateMap);
       }
     });
 
@@ -113,7 +111,7 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
   };
 
   const selectedLessonData = useMemo(() => {
-     return data.filter((l) => selectedLessons.includes(l.lessonId));
+    return data.filter((l) => selectedLessons.includes(l.lessonId));
   }, [data, selectedLessons]);
 
   return (

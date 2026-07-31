@@ -67,28 +67,34 @@ describe('TestController - getUserStats', () => {
 
     await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
-    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.any(Object),
-      _count: { _all: true },
-      _avg: { wpm: true, accuracy: true },
-      _max: { wpm: true, accuracy: true },
-    }));
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.any(Object),
+        _count: { _all: true },
+        _avg: { wpm: true, accuracy: true },
+        _max: { wpm: true, accuracy: true },
+      })
+    );
 
-    expect(prisma.testResult.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-    }));
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      })
+    );
 
-    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
-      stats: {
-        averageWpm: 70,
-        averageAccuracy: 98,
-        bestWpm: 80,
-        bestAccuracy: 100,
-        totalTests: 2,
-        recentTests: mockRecentTests,
-      },
-    }));
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stats: {
+          averageWpm: 70,
+          averageAccuracy: 98,
+          bestWpm: 80,
+          bestAccuracy: 100,
+          totalTests: 2,
+          recentTests: mockRecentTests,
+        },
+      })
+    );
   });
 
   it('should handle zero tests correctly with aggregation', async () => {
@@ -103,16 +109,18 @@ describe('TestController - getUserStats', () => {
 
     await getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
-    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
-      stats: {
-        averageWpm: 0,
-        averageAccuracy: 0,
-        bestWpm: 0,
-        bestAccuracy: 0,
-        totalTests: 0,
-        recentTests: [],
-      },
-    }));
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stats: {
+          averageWpm: 0,
+          averageAccuracy: 0,
+          bestWpm: 0,
+          bestAccuracy: 0,
+          totalTests: 0,
+          recentTests: [],
+        },
+      })
+    );
   });
 
   it('should respect the days query parameter', async () => {
@@ -126,16 +134,20 @@ describe('TestController - getUserStats', () => {
 
     await getUserStats(mockRequest as any, mockResponse as any, mockNext);
 
-    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        createdAt: expect.objectContaining({
-          gte: expect.any(Date),
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: expect.objectContaining({
+            gte: expect.any(Date),
+          }),
         }),
-      }),
-    }));
-    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
-      period: 'Last 7 days',
-    }));
+      })
+    );
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        period: 'Last 7 days',
+      })
+    );
   });
 
   it('should filter by duration if provided', async () => {
