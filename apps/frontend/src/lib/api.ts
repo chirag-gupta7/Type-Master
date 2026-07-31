@@ -608,6 +608,8 @@ export const lessonAPI = {
         minAccuracy: number;
         exerciseType: string;
         content: string;
+        section: number;
+        isCheckpoint: boolean;
         userProgress?: Array<{
           completed: boolean;
           bestWpm: number;

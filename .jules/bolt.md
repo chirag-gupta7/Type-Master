@@ -1,3 +1,7 @@
+## 2026-06-02 - Database-level aggregation for user statistics
+**Learning:** Fetching an entire history of records to calculate statistics (averages, maximums) in-memory is inefficient and doesn't scale. Using database aggregation (e.g., Prisma's `aggregate`) reduces network traffic and server memory usage from O(N) to O(1).
+**Action:** Offload statistical calculations to the database using Prisma's `aggregate` or `groupBy` features. Parallelize these with any other required fetches using `Promise.all`.
+
 ## 2025-05-22 - [Optimizing N+1 queries in statistics endpoints]
 **Learning:** Statistics endpoints that iterate over categories (like game types) to perform multiple database queries per category (e.g., count, max, average) create a significant performance bottleneck (N+1 query problem). This can be optimized using Prisma's `groupBy` and aggregate features (`_count`, `_max`, `_avg`) to fetch all required data in a single database roundtrip.
 **Action:** Always check for loops containing database queries in controller logic. Prefer bulk data retrieval and in-memory mapping over sequential per-category queries.
@@ -13,3 +17,7 @@
 ## 2026-06-23 - Eliminating redundant historical data fetches
 **Learning:** Complex visualization endpoints often fetch the same underlying data multiple times (e.g., fetching all lessons with progress AND then fetching lesson history separately). Since progress records often represent a summary of history, derived metrics for heatmaps and progress charts can be computed in-memory from a single comprehensive database fetch. This preserves the API contract while drastically reducing total query count and sequential roundtrips.
 **Action:** Before adding a new query for historical analysis, check if the data can be derived from existing parallelized fetches.
+
+## 2026-06-21 - [Parallelizing dashboard metrics fetching]
+**Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
+**Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
