@@ -14,7 +14,6 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
-## 2025-05-25 - [WPMProgressChart.tsx]
-**Bottleneck/Context:** Array maps within chart renders recalculate expensive derived states on every render. Finding a specific point inside a nested array via `.find()` within an iteration makes the operation O(N²) or O(N³), causing severe UI lag when filtering datasets or typing fast.
-**Failed Attempt/Lesson:** N/A (Direct fix identified).
-**Action Pattern:** Always memoize derived arrays for charting components using `useMemo` and replace `.find()` inside mapping loops with pre-computed `Map` or `Set` lookups to reduce algorithmic complexity to O(N).
+## 2026-06-21 - [Parallelizing dashboard metrics fetching]
+**Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
+**Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
