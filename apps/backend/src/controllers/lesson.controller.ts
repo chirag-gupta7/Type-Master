@@ -495,15 +495,18 @@ export const getProgressVisualization = async (
 
     const userId = req.user.userId;
 
-    // Optimization: Parallelize core data fetching and derive secondary metrics in-memory.
-    // This reduces the number of database queries from 4 to 2, and executes them concurrently.
-    // Before: 4 sequential/mixed queries. After: 2 parallel queries.
+    // Set time boundaries for historical data
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
+    /**
+     * OPTIMIZATION: Parallelize independent database queries and eliminate redundant fetches.
+     * Before: 4 sequential/mixed queries. After: 2 parallel queries.
+     * We derive lesson history and activity in-memory from the comprehensive lessonsWithProgress fetch.
+     */
     const [lessonsWithProgress, testActivity] = await Promise.all([
       prisma.lesson.findMany({
         orderBy: [{ level: 'asc' }, { order: 'asc' }],
@@ -568,58 +571,53 @@ export const getProgressVisualization = async (
       maxStars: stats.totalStars,
     }));
 
-    // Derive lesson history for the last 90 days in-memory
-    const lessonHistory = lessonsWithProgress
-      .filter((l) => l.userProgress[0] && l.userProgress[0].lastAttempt >= ninetyDaysAgo)
-      .map((l) => ({
-        ...l.userProgress[0]!,
-        lesson: {
-          id: l.id,
-          title: l.title,
-          level: l.level,
-        },
-      }))
-      .sort((a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime());
+    // Derive WPM history and lesson activity in-memory to avoid redundant database roundtrips
+    const wpmByLessonData: Array<{
+      lessonId: string;
+      lessonTitle: string;
+      level: number;
+      lastAttempt: Date;
+      data: Array<{ date: string; wpm: number; accuracy: number }>;
+    }> = [];
 
-    // Group WPM data by lesson
-    const wpmByLesson = lessonHistory.reduce(
-      (acc, entry) => {
-        const lessonId = entry.lesson.id;
-        if (!acc[lessonId]) {
-          acc[lessonId] = {
-            lessonId,
-            lessonTitle: entry.lesson.title,
-            level: entry.lesson.level,
-            data: [],
-          };
-        }
-        acc[lessonId].data.push({
-          date: entry.lastAttempt.toISOString().split('T')[0],
-          wpm: entry.bestWpm,
-          accuracy: entry.bestAccuracy,
+    const lessonActivityDates: Array<{ lastAttempt: Date }> = [];
+
+    lessonsWithProgress.forEach((lesson) => {
+      const progress = lesson.userProgress[0];
+      if (!progress || !progress.lastAttempt) return;
+
+      const lastAttemptDate = progress.lastAttempt;
+
+      // Track activity for heat map (last 365 days)
+      if (lastAttemptDate >= oneYearAgo) {
+        lessonActivityDates.push({ lastAttempt: lastAttemptDate });
+      }
+
+      // Track WPM history (last 90 days)
+      if (lastAttemptDate >= ninetyDaysAgo) {
+        wpmByLessonData.push({
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          level: lesson.level,
+          lastAttempt: lastAttemptDate,
+          data: [
+            {
+              date: lastAttemptDate.toISOString().split('T')[0],
+              wpm: progress.bestWpm,
+              accuracy: progress.bestAccuracy,
+            },
+          ],
         });
-        return acc;
-      },
-      {} as Record<
-        string,
-        {
-          lessonId: string;
-          lessonTitle: string;
-          level: number;
-          data: Array<{ date: string; wpm: number; accuracy: number }>;
-        }
-      >
-    );
+      }
+    });
 
-    // Derive lesson activity for the last year in-memory
-    const lessonActivity = lessonsWithProgress
-      .filter((l) => l.userProgress[0] && l.userProgress[0].lastAttempt >= oneYearAgo)
-      .map((l) => ({
-        lastAttempt: l.userProgress[0]!.lastAttempt,
-      }));
+    // Sort by lastAttempt asc to maintain consistency with the original database query order
+    const wpmByLesson = wpmByLessonData
+      .sort((a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime())
+      .map(({ lastAttempt, ...rest }) => rest);
 
     // Combine and count activities by date
-    const activityByDate = [...testActivity, ...lessonActivity].reduce(
+    const activityByDate = [...testActivity, ...lessonActivityDates].reduce(
       (acc, entry) => {
         const date =
           'createdAt' in entry

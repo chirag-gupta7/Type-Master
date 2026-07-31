@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2026-06-23 - Eliminating redundant historical data fetches
+**Learning:** Complex visualization endpoints often fetch the same underlying data multiple times (e.g., fetching all lessons with progress AND then fetching lesson history separately). Since progress records often represent a summary of history, derived metrics for heatmaps and progress charts can be computed in-memory from a single comprehensive database fetch. This preserves the API contract while drastically reducing total query count and sequential roundtrips.
+**Action:** Before adding a new query for historical analysis, check if the data can be derived from existing parallelized fetches.
+
 ## 2026-06-21 - [Parallelizing dashboard metrics fetching]
 **Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
 **Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
