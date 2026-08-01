@@ -673,7 +673,7 @@ export const getProgressVisualization = async (
 
     res.json({
       completionByLevel,
-      wpmByLesson: Object.values(wpmByLesson),
+      wpmByLesson,
       practiceFrequency,
       skillTree,
     });
@@ -953,17 +953,17 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
 
     const userId = req.user.userId;
 
-    // Get user's latest assessment
-    const assessment = await prisma.userSkillAssessment.findFirst({
-      where: { userId },
-      orderBy: { assessmentDate: 'desc' },
-    });
-
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
+    // Optimization: Parallelize independent assessment and progress lookups
+    const [assessment, completedProgress] = await Promise.all([
+      prisma.userSkillAssessment.findFirst({
+        where: { userId },
+        orderBy: { assessmentDate: 'desc' },
+      }),
+      prisma.userLessonProgress.findMany({
+        where: { userId, completed: true },
+        select: { lessonId: true },
+      }),
+    ]);
 
     const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
 
