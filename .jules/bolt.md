@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2026-06-24 - [Prisma Aggregation Consolidation]
+**Learning:** Multiple separate database calls for different aggregates (count, sum, max) on the same table with identical filters can be consolidated into a single Prisma `aggregate` call. This reduces the number of database round-trips from N to 1, further lowering latency and database overhead.
+**Action:** Always look for opportunities to merge separate `count`, `aggregate`, or `groupBy` calls on the same model and filters into a single consolidated aggregation query.
+
 ## 2026-06-23 - Eliminating redundant historical data fetches
 **Learning:** Complex visualization endpoints often fetch the same underlying data multiple times (e.g., fetching all lessons with progress AND then fetching lesson history separately). Since progress records often represent a summary of history, derived metrics for heatmaps and progress charts can be computed in-memory from a single comprehensive database fetch. This preserves the API contract while drastically reducing total query count and sequential roundtrips.
 **Action:** Before adding a new query for historical analysis, check if the data can be derived from existing parallelized fetches.

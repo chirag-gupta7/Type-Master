@@ -258,9 +258,10 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     }
 
     // Optimization: Parallelize independent aggregate and list queries
-    const [totalAchievements, totalPointsAgg, userAchievements, recentUnlocks] = await Promise.all([
-      prisma.achievement.count(),
+    // Further optimization: Consolidate redundant aggregate queries into a single call
+    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
       prisma.achievement.aggregate({
+        _count: { _all: true },
         _sum: { points: true },
       }),
       prisma.userAchievement.findMany({
@@ -283,7 +284,8 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       }),
     ]);
 
-    const totalPoints = totalPointsAgg._sum.points || 0;
+    const totalAchievements = achievementAggregates._count._all;
+    const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
 
