@@ -14,6 +14,9 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2025-06-27 - [Optimizing O(N²) loop in skill tree construction]
+**Learning:** Nested array operations like `.filter()`, `.find()`, and `.map()` inside an outer `.map()` loop create a quadratic O(N²) complexity bottleneck. This is especially impactful in data visualization endpoints that process large sets of related records (e.g., lessons and their prerequisites). Using Map-based indexing transforms these operations into O(N) by providing constant-time lookups for related data.
+**Action:** Always audit loops that perform sub-lookups on the same or related datasets. Pre-calculate indices or Maps to ensure linear time complexity.
 ## 2025-06-05 - [In-memory derivation from joined datasets]
 **Learning:** For endpoints like progress dashboards that fetch a comprehensive dataset (e.g., all lessons with user progress), subsequent queries for historical windows or activity metrics can be completely eliminated. Deriving these in-memory from the initial dataset is faster than additional database roundtrips, provided the base data is already in memory.
 **Action:** Always check if a new database query is redundant given existing datasets in the controller's scope. Prioritize in-memory filtering and mapping over sequential lookups.
