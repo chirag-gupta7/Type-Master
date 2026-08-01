@@ -5,6 +5,13 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
+
 type LessonWithProgress = Prisma.LessonGetPayload<{
   include: {
     userProgress: true;
@@ -168,7 +175,7 @@ const buildLessonsWithUnlockState = (
  * @desc    Get all lessons with user progress
  * @access  Public (shows progress if authenticated)
  */
-export const getAllLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -201,7 +208,7 @@ export const getAllLessons = async (req: Request, res: Response, next: NextFunct
  * @desc    Get single lesson with details
  * @access  Public
  */
-export const getLessonById = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
@@ -268,7 +275,7 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
  * @access  Private
  */
 export const saveLessonProgress = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -424,7 +431,7 @@ export const saveLessonProgress = async (
  * @desc    Get user's overall learning statistics
  * @access  Private
  */
-export const getLearningStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -432,41 +439,38 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    // Optimization: Consolidate queries by fetching all progress and filtering in-memory.
-    // This reduces database roundtrips from 3 to 2.
-    const [totalLessons, allProgress] = await Promise.all([
+    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
+    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
+    const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.findMany({
+      prisma.userLessonProgress.count({
+        where: { userId, completed: true },
+      }),
+      prisma.userLessonProgress.aggregate({
         where: { userId },
-        select: {
-          completed: true,
+        _sum: {
           stars: true,
+        },
+        _avg: {
           bestWpm: true,
           bestAccuracy: true,
         },
+        _count: {
+          _all: true,
+        },
       }),
     ]);
-
-    const completedLessons = allProgress.filter((p) => p.completed).length;
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
 
     res.json({
       stats: {
         totalLessons,
         completedLessons,
-        completionPercentage: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        totalStars,
+        completionPercentage:
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        totalStars: aggregation._sum.stars || 0,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(avgWpm),
-        averageAccuracy: Math.round(avgAccuracy * 10) / 10,
+        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
+        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
       },
     });
   } catch (error) {
@@ -479,7 +483,11 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
  * @desc    Get detailed progress data for visualization (charts, heatmap, skill tree)
  * @access  Private
  */
-export const getProgressVisualization = async (req: Request, res: Response, next: NextFunction) => {
+export const getProgressVisualization = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -653,7 +661,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
  * @desc    Get section summaries for a given practice type
  * @access  Public
  */
-export const getSectionSummaries = async (req: Request, res: Response, next: NextFunction) => {
+export const getSectionSummaries = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
     const practiceType = PRACTICE_TYPE_SCHEMA.catch('normal').parse(req.query.practiceType);
@@ -775,7 +783,7 @@ export const getSectionSummaries = async (req: Request, res: Response, next: Nex
  * @access  Public
  */
 
-export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonsBySection = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { sectionId } = req.params;
     const userId = req.user?.userId;
@@ -876,7 +884,7 @@ export const getLessonsBySection = async (req: Request, res: Response, next: Nex
  * @desc    Get all checkpoint lessons
  * @access  Public
  */
-export const getCheckpointLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getCheckpointLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -911,7 +919,7 @@ export const getCheckpointLessons = async (req: Request, res: Response, next: Ne
  * @desc    Get next recommended lesson for the user
  * @access  Private
  */
-export const getRecommendedLesson = async (req: Request, res: Response, next: NextFunction) => {
+export const getRecommendedLesson = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -919,17 +927,17 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Get user's latest assessment
-    const assessment = await prisma.userSkillAssessment.findFirst({
-      where: { userId },
-      orderBy: { assessmentDate: 'desc' },
-    });
-
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
+    // Optimization: Parallelize independent assessment and progress lookups
+    const [assessment, completedProgress] = await Promise.all([
+      prisma.userSkillAssessment.findFirst({
+        where: { userId },
+        orderBy: { assessmentDate: 'desc' },
+      }),
+      prisma.userLessonProgress.findMany({
+        where: { userId, completed: true },
+        select: { lessonId: true },
+      }),
+    ]);
 
     const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
 
@@ -979,7 +987,7 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
  * @desc    Get all sections with lessons and user progress
  * @access  Private
  */
-export const getLearningDashboard = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningDashboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
