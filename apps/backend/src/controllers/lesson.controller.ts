@@ -5,6 +5,13 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
+
 type LessonWithProgress = Prisma.LessonGetPayload<{
   include: {
     userProgress: true;
@@ -168,7 +175,7 @@ const buildLessonsWithUnlockState = (
  * @desc    Get all lessons with user progress
  * @access  Public (shows progress if authenticated)
  */
-export const getAllLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -201,7 +208,7 @@ export const getAllLessons = async (req: Request, res: Response, next: NextFunct
  * @desc    Get single lesson with details
  * @access  Public
  */
-export const getLessonById = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
@@ -268,7 +275,7 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
  * @access  Private
  */
 export const saveLessonProgress = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -424,7 +431,7 @@ export const saveLessonProgress = async (
  * @desc    Get user's overall learning statistics
  * @access  Private
  */
-export const getLearningStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -432,42 +439,38 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    // Optimization: Consolidate queries by fetching all progress and filtering in-memory
-    // Reduces database roundtrips from 3 to 2
-    const [totalLessons, allProgress] = await Promise.all([
+    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
+    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
+    const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.findMany({
+      prisma.userLessonProgress.count({
+        where: { userId, completed: true },
+      }),
+      prisma.userLessonProgress.aggregate({
         where: { userId },
-        select: {
-          completed: true,
+        _sum: {
           stars: true,
+        },
+        _avg: {
           bestWpm: true,
           bestAccuracy: true,
+        },
+        _count: {
+          _all: true,
         },
       }),
     ]);
 
-    const completedProgress = allProgress.filter((p) => p.completed).length;
-    const totalStars = allProgress.reduce((sum, p) => sum + p.stars, 0);
-    const avgWpm =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestWpm, 0) / allProgress.length
-        : 0;
-    const avgAccuracy =
-      allProgress.length > 0
-        ? allProgress.reduce((sum, p) => sum + p.bestAccuracy, 0) / allProgress.length
-        : 0;
-
     res.json({
       stats: {
         totalLessons,
-        completedLessons: completedProgress,
+        completedLessons,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
-        totalStars,
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        totalStars: aggregation._sum.stars || 0,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(avgWpm),
-        averageAccuracy: Math.round(avgAccuracy * 10) / 10,
+        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
+        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
       },
     });
   } catch (error) {
@@ -480,7 +483,11 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
  * @desc    Get detailed progress data for visualization (charts, heatmap, skill tree)
  * @access  Private
  */
-export const getProgressVisualization = async (req: Request, res: Response, next: NextFunction) => {
+export const getProgressVisualization = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -488,13 +495,18 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
-    // Optimization: Parallelize independent database queries and derive metrics in-memory
-    // Reduces sequential await points and database roundtrips
+    // Set time boundaries for historical data
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
+    /**
+     * OPTIMIZATION: Parallelize independent database queries and eliminate redundant fetches.
+     * Before: 4 sequential/mixed queries. After: 2 parallel queries.
+     * We derive lesson history and activity in-memory from the comprehensive lessonsWithProgress fetch.
+     */
     const [lessonsWithProgress, testActivity] = await Promise.all([
       prisma.lesson.findMany({
         orderBy: [{ level: 'asc' }, { order: 'asc' }],
@@ -559,53 +571,53 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Optimization: Derive historical WPM and activity metrics in-memory from already fetched data
-    // Group WPM data by lesson using lessonsWithProgress
-    const wpmByLesson = lessonsWithProgress.reduce(
-      (acc, lesson) => {
-        const progress = lesson.userProgress[0];
-        if (progress && progress.lastAttempt >= ninetyDaysAgo) {
-          const lessonId = lesson.id;
-          if (!acc[lessonId]) {
-            acc[lessonId] = {
-              lessonId,
-              lessonTitle: lesson.title,
-              level: lesson.level,
-              data: [],
-              _lastAttempt: progress.lastAttempt, // Temporarily store for sorting
-            };
-          }
-          acc[lessonId].data.push({
-            date: progress.lastAttempt.toISOString().split('T')[0],
-            wpm: progress.bestWpm,
-            accuracy: progress.bestAccuracy,
-          });
-        }
-        return acc;
-      },
-      {} as Record<
-        string,
-        {
-          lessonId: string;
-          lessonTitle: string;
-          level: number;
-          data: Array<{ date: string; wpm: number; accuracy: number }>;
-          _lastAttempt: Date;
-        }
-      >
-    );
+    // Derive WPM history and lesson activity in-memory to avoid redundant database roundtrips
+    const wpmByLessonData: Array<{
+      lessonId: string;
+      lessonTitle: string;
+      level: number;
+      lastAttempt: Date;
+      data: Array<{ date: string; wpm: number; accuracy: number }>;
+    }> = [];
 
-    // Sort lessons by last attempt date to match original behavior
-    const sortedWpmByLesson = Object.values(wpmByLesson)
-      .sort((a, b) => a._lastAttempt.getTime() - b._lastAttempt.getTime())
-      .map(({ _lastAttempt, ...rest }) => rest);
+    const lessonActivityDates: Array<{ lastAttempt: Date }> = [];
 
-    // Combine and count activities by date using in-memory data
-    const lessonActivity = lessonsWithProgress
-      .map((l) => l.userProgress[0])
-      .filter((p): p is NonNullable<typeof p> => !!p && p.lastAttempt >= oneYearAgo);
+    lessonsWithProgress.forEach((lesson) => {
+      const progress = lesson.userProgress[0];
+      if (!progress || !progress.lastAttempt) return;
 
-    const activityByDate = [...testActivity, ...lessonActivity].reduce(
+      const lastAttemptDate = progress.lastAttempt;
+
+      // Track activity for heat map (last 365 days)
+      if (lastAttemptDate >= oneYearAgo) {
+        lessonActivityDates.push({ lastAttempt: lastAttemptDate });
+      }
+
+      // Track WPM history (last 90 days)
+      if (lastAttemptDate >= ninetyDaysAgo) {
+        wpmByLessonData.push({
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          level: lesson.level,
+          lastAttempt: lastAttemptDate,
+          data: [
+            {
+              date: lastAttemptDate.toISOString().split('T')[0],
+              wpm: progress.bestWpm,
+              accuracy: progress.bestAccuracy,
+            },
+          ],
+        });
+      }
+    });
+
+    // Sort by lastAttempt asc to maintain consistency with the original database query order
+    const wpmByLesson = wpmByLessonData
+      .sort((a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime())
+      .map(({ lastAttempt, ...rest }) => rest);
+
+    // Combine and count activities by date
+    const activityByDate = [...testActivity, ...lessonActivityDates].reduce(
       (acc, entry) => {
         const date =
           'createdAt' in entry
@@ -661,7 +673,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     res.json({
       completionByLevel,
-      wpmByLesson: sortedWpmByLesson,
+      wpmByLesson,
       practiceFrequency,
       skillTree,
     });
@@ -675,7 +687,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
  * @desc    Get section summaries for a given practice type
  * @access  Public
  */
-export const getSectionSummaries = async (req: Request, res: Response, next: NextFunction) => {
+export const getSectionSummaries = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
     const practiceType = PRACTICE_TYPE_SCHEMA.catch('normal').parse(req.query.practiceType);
@@ -797,7 +809,7 @@ export const getSectionSummaries = async (req: Request, res: Response, next: Nex
  * @access  Public
  */
 
-export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonsBySection = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { sectionId } = req.params;
     const userId = req.user?.userId;
@@ -898,7 +910,7 @@ export const getLessonsBySection = async (req: Request, res: Response, next: Nex
  * @desc    Get all checkpoint lessons
  * @access  Public
  */
-export const getCheckpointLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getCheckpointLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -933,7 +945,7 @@ export const getCheckpointLessons = async (req: Request, res: Response, next: Ne
  * @desc    Get next recommended lesson for the user
  * @access  Private
  */
-export const getRecommendedLesson = async (req: Request, res: Response, next: NextFunction) => {
+export const getRecommendedLesson = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -1001,7 +1013,7 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
  * @desc    Get all sections with lessons and user progress
  * @access  Private
  */
-export const getLearningDashboard = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningDashboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');

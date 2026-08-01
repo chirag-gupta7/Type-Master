@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
-import { authAPI, lessonAPI, mistakeAPI } from '@/lib/api';
+import { userAPI, lessonAPI, mistakeAPI } from '@/lib/api';
 
 interface Lesson {
   id: string;
@@ -72,7 +72,7 @@ export default function EnhancedLessonPage() {
   useEffect(() => {
     async function loadUserProfile() {
       try {
-        const profile = await authAPI.getProfile();
+        const profile = await userAPI.getProfile();
         setUserId(profile.user.id);
       } catch (err) {
         console.warn('Proceeding without authenticated user profile', err);
