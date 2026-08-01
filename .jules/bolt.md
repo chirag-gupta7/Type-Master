@@ -21,3 +21,7 @@
 ## 2026-06-21 - [Parallelizing dashboard metrics fetching]
 **Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
 **Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
+
+## 2026-08-01 - Parallelizing weak key analysis fetches
+**Learning:** The `getWeakKeyAnalysis` endpoint was executing three independent database queries (finding user weak keys, querying finger error patterns via `$queryRaw`, and retrieving recent typing mistakes) sequentially. This sequentially blocks the Node event loop and accumulates latency. Parallelizing these queries using `Promise.all` reduces latency to the duration of the single slowest query.
+**Action:** Execute independent read operations concurrently via `Promise.all` to optimize backend endpoint performance.
