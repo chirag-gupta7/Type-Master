@@ -5,6 +5,13 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+  };
+}
+
 type LessonWithProgress = Prisma.LessonGetPayload<{
   include: {
     userProgress: true;
@@ -168,7 +175,7 @@ const buildLessonsWithUnlockState = (
  * @desc    Get all lessons with user progress
  * @access  Public (shows progress if authenticated)
  */
-export const getAllLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -201,7 +208,7 @@ export const getAllLessons = async (req: Request, res: Response, next: NextFunct
  * @desc    Get single lesson with details
  * @access  Public
  */
-export const getLessonById = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
@@ -268,7 +275,7 @@ export const getLessonById = async (req: Request, res: Response, next: NextFunct
  * @access  Private
  */
 export const saveLessonProgress = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -424,7 +431,7 @@ export const saveLessonProgress = async (
  * @desc    Get user's overall learning statistics
  * @access  Private
  */
-export const getLearningStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -432,45 +439,38 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
 
     const userId = req.user.userId;
 
-    // Optimization: Consolidate database queries from 3 to 2 by deriving completion count
-    // and statistics in-memory from a single findMany call.
-    const [totalLessons, allProgress] = await Promise.all([
+    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
+    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
+    const [totalLessons, completedLessons, aggregation] = await Promise.all([
       prisma.lesson.count(),
-      prisma.userLessonProgress.findMany({
+      prisma.userLessonProgress.count({
+        where: { userId, completed: true },
+      }),
+      prisma.userLessonProgress.aggregate({
         where: { userId },
-        select: {
-          completed: true,
+        _sum: {
           stars: true,
+        },
+        _avg: {
           bestWpm: true,
           bestAccuracy: true,
+        },
+        _count: {
+          _all: true,
         },
       }),
     ]);
 
-    const statsSummary = allProgress.reduce(
-      (acc, p) => {
-        if (p.completed) acc.completedCount++;
-        acc.totalStars += p.stars;
-        acc.sumWpm += p.bestWpm;
-        acc.sumAccuracy += p.bestAccuracy;
-        return acc;
-      },
-      { completedCount: 0, totalStars: 0, sumWpm: 0, sumAccuracy: 0 }
-    );
-
-    const avgWpm = allProgress.length > 0 ? statsSummary.sumWpm / allProgress.length : 0;
-    const avgAccuracy = allProgress.length > 0 ? statsSummary.sumAccuracy / allProgress.length : 0;
-
     res.json({
       stats: {
         totalLessons,
-        completedLessons: statsSummary.completedCount,
+        completedLessons,
         completionPercentage:
-          totalLessons > 0 ? Math.round((statsSummary.completedCount / totalLessons) * 100) : 0,
-        totalStars: statsSummary.totalStars,
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        totalStars: aggregation._sum.stars || 0,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(avgWpm),
-        averageAccuracy: Math.round(avgAccuracy * 10) / 10,
+        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
+        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
       },
     });
   } catch (error) {
@@ -483,7 +483,11 @@ export const getLearningStats = async (req: Request, res: Response, next: NextFu
  * @desc    Get detailed progress data for visualization (charts, heatmap, skill tree)
  * @access  Private
  */
-export const getProgressVisualization = async (req: Request, res: Response, next: NextFunction) => {
+export const getProgressVisualization = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -491,14 +495,15 @@ export const getProgressVisualization = async (req: Request, res: Response, next
 
     const userId = req.user.userId;
 
+    // Optimization: Consolidate data fetching and derivation.
+    // 1. Parallelize core independent queries (Lessons and Tests).
+    // 2. Eliminate redundant 'findMany' queries by deriving historical/activity metrics in-memory from the base dataset.
+    // 3. Optimize skill tree O(N²) construction with O(1) Map lookups.
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    // Optimization: Consolidate database queries from 4 to 2 by parallelizing and
-    // deriving historical metrics in-memory from the base lesson dataset.
     const [lessonsWithProgress, testActivity] = await Promise.all([
       prisma.lesson.findMany({
         orderBy: [{ level: 'asc' }, { order: 'asc' }],
@@ -527,68 +532,51 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       }),
     ]);
 
-    // Single pass to calculate level stats, historical WPM data, and lesson activity
-    const levelStats: Record<
-      string,
-      { total: number; completed: number; totalStars: number; earnedStars: number }
-    > = {};
+    // 1. Calculate completion by level & Derive lesson activity for heatmap & Group WPM history
+    const levelStats: Record<string, { total: number; completed: number; totalStars: number; earnedStars: number }> = {};
     const activityByDate: Record<string, number> = {};
-    const wpmByLessonMap = new Map<
-      string,
-      {
-        lessonId: string;
-        lessonTitle: string;
-        level: number;
-        data: Array<{ date: string; wpm: number; accuracy: number }>;
-        lastAttempt: Date;
-      }
-    >();
+    const wpmByLessonMap: Record<string, { lessonId: string; lessonTitle: string; level: number; data: Array<{ date: string; wpm: number; accuracy: number }> }> = {};
 
-    // Optimization: Use Map-based lookup and pre-grouping to reduce skill tree complexity from O(N^2) to O(N)
-    const lessonMap = new Map(lessonsWithProgress.map((l) => [l.id, l]));
-    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
-
+    // Single pass through lessons to derive multiple metrics (O(N))
     for (const lesson of lessonsWithProgress) {
-      // 1. Level stats
+      // Level Stats
       const levelKey = `level${lesson.level}`;
       if (!levelStats[levelKey]) {
         levelStats[levelKey] = { total: 0, completed: 0, totalStars: 0, earnedStars: 0 };
       }
       levelStats[levelKey].total++;
-
       const progress = lesson.userProgress[0];
-      if (progress) {
-        if (progress.completed) levelStats[levelKey].completed++;
-        levelStats[levelKey].totalStars += 3;
-        levelStats[levelKey].earnedStars += progress.stars;
+      if (progress?.completed) {
+        levelStats[levelKey].completed++;
+      }
+      levelStats[levelKey].totalStars += 3;
+      levelStats[levelKey].earnedStars += progress?.stars || 0;
 
-        // 2. WPM History (last 90 days)
-        if (progress.lastAttempt >= ninetyDaysAgo) {
-          wpmByLessonMap.set(lesson.id, {
-            lessonId: lesson.id,
-            lessonTitle: lesson.title,
-            level: lesson.level,
-            lastAttempt: progress.lastAttempt,
-            data: [
-              {
-                date: progress.lastAttempt.toISOString().split('T')[0],
-                wpm: progress.bestWpm,
-                accuracy: progress.bestAccuracy,
-              },
-            ],
-          });
-        }
-
-        // 3. Lesson Activity (last 365 days)
+      // Practice Activity & History derivation (instead of separate queries)
+      if (progress?.lastAttempt) {
+        // Activity for heatmap (1 year)
         if (progress.lastAttempt >= oneYearAgo) {
           const date = progress.lastAttempt.toISOString().split('T')[0];
           activityByDate[date] = (activityByDate[date] || 0) + 1;
         }
-      }
 
-      // 4. Pre-group for skill tree
-      if (!lessonsByLevel.has(lesson.level)) lessonsByLevel.set(lesson.level, []);
-      lessonsByLevel.get(lesson.level)!.push(lesson);
+        // WPM history (90 days)
+        if (progress.lastAttempt >= ninetyDaysAgo) {
+          if (!wpmByLessonMap[lesson.id]) {
+            wpmByLessonMap[lesson.id] = {
+              lessonId: lesson.id,
+              lessonTitle: lesson.title,
+              level: lesson.level,
+              data: [],
+            };
+          }
+          wpmByLessonMap[lesson.id].data.push({
+            date: progress.lastAttempt.toISOString().split('T')[0],
+            wpm: progress.bestWpm,
+            accuracy: progress.bestAccuracy,
+          });
+        }
+      }
     }
 
     // Format level completion data
@@ -605,7 +593,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       maxStars: stats.totalStars,
     }));
 
-    // Add test activity to activity counts
+    // Merge test activity into activityByDate
     for (const test of testActivity) {
       const date = test.createdAt.toISOString().split('T')[0];
       activityByDate[date] = (activityByDate[date] || 0) + 1;
@@ -616,23 +604,43 @@ export const getProgressVisualization = async (req: Request, res: Response, next
       count,
     }));
 
-    // Build skill tree structure O(N)
+    // O(N) Optimization: Replace nested array scans (filter/find) with Map-based lookups
+    // for lesson completion status, level grouping, and prerequisite checking.
+    const lessonCompletionMap = new Map<string, boolean>();
+    const lessonsByLevelMap = new Map<number, typeof lessonsWithProgress>();
+
+    for (const lesson of lessonsWithProgress) {
+      lessonCompletionMap.set(lesson.id, !!lesson.userProgress[0]?.completed);
+
+      if (!lessonsByLevelMap.has(lesson.level)) {
+        lessonsByLevelMap.set(lesson.level, []);
+      }
+      lessonsByLevelMap.get(lesson.level)?.push(lesson);
+    }
+
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const levelLessons = lessonsByLevel.get(lesson.level) || [];
-
       let prerequisites: string[] = [];
+
       if (lesson.order > 1) {
-        // Find largest order < lesson.order in same level (optimized from slice(-1))
-        const prev = levelLessons.reduce((best, curr) => {
-          if (curr.order < lesson.order && (!best || curr.order > best.order)) return curr;
-          return best;
-        }, null as (typeof lessonsWithProgress)[number] | null);
-        if (prev) prerequisites = [prev.id];
+        // Prerequisite is the lesson with the largest order less than the current lesson in the same level
+        const sameLevelLessons = lessonsByLevelMap.get(lesson.level) || [];
+        const prevInLevel = sameLevelLessons
+          .filter((l) => l.order < lesson.order)
+          .sort((a, b) => b.order - a.order)[0];
+        if (prevInLevel) {
+          prerequisites = [prevInLevel.id];
+        }
       } else if (lesson.level > 1) {
-        // Last 3 from previous level
-        prerequisites = (lessonsByLevel.get(lesson.level - 1) || []).slice(-3).map((l) => l.id);
+        // Prerequisites are the last 3 lessons from the previous level
+        const prevLevelLessons = lessonsByLevelMap.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
       }
+
+      const isLocked =
+        prerequisites.length > 0
+          ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId))
+          : false;
 
       return {
         id: lesson.id,
@@ -645,22 +653,14 @@ export const getProgressVisualization = async (req: Request, res: Response, next
         stars: progress?.stars || 0,
         bestWpm: progress?.bestWpm || 0,
         attempts: progress?.attempts || 0,
-        locked:
-          prerequisites.length > 0
-            ? !prerequisites.every((preId) => {
-                const preReq = lessonMap.get(preId);
-                return preReq?.userProgress[0]?.completed;
-              })
-            : false,
+        locked: isLocked,
         prerequisites,
       };
     });
 
     res.json({
       completionByLevel,
-      wpmByLesson: Array.from(wpmByLessonMap.values()).sort(
-        (a, b) => a.lastAttempt.getTime() - b.lastAttempt.getTime()
-      ),
+      wpmByLesson: Object.values(wpmByLessonMap),
       practiceFrequency,
       skillTree,
     });
@@ -674,7 +674,7 @@ export const getProgressVisualization = async (req: Request, res: Response, next
  * @desc    Get section summaries for a given practice type
  * @access  Public
  */
-export const getSectionSummaries = async (req: Request, res: Response, next: NextFunction) => {
+export const getSectionSummaries = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
     const practiceType = PRACTICE_TYPE_SCHEMA.catch('normal').parse(req.query.practiceType);
@@ -796,7 +796,7 @@ export const getSectionSummaries = async (req: Request, res: Response, next: Nex
  * @access  Public
  */
 
-export const getLessonsBySection = async (req: Request, res: Response, next: NextFunction) => {
+export const getLessonsBySection = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { sectionId } = req.params;
     const userId = req.user?.userId;
@@ -897,7 +897,7 @@ export const getLessonsBySection = async (req: Request, res: Response, next: Nex
  * @desc    Get all checkpoint lessons
  * @access  Public
  */
-export const getCheckpointLessons = async (req: Request, res: Response, next: NextFunction) => {
+export const getCheckpointLessons = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
 
@@ -932,7 +932,7 @@ export const getCheckpointLessons = async (req: Request, res: Response, next: Ne
  * @desc    Get next recommended lesson for the user
  * @access  Private
  */
-export const getRecommendedLesson = async (req: Request, res: Response, next: NextFunction) => {
+export const getRecommendedLesson = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');
@@ -940,17 +940,17 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Get user's latest assessment
-    const assessment = await prisma.userSkillAssessment.findFirst({
-      where: { userId },
-      orderBy: { assessmentDate: 'desc' },
-    });
-
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
+    // Optimization: Parallelize independent assessment and progress lookups
+    const [assessment, completedProgress] = await Promise.all([
+      prisma.userSkillAssessment.findFirst({
+        where: { userId },
+        orderBy: { assessmentDate: 'desc' },
+      }),
+      prisma.userLessonProgress.findMany({
+        where: { userId, completed: true },
+        select: { lessonId: true },
+      }),
+    ]);
 
     const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
 
@@ -1000,7 +1000,7 @@ export const getRecommendedLesson = async (req: Request, res: Response, next: Ne
  * @desc    Get all sections with lessons and user progress
  * @access  Private
  */
-export const getLearningDashboard = async (req: Request, res: Response, next: NextFunction) => {
+export const getLearningDashboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       throw new AppError(401, 'User not authenticated');

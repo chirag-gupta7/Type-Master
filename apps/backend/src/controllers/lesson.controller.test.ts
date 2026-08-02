@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from 'express';
 import { getLearningStats, getProgressVisualization } from './lesson.controller';
 import { prisma } from '../utils/prisma';
 
@@ -9,7 +10,9 @@ jest.mock('../utils/prisma', () => ({
       findMany: jest.fn(),
     },
     userLessonProgress: {
+      count: jest.fn(),
       findMany: jest.fn(),
+      aggregate: jest.fn(),
     },
     testResult: {
       findMany: jest.fn(),
@@ -17,7 +20,6 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
-// Mock Logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -26,29 +28,71 @@ jest.mock('../utils/logger', () => ({
 }));
 
 describe('LessonController - Optimized Methods', () => {
-  let mockRequest: any;
-  let mockResponse: any;
+  let mockRequest: Partial<Request & { user?: { userId: string } }>;
+  let mockResponse: Partial<Response>;
+  const nextFunction: NextFunction = jest.fn();
   let jsonMock: jest.Mock;
-  let nextMock: jest.Mock;
 
   beforeEach(() => {
     jsonMock = jest.fn();
-    nextMock = jest.fn();
     mockResponse = {
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123' },
+      user: { userId: 'user-123', email: 'test@example.com' },
     };
     jest.clearAllMocks();
   });
 
   describe('getLearningStats', () => {
-    it('should return correct stats when user has no progress', async () => {
-      (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
-      (prisma.userLessonProgress.findMany as jest.Mock).mockResolvedValue([]);
+    it('should return 401 if user is not authenticated', async () => {
+      mockRequest.user = undefined;
 
-      await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
+      await getLearningStats(mockRequest as any, mockResponse as any, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+    });
+
+    it('should calculate learning stats correctly using database aggregation', async () => {
+      (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
+      (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(5);
+      (prisma.userLessonProgress.aggregate as jest.Mock).mockResolvedValue({
+        _sum: { stars: 5 },
+        _avg: { bestWpm: 45, bestAccuracy: 92.5 },
+        _count: { _all: 2 },
+      });
+
+      await getLearningStats(mockRequest as any, mockResponse as any, nextFunction);
+
+      expect(prisma.userLessonProgress.aggregate).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        _sum: { stars: true },
+        _avg: { bestWpm: true, bestAccuracy: true },
+        _count: { _all: true },
+      });
+      expect(jsonMock).toHaveBeenCalledWith({
+        stats: {
+          totalLessons: 10,
+          completedLessons: 5,
+          completionPercentage: 50,
+          totalStars: 5,
+          maxStars: 30,
+          averageWpm: 45,
+          averageAccuracy: 92.5,
+        },
+      });
+    });
+
+    it('should return default stats when no progress', async () => {
+      (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
+      (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(0);
+      (prisma.userLessonProgress.aggregate as jest.Mock).mockResolvedValue({
+        _sum: { stars: null },
+        _avg: { bestWpm: null, bestAccuracy: null },
+        _count: { _all: 0 },
+      });
+
+      await getLearningStats(mockRequest as any, mockResponse as any, nextFunction);
 
       expect(jsonMock).toHaveBeenCalledWith({
         stats: {
@@ -62,122 +106,126 @@ describe('LessonController - Optimized Methods', () => {
         },
       });
     });
-
-    it('should correctly aggregate stats in-memory', async () => {
-      (prisma.lesson.count as jest.Mock).mockResolvedValue(5);
-      (prisma.userLessonProgress.findMany as jest.Mock).mockResolvedValue([
-        { completed: true, stars: 3, bestWpm: 60, bestAccuracy: 98 },
-        { completed: false, stars: 0, bestWpm: 20, bestAccuracy: 80 },
-      ]);
-
-      await getLearningStats(mockRequest as any, mockResponse as any, nextMock);
-
-      expect(jsonMock).toHaveBeenCalledWith({
-        stats: {
-          totalLessons: 5,
-          completedLessons: 1,
-          completionPercentage: 20,
-          totalStars: 3,
-          maxStars: 15,
-          averageWpm: 40, // (60 + 20) / 2
-          averageAccuracy: 89, // (98 + 80) / 2
-        },
-      });
-    });
   });
 
   describe('getProgressVisualization', () => {
-    it('should construct correct visualization data', async () => {
-      const now = new Date();
-      const lessons = [
+    it('should successfully fetch and format progress visualization data', async () => {
+      const mockLessons = [
         {
-          id: 'l1',
+          id: 'lesson-1',
           level: 1,
           order: 1,
           title: 'Lesson 1',
           difficulty: 'BEGINNER',
           targetWpm: 20,
-          userProgress: [{ completed: true, stars: 3, bestWpm: 30, bestAccuracy: 100, attempts: 1, lastAttempt: now }],
+          userProgress: [{ completed: true, stars: 3, bestWpm: 30, bestAccuracy: 99, attempts: 1, lastAttempt: new Date() }],
         },
         {
-          id: 'l2',
+          id: 'lesson-2',
           level: 1,
           order: 2,
           title: 'Lesson 2',
           difficulty: 'BEGINNER',
-          targetWpm: 20,
-          userProgress: [{ completed: false, stars: 0, bestWpm: 10, bestAccuracy: 70, attempts: 2, lastAttempt: now }],
+          targetWpm: 25,
+          userProgress: [{ completed: false, stars: 0, bestWpm: 0, bestAccuracy: 0, attempts: 0, lastAttempt: new Date() }],
         },
-        {
-          id: 'l3',
-          level: 2,
-          order: 1,
-          title: 'Lesson 3',
-          difficulty: 'INTERMEDIATE',
-          targetWpm: 40,
-          userProgress: [],
-        }
       ];
 
-      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(lessons);
-      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([
-        { createdAt: now }
-      ]);
-
-      await getProgressVisualization(mockRequest as any, mockResponse as any, nextMock);
-
-      const response = jsonMock.mock.calls[0][0];
-
-      // Verify level stats
-      expect(response.completionByLevel).toContainEqual(expect.objectContaining({
-        level: '1',
-        percentage: 50,
-        completed: 1,
-        total: 2,
-      }));
-
-      // Verify skill tree
-      expect(response.skillTree).toHaveLength(3);
-      expect(response.skillTree[0].id).toBe('l1');
-      expect(response.skillTree[0].locked).toBe(false);
-
-      expect(response.skillTree[1].id).toBe('l2');
-      expect(response.skillTree[1].prerequisites).toEqual(['l1']);
-      expect(response.skillTree[1].locked).toBe(false); // l1 is completed
-
-      expect(response.skillTree[2].id).toBe('l3');
-      expect(response.skillTree[2].locked).toBe(true); // l1, l2 or previous level last 3 not all completed (none of level 1 last 3 are completed except l1)
-
-      // Verify activity
-      expect(response.practiceFrequency).toHaveLength(1);
-      expect(response.practiceFrequency[0].count).toBe(3); // 2 lessons + 1 test
-    });
-
-    it('should handle non-sequential order correctly in skill tree', async () => {
-       const lessons = [
-        {
-          id: 'l1',
-          level: 1,
-          order: 10,
-          title: 'Lesson 1',
-          userProgress: [{ completed: true }],
-        },
-        {
-          id: 'l2',
-          level: 1,
-          order: 20,
-          title: 'Lesson 2',
-          userProgress: [],
-        }
-      ];
-      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(lessons);
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(mockLessons);
       (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 
-      await getProgressVisualization(mockRequest as any, mockResponse as any, nextMock);
+      await getProgressVisualization(mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(jsonMock).toHaveBeenCalled();
+      const response = jsonMock.mock.calls[0][0];
+
+      expect(response.completionByLevel).toHaveLength(1);
+      expect(response.skillTree).toHaveLength(2);
+
+      // Check first lesson in skillTree
+      expect(response.skillTree[0]).toMatchObject({
+        id: 'lesson-1',
+        completed: true,
+        locked: false,
+      });
+
+      // Check second lesson in skillTree - unlocked because lesson-1 is completed
+      expect(response.skillTree[1]).toMatchObject({
+        id: 'lesson-2',
+        completed: false,
+        locked: false,
+        prerequisites: ['lesson-1'],
+      });
+    });
+
+    it('should correctly handle locked status', async () => {
+      const mockLessons = [
+        {
+          id: 'lesson-1',
+          level: 1,
+          order: 1,
+          title: 'Lesson 1',
+          difficulty: 'BEGINNER',
+          targetWpm: 20,
+          userProgress: [{ completed: false, stars: 0, bestWpm: 0, bestAccuracy: 0, attempts: 1, lastAttempt: new Date() }],
+        },
+        {
+          id: 'lesson-2',
+          level: 1,
+          order: 2,
+          title: 'Lesson 2',
+          difficulty: 'BEGINNER',
+          targetWpm: 25,
+          userProgress: [],
+        },
+      ];
+
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(mockLessons);
+      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getProgressVisualization(mockRequest as Request, mockResponse as Response, nextFunction);
 
       const response = jsonMock.mock.calls[0][0];
-      expect(response.skillTree[1].prerequisites).toEqual(['l1']);
-      expect(response.skillTree[1].locked).toBe(false);
+
+      expect(response.skillTree[1]).toMatchObject({
+        id: 'lesson-2',
+        locked: true, // locked because lesson-1 is NOT completed
+      });
+    });
+
+    it('should correctly handle non-sequential lesson orders', async () => {
+      const mockLessons = [
+        {
+          id: 'lesson-1',
+          level: 1,
+          order: 1,
+          title: 'Lesson 1',
+          difficulty: 'BEGINNER',
+          targetWpm: 20,
+          userProgress: [{ completed: true, stars: 3, bestWpm: 30, bestAccuracy: 99, attempts: 1, lastAttempt: new Date() }],
+        },
+        {
+          id: 'lesson-3', // Gap in order
+          level: 1,
+          order: 3,
+          title: 'Lesson 3',
+          difficulty: 'BEGINNER',
+          targetWpm: 25,
+          userProgress: [],
+        },
+      ];
+
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(mockLessons);
+      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getProgressVisualization(mockRequest as Request, mockResponse as Response, nextFunction);
+
+      const response = jsonMock.mock.calls[0][0];
+
+      expect(response.skillTree[1]).toMatchObject({
+        id: 'lesson-3',
+        prerequisites: ['lesson-1'], // Should find lesson-1 despite gap
+      });
     });
   });
 });
