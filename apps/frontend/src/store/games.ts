@@ -157,7 +157,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...state,
       currentGame: null,
       score: 0,
+      highScore: 0,
       isPlaying: false,
+      gameHistory: [],
     }));
   },
 
