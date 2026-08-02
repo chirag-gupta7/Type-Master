@@ -33,3 +33,8 @@
 **Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
+
+## 2026-08-02 - IP Spoofing & Password Spraying Rate-Limit Bypass
+**Vulnerability:** Manual extraction of `X-Forwarded-For` header in `getRequestIp` bypassed Express's `trust proxy` configuration, allowing IP spoofing. Additionally, `getAuthRateLimitKey` keyed limits on `email:${email}:ip:${ip}`, permitting password spraying of multiple accounts from a single IP.
+**Learning:** Relying on raw headers instead of framework-native helpers (like Express's `req.ip` combined with proper `trust proxy` settings) invites header injection bypasses. Keying auth limits with user-controlled identifiers allows credential spraying across different identifiers.
+**Prevention:** Always strictly use framework-provided `req.ip` to extract client IP address and use purely IP-based keys (`ip:${ip}`) to limit sensitive authentication endpoints.

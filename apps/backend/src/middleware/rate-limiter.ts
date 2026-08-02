@@ -15,45 +15,24 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
-const extractPrimaryForwardedIp = (value: string): string => {
-  return value.split(',')[0]?.trim() || '';
+/**
+ * Securely extracts the request IP.
+ * Relying on Express's secure, built-in `req.ip` is highly secure because Express honors
+ * 'trust proxy' settings which validate proxy headers against a list of trusted upstream proxies,
+ * thereby preventing malicious clients from spoofing their IP address via custom X-Forwarded-For headers.
+ */
+export const getRequestIp = (req: Request): string => {
+  return req.ip || 'unknown';
 };
 
-const getRequestIp = (req: Request): string => {
-  const forwarded = req.headers['x-forwarded-for'];
-
-  if (typeof forwarded === 'string' && forwarded.trim().length > 0) {
-    return extractPrimaryForwardedIp(forwarded);
-  }
-
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    return extractPrimaryForwardedIp(forwarded[0] || '');
-  }
-
-  return req.ip || req.socket.remoteAddress || 'unknown';
-};
-
-const getEmailFromBody = (req: Request): string | null => {
-  const body = req.body as { email?: unknown } | undefined;
-  const rawEmail = body?.email;
-
-  if (typeof rawEmail !== 'string') {
-    return null;
-  }
-
-  const normalized = rawEmail.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-};
-
-const getAuthRateLimitKey = (req: Request): string => {
-  const email = getEmailFromBody(req);
+/**
+ * Generates a rate limit key for authentication attempts.
+ * Using strictly IP-based keys (ip:${ip}) prevents credential stuffing and password spraying
+ * attacks from a single source, as all attempts (even with different emails) from that IP are bound
+ * to the same limit window.
+ */
+export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
-
-  if (email) {
-    // Prevent one noisy IP from blocking all users on shared networks.
-    return `email:${email}:ip:${ip}`;
-  }
-
   return `ip:${ip}`;
 };
 
