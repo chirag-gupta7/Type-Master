@@ -532,9 +532,6 @@ export const getProgressVisualization = async (
       }),
     ]);
 
-    // O(N) lookup for lesson status
-    const lessonMap = new Map(lessonsWithProgress.map((l) => [l.id, l]));
-
     // 1. Calculate completion by level & Derive lesson activity for heatmap & Group WPM history
     const levelStats: Record<string, { total: number; completed: number; totalStars: number; earnedStars: number }> = {};
     const activityByDate: Record<string, number> = {};
@@ -607,21 +604,43 @@ export const getProgressVisualization = async (
       count,
     }));
 
-    // Build skill tree structure with dependencies (O(N) with Map lookup)
+    // O(N) Optimization: Replace nested array scans (filter/find) with Map-based lookups
+    // for lesson completion status, level grouping, and prerequisite checking.
+    const lessonCompletionMap = new Map<string, boolean>();
+    const lessonsByLevelMap = new Map<number, typeof lessonsWithProgress>();
+
+    for (const lesson of lessonsWithProgress) {
+      lessonCompletionMap.set(lesson.id, !!lesson.userProgress[0]?.completed);
+
+      if (!lessonsByLevelMap.has(lesson.level)) {
+        lessonsByLevelMap.set(lesson.level, []);
+      }
+      lessonsByLevelMap.get(lesson.level)?.push(lesson);
+    }
+
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+      let prerequisites: string[] = [];
+
+      if (lesson.order > 1) {
+        // Prerequisite is the lesson with the largest order less than the current lesson in the same level
+        const sameLevelLessons = lessonsByLevelMap.get(lesson.level) || [];
+        const prevInLevel = sameLevelLessons
+          .filter((l) => l.order < lesson.order)
+          .sort((a, b) => b.order - a.order)[0];
+        if (prevInLevel) {
+          prerequisites = [prevInLevel.id];
+        }
+      } else if (lesson.level > 1) {
+        // Prerequisites are the last 3 lessons from the previous level
+        const prevLevelLessons = lessonsByLevelMap.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
+      }
+
+      const isLocked =
+        prerequisites.length > 0
+          ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId))
+          : false;
 
       return {
         id: lesson.id,
@@ -634,13 +653,7 @@ export const getProgressVisualization = async (
         stars: progress?.stars || 0,
         bestWpm: progress?.bestWpm || 0,
         attempts: progress?.attempts || 0,
-        locked:
-          prerequisites.length > 0
-            ? !prerequisites.every((preReqId) => {
-                const preReq = lessonMap.get(preReqId);
-                return Boolean(preReq?.userProgress[0]?.completed);
-              })
-            : false,
+        locked: isLocked,
         prerequisites,
       };
     });

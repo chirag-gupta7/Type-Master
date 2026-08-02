@@ -108,7 +108,8 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
 export const getLeaderboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const rawType = parseGameType(req.query.gameType);
-    const limit = Math.min(Number.parseInt(String(req.query.limit ?? '100'), 10) || 100, 100);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? '100'), 10);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1), 100);
 
     if (!rawType) {
       res.status(400).json({ error: 'Invalid or missing game type' });
@@ -229,7 +230,8 @@ export const getUserGameHistory = async (req: AuthRequest, res: Response): Promi
     }
 
     const requestedType = parseGameType(req.query.gameType);
-    const limit = Math.min(Number.parseInt(String(req.query.limit ?? '50'), 10) || 50, 100);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? '50'), 10);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 50 : parsedLimit, 1), 100);
 
     const where: Prisma.GameScoreWhereInput = {
       userId,
