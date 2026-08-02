@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2026-07-05 - [Optimizing lesson recommendations with relational filters]
+**Learning:** Using a two-step query process (fetching IDs of completed items and then using 'notIn' to find incomplete ones) is a performance anti-pattern. It increases database roundtrips and memory overhead for large datasets. Prisma's relational filters (like 'none') can merge these into a single, efficient database operation.
+**Action:** When searching for items that lack a specific relationship or state (like "incomplete lessons"), use relational filters like 'none' or 'some' instead of manual ID-based exclusion.
+
 ## 2025-06-15 - [O(L) Skill Tree and Dashboard Derivation]
 **Learning:** Complex dashboards requiring skill trees, heatmaps, and historical charts can often be derived from a single, pre-sorted database query (e.g., `prisma.lesson.findMany` with `include: userProgress`). By processing this dataset once (O(L)), we can eliminate redundant queries for historical windows and replace O(L²) prerequisite filtering with O(1) or O(K) index-based lookups in the sorted array.
 **Action:** Before adding separate queries for dashboard metrics, check if the data can be derived efficiently from an existing bulk fetch. Use index-based lookups for dependencies in sorted lists.
