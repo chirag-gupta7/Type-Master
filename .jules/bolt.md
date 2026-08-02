@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2025-07-01 - [In-memory derivation and O(N) Skill Tree construction]
+**Learning:** For endpoints like `getLearningStats` and `getProgressVisualization`, we can reduce database round-trips by fetching a base dataset (e.g., all lessons with user progress) and deriving metrics like historical activity or completion stats in-memory. Additionally, recursive or nested filtering for skill tree prerequisites can create O(N²) bottlenecks; using Map-based lookups and pre-grouping data by level reduces this to O(N).
+**Action:** Before adding new database queries for related metrics, check if the data can be derived from an already-fetched parent dataset. Use Maps for efficient prerequisite lookups.
+
 ## 2026-06-29 - [Optimizing skill tree construction and stats aggregation]
 **Learning:** O(N²) array operations in controller logic (e.g., nested .map and .find for prerequisites) can be optimized to O(N) using Map-based lookups. Additionally, deriving counts and metrics in-memory from a single comprehensive findMany call is more efficient than performing multiple specialized count/aggregate queries.
 **Action:** Use Map-based lookups for relational data derived from flat lists. Consolidate database queries by fetching broader datasets and aggregating in-memory when the cost of data transfer is lower than the latency of multiple roundtrips.
