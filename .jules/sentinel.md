@@ -33,3 +33,8 @@
 **Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
+
+## 2026-08-03 - Prompt Injection and DoS on AI Proxy Endpoints
+**Vulnerability:** The AI proxy endpoints accepted unvalidated numeric values and unsanitized text payloads of arbitrary length from clients, introducing risks of prompt injection and Denial of Service (DoS) due to excessive API resource/cost consumption.
+**Learning:** Endpoints that interface with third-party LLMs must enforce strict type constraints, ranges, and maximum input length limitations on the server side to protect backend assets and billing.
+**Prevention:** Always use Zod or comparable validation middleware to strictly enforce type safety (e.g., numeric ranges for metrics) and maximum string length limits (e.g., maximum characters for user text inputs) before forwarding data to downstream AI APIs.
