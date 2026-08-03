@@ -84,3 +84,7 @@
 ## 2026-06-21 - [Parallelizing dashboard metrics fetching]
 **Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
 **Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
+
+## 2026-08-03 - [Visual Keyboard Rendering Optimization]
+**Learning:** When building interactive components that capture continuous streams of real-time input (like a custom typing test keyboard containing 60+ keys), re-rendering the entire component tree on every keystroke causes significant visual stuttering and high CPU consumption. By extracting individual keys into a `React.memo` wrapped `KeyboardKey` component and pre-normalizing target/pressed values in the parent component, key down/up rendering is optimized from O(N) to O(1).
+**Action:** Memoize large grids of static or independent items that receive frequent interactive state updates. Pre-calculate values to ensure clean, primitive prop boundaries for React.memo to do cheap, shallow comparisons.
