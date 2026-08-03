@@ -940,19 +940,11 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
 
     const userId = req.user.userId;
 
-    // Optimization: Parallelize independent assessment and progress lookups
-    const [assessment, completedProgress] = await Promise.all([
-      prisma.userSkillAssessment.findFirst({
-        where: { userId },
-        orderBy: { assessmentDate: 'desc' },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: { userId, completed: true },
-        select: { lessonId: true },
-      }),
-    ]);
-
-    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
+    // Get user's latest assessment
+    const assessment = await prisma.userSkillAssessment.findFirst({
+      where: { userId },
+      orderBy: { assessmentDate: 'desc' },
+    });
 
     // Determine starting section based on assessment or default to Section 1
     let startSection = 1;
@@ -962,11 +954,18 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
       else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
     }
 
+    // Optimization: Replace a two-step query process (fetching completed IDs then filtering with 'notIn')
+    // with a single query using Prisma's relational 'none' filter.
     // Find first incomplete lesson in the appropriate section
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
         section: { gte: startSection },
-        id: { notIn: Array.from(completedLessonIds) },
+        userProgress: {
+          none: {
+            userId,
+            completed: true,
+          },
+        },
       },
       orderBy: [{ section: 'asc' }, { order: 'asc' }],
     });
