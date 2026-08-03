@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   LineChart,
@@ -70,26 +70,41 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
   );
   const [showFilter, setShowFilter] = useState(false);
 
+  // Optimization: Memoize and precompute derived chart data (O(N²) -> O(N))
   // Combine all data points by date
-  const allDates = Array.from(
-    new Set(data.flatMap((lesson) => lesson.data.map((d) => d.date)))
-  ).sort();
+  const allDates = useMemo(() => {
+    return Array.from(
+      new Set(data.flatMap((lesson) => lesson.data.map((d) => d.date)))
+    ).sort();
+  }, [data]);
 
-  // Create chart data with all lessons
-  const chartData = allDates.map((date) => {
-    const dataPoint: Record<string, string | number> = {
-      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    };
-    data.forEach((lesson) => {
+  // Create chart data with all lessons using O(1) map lookups instead of O(N) array finds
+  const chartData = useMemo(() => {
+    const lessonDataMaps = new Map<string, Map<string, number>>();
+
+    // Pre-compute O(1) lookups for each lesson's date-to-wpm mapping
+    data.forEach(lesson => {
       if (selectedLessons.includes(lesson.lessonId)) {
-        const lessonData = lesson.data.find((d) => d.date === date);
-        if (lessonData) {
-          dataPoint[lesson.lessonTitle] = lessonData.wpm;
-        }
+         const dateMap = new Map<string, number>();
+         lesson.data.forEach(d => dateMap.set(d.date, d.wpm));
+         lessonDataMaps.set(lesson.lessonTitle, dateMap);
       }
     });
-    return dataPoint;
-  });
+
+    return allDates.map((date) => {
+      const dataPoint: Record<string, string | number> = {
+        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      };
+
+      for (const [title, dateMap] of lessonDataMaps.entries()) {
+        const wpm = dateMap.get(date);
+        if (wpm !== undefined) {
+          dataPoint[title] = wpm;
+        }
+      }
+      return dataPoint;
+    });
+  }, [allDates, data, selectedLessons]);
 
   const toggleLesson = (lessonId: string) => {
     setSelectedLessons((prev) =>
@@ -97,7 +112,9 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
     );
   };
 
-  const selectedLessonData = data.filter((l) => selectedLessons.includes(l.lessonId));
+  const selectedLessonData = useMemo(() => {
+     return data.filter((l) => selectedLessons.includes(l.lessonId));
+  }, [data, selectedLessons]);
 
   return (
     <motion.div
