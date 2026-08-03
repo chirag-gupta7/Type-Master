@@ -19,9 +19,12 @@ export function ThemeSelector() {
       if (saved) {
         try {
           const theme = JSON.parse(saved);
-          setTheme(theme);
+          if (theme && typeof theme === 'object' && 'name' in theme && 'primary' in theme && 'secondary' in theme && 'accent' in theme) {
+            setTheme(theme as ThemeColors);
+          } else {
+            applyTheme();
+          }
         } catch {
-          // If parsing fails, just apply current theme
           applyTheme();
         }
       } else {
@@ -46,14 +49,16 @@ export function ThemeSelector() {
             onClick={() => setIsOpen(!isOpen)}
             className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow"
             style={{
-              boxShadow: `0 0 20px ${currentTheme.primary}40`,
+              boxShadow: `0 0 20px ${(currentTheme?.primary || '#000')}40`,
             }}
-            aria-label="Change Theme"
+            aria-label="Open theme picker"
           >
             <Palette className="w-6 h-6 text-white" />
           </motion.button>
         </TooltipTrigger>
-        <TooltipContent side="left">Change Theme</TooltipContent>
+        <TooltipContent side="left">
+          <p>Open theme picker</p>
+        </TooltipContent>
       </Tooltip>
 
       {/* Theme Picker Dialog */}
@@ -67,7 +72,6 @@ export function ThemeSelector() {
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-              style={{ top: 0, left: 0 }}
             />
 
             {/* Theme Picker Panel */}
