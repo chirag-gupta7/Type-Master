@@ -960,6 +960,9 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
 
     // Optimization: Replace a two-step query process (fetching completed IDs then filtering with 'notIn')
     // with a single query using Prisma's relational 'none' filter.
+    // Instead of fetching all completed lesson IDs and using 'notIn',
+    // we use 'none' to filter for lessons where no 'completed' progress exists for this user.
+    // This reduces database roundtrips and memory overhead (O(1) database roundtrip).
     // Find first incomplete lesson in the appropriate section
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
