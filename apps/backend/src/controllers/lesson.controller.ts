@@ -439,9 +439,9 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate' feature.
-    // This reduces memory usage and processing time by avoiding fetching all progress records into memory.
-    const [totalLessons, completedProgress, aggregates] = await Promise.all([
+    // Optimization: Use database aggregation to calculate statistics.
+    // This reduces data transfer and processing from O(N) to O(1).
+    const [totalLessons, completedProgress, aggregateResult] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
@@ -461,9 +461,9 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
       }),
     ]);
 
-    const totalStars = aggregates._sum.stars || 0;
-    const avgWpm = aggregates._avg.bestWpm || 0;
-    const avgAccuracy = aggregates._avg.bestAccuracy || 0;
+    const totalStars = aggregateResult._sum.stars || 0;
+    const avgWpm = aggregateResult._avg.bestWpm || 0;
+    const avgAccuracy = aggregateResult._avg.bestAccuracy || 0;
 
     res.json({
       stats: {
