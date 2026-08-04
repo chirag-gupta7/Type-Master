@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
@@ -502,7 +502,7 @@ export const getProgressVisualization = async (
     // Optimization: Consolidate data fetching and derivation.
     // 1. Parallelize core independent queries (Lessons and Tests).
     // 2. Eliminate redundant 'findMany' queries by deriving historical/activity metrics in-memory from the base dataset.
-    // 3. Optimize skill tree O(N²) construction with O(1) Map lookups.
+    // 3. Optimize skill tree O(NÂ²) construction with O(1) Map lookups.
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const oneYearAgo = new Date();
