@@ -14,6 +14,10 @@
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
 
+## 2026-07-13 - [Offloading statistical aggregation to Database]
+**Learning:** Performing statistical calculations (sum, average) in application memory using `.reduce()` on large datasets retrieved from the database creates O(N) memory and processing overhead. Offloading these to Prisma's `.aggregate()` function reduces complexity to O(1) at the application level and minimizes network payload size.
+**Action:** Replace in-memory aggregations of database results with native SQL aggregation functions via Prisma's `aggregate` or `groupBy` features.
+
 ## 2025-06-12 - [Consolidating multi-step relational queries]
 **Learning:** Multi-step database operations that first fetch IDs and then filter by them (e.g., using `notIn`) can be consolidated into a single query using Prisma's relational filters like `none`. This reduces database roundtrips and application memory overhead.
 **Action:** Look for patterns where `findMany` is followed by another query using those results, and try to use relational filters instead.
