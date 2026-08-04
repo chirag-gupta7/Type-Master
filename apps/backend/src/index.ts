@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler } from './middleware/error-handler';
+import { isOriginAllowed } from './utils/cors';
 import { rateLimiter } from './middleware/rate-limiter';
 import { logger } from './utils/logger';
 import authRoutes from './routes/auth.routes';
@@ -47,14 +48,9 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true); // allow same-origin / server-to-server
-      if (allowedOrigins.includes('*')) return callback(null, true);
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed === origin) return true;
-        // Only allow wildcard matching if the config explicitly allows a vercel domain
-        if (allowed.includes('.vercel.app') && origin.endsWith('.vercel.app')) return true;
-        return false;
-      });
-      if (isAllowed) return callback(null, true);
+      if (isOriginAllowed(origin, allowedOrigins)) {
+        return callback(null, true);
+      }
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
