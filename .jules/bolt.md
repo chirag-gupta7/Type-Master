@@ -3,16 +3,24 @@
 **Action:** Offload statistical calculations to the database using Prisma's `aggregate` or `groupBy` features. Parallelize these with any other required fetches using `Promise.all`.
 
 ## 2025-05-22 - [Optimizing N+1 queries in statistics endpoints]
+
 **Learning:** Statistics endpoints that iterate over categories (like game types) to perform multiple database queries per category (e.g., count, max, average) create a significant performance bottleneck (N+1 query problem). This can be optimized using Prisma's `groupBy` and aggregate features (`_count`, `_max`, `_avg`) to fetch all required data in a single database roundtrip.
 **Action:** Always check for loops containing database queries in controller logic. Prefer bulk data retrieval and in-memory mapping over sequential per-category queries.
 
 ## 2025-05-10 - Batching upserts in logMistakes
+
 **Learning:** Sequential database roundtrips in a loop (O(n)) can be significantly optimized by aggregating data first and using Prisma transactions. Even when a native 'upsertMany' is missing, grouping by key and batching within a transaction reduces latency.
 **Action:** Always look for loops containing database calls and consider if they can be aggregated or batched using `$transaction`.
 
 ## 2025-05-24 - Parallelizing bulk metric fetching
+
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2026-07-17 - O(L) Index-Based Lookups for Pre-Sorted Lists
+
+**Learning:** Building dependency and skill trees from sorted flat lists (like lessons sorted by level/order) can suffer from O(L^2) overhead if we filter the entire list to locate parents or prerequisites. When the database already guarantees a sorted order (e.g., level asc, order asc), relative parent nodes are at deterministic relative index offsets (e.g., `index - 1`).
+**Action:** Leverage index offsets and pre-computed hash sets for O(1) membership queries to construct flat trees in strict O(L) time.
 
 ## 2025-05-26 - [Database-level aggregation for statistics]
 **Learning:** Calculating statistics (stars, WPM, accuracy) in-memory using `.reduce()` after a `findMany` call can be extremely inefficient as the dataset grows (O(N) data transfer and processing). Using Prisma's `aggregate` feature (`_sum`, `_avg`, `_count`) moves this logic to the database, resulting in O(1) data transfer and significantly lower memory footprint on the backend.
