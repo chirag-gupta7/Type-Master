@@ -281,7 +281,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
 /**
  * @route   POST /api/v1/auth/token
  * @desc    Get backend JWT token for NextAuth authenticated users
- * @access  Public
+ * @access  Internal Only
  */
 export const getTokenForNextAuthUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
