@@ -8,8 +8,8 @@ jest.mock('../utils/prisma', () => ({
   prisma: {
     gameScore: {
       findMany: jest.fn(),
-      groupBy: jest.fn(),
       findFirst: jest.fn(),
+      groupBy: jest.fn(),
     },
   },
 }));
@@ -162,13 +162,31 @@ describe('GameController - getUserHighScores', () => {
       createdAt: new Date('2023-01-01'),
     };
 
+    const mockSpeedRaceBest = {
+      gameType: GameType.SPEED_RACE,
+      score: 120,
+      wpm: 80,
+      accuracy: 90,
+      duration: 60,
+      createdAt: new Date('2023-01-02'),
+    };
+
     (prisma.gameScore.findMany as jest.Mock)
       .mockResolvedValueOnce(mockAvailableTypes)
-      .mockResolvedValueOnce([mockBestWordBlitz]);
+      .mockResolvedValueOnce([mockBestWordBlitz, mockSpeedRaceBest]);
 
     await getUserHighScores(mockRequest as Request, mockResponse as Response);
 
-    expect(prisma.gameScore.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      distinct: ['gameType'],
+      select: { gameType: true },
+    });
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+      distinct: ['gameType'],
+      orderBy: [{ gameType: 'asc' }, { score: 'desc' }],
+    });
 
     expect(jsonMock).toHaveBeenCalledWith({
       success: true,
@@ -183,6 +201,30 @@ describe('GameController - getUserHighScores', () => {
         },
         {
           gameType: GameType.SPEED_RACE,
+          score: 120,
+          wpm: 80,
+          accuracy: 90,
+          duration: 60,
+          createdAt: mockSpeedRaceBest.createdAt,
+        },
+      ],
+    });
+  });
+
+  it('should handle game types with no scores', async () => {
+    const mockAvailableTypes = [{ gameType: GameType.WORD_BLITZ }];
+
+    (prisma.gameScore.findMany as jest.Mock)
+      .mockResolvedValueOnce(mockAvailableTypes)
+      .mockResolvedValueOnce([]);
+
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: [
+        {
+          gameType: GameType.WORD_BLITZ,
           score: 0,
           wpm: null,
           accuracy: null,
@@ -191,6 +233,167 @@ describe('GameController - getUserHighScores', () => {
         },
       ],
     });
+  });
+  it('should handle errors gracefully', async () => {
+    (prisma.gameScore.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
+
+    await getUserHighScores(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch high scores' });
+  });
+});
+
+describe('GameController - getLeaderboard', () => {
+  let mockRequest: Partial<Request>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      query: {
+        gameType: 'WORD_BLITZ',
+        limit: '10',
+      },
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 400 if gameType is invalid or missing', async () => {
+    mockRequest.query = { gameType: 'INVALID_GAME' };
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid or missing game type' });
+  });
+
+  it('should return an empty leaderboard if there are no scores', async () => {
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue([]);
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.groupBy).toHaveBeenCalledWith({
+      by: ['userId'],
+      where: { gameType: GameType.WORD_BLITZ },
+      _max: { score: true },
+      orderBy: { _max: { score: 'desc' } },
+      take: 10,
+    });
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        gameType: GameType.WORD_BLITZ,
+        leaderboard: [],
+        total: 0,
+      },
+    });
+  });
+
+  it('should successfully fetch the leaderboard with the highest score per user, respecting the limit', async () => {
+    const mockUserBestScores = [
+      { userId: 'user-1', _max: { score: 1000 } },
+      { userId: 'user-2', _max: { score: 800 } },
+    ];
+
+    const mockTopScoresDetails = [
+      {
+        userId: 'user-1',
+        score: 1000,
+        wpm: 90,
+        accuracy: 98,
+        duration: 60,
+        createdAt: new Date('2023-01-01'),
+        user: { id: 'user-1', username: 'PlayerOne' },
+      },
+      {
+        userId: 'user-2',
+        score: 800,
+        wpm: 80,
+        accuracy: 95,
+        duration: 60,
+        createdAt: new Date('2023-01-02'),
+        user: { id: 'user-2', username: 'PlayerTwo' },
+      },
+    ];
+
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue(mockUserBestScores);
+    (prisma.gameScore.findMany as jest.Mock).mockResolvedValue(mockTopScoresDetails);
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.groupBy).toHaveBeenCalledWith({
+      by: ['userId'],
+      where: { gameType: GameType.WORD_BLITZ },
+      _max: { score: true },
+      orderBy: { _max: { score: 'desc' } },
+      take: 10,
+    });
+
+    expect(prisma.gameScore.findMany).toHaveBeenCalledWith({
+      where: {
+        gameType: GameType.WORD_BLITZ,
+        OR: [
+          { userId: 'user-1', score: 1000 },
+          { userId: 'user-2', score: 800 },
+        ],
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        gameType: GameType.WORD_BLITZ,
+        leaderboard: [
+          {
+            rank: 1,
+            userId: 'user-1',
+            username: 'PlayerOne',
+            score: 1000,
+            wpm: 90,
+            accuracy: 98,
+            duration: 60,
+            createdAt: mockTopScoresDetails[0].createdAt,
+          },
+          {
+            rank: 2,
+            userId: 'user-2',
+            username: 'PlayerTwo',
+            score: 800,
+            wpm: 80,
+            accuracy: 95,
+            duration: 60,
+            createdAt: mockTopScoresDetails[1].createdAt,
+          },
+        ],
+        total: 2,
+      },
+    });
+  });
+
+  it('should handle errors gracefully', async () => {
+    (prisma.gameScore.groupBy as jest.Mock).mockRejectedValue(new Error('Database GroupBy Error'));
+
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch leaderboard' });
   });
 });
 
