@@ -11,8 +11,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { authAPI } from '@/lib/api';
 import { useUiStore } from '../store/ui';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -51,11 +49,15 @@ export function Navbar() {
     setMounted(true);
   }, []);
 
+  // Reset loading state on route change
+  useEffect(() => {
+    setLoading(false);
+  }, [pathname, setLoading]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl+Number shortcuts
-      if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '7') {
         const link = navLinks.find((l) => l.shortcut === e.key);
         if (link) {
           e.preventDefault();
@@ -73,8 +75,12 @@ export function Navbar() {
   };
 
   const handleSignOut = async () => {
-    authAPI.logout();
-    await signOut({ callbackUrl: '/' });
+    try {
+      authAPI.logout();
+      await signOut({ callbackUrl: '/' });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   return (
@@ -169,13 +175,13 @@ export function Navbar() {
                     size="icon"
                     onClick={toggleTheme}
                     className="ml-2"
-                    aria-label="Toggle theme"
+                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
                     {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Toggle {theme === 'dark' ? 'light' : 'dark'} mode</p>
+                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -190,12 +196,14 @@ export function Navbar() {
                     variant="ghost"
                     size="icon"
                     onClick={toggleTheme}
-                    aria-label="Toggle theme"
+                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
                     {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Toggle {theme === 'dark' ? 'light' : 'dark'} mode</TooltipContent>
+                <TooltipContent>
+                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
+                </TooltipContent>
               </Tooltip>
             )}
             <Tooltip>

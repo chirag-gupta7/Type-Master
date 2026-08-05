@@ -92,7 +92,7 @@ describe('MistakeController - getWeakKeyAnalysis', () => {
       orderBy: { errorCount: 'desc' },
       take: 5,
     });
-
+    expect(prisma.$queryRaw).toHaveBeenCalled();
     expect(prisma.typingMistake.findMany).toHaveBeenCalledWith({
       where: { userId: 'user-123' },
       orderBy: { timestamp: 'desc' },
