@@ -109,10 +109,11 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Optimization: Parallelize independent queries using Promise.all to fetch
-    // weak keys, finger-specific error patterns, and recent mistakes concurrently.
-    // This reduces latency from the sum of all queries to just the slowest one.
-    // Time complexity: O(1) database round-trips.
+    // Optimization: Parallelize independent queries to avoid database query N+1 sequential bottlenecks.
+    // Instead of sequentially executing three separate queries (taking total sequential time),
+    // we use Promise.all to fetch the weak keys, finger-specific error patterns via raw SQL, and
+    // the 20 most recent mistakes concurrently. This cuts database-level retrieval latency significantly,
+    // reducing it to the duration of the slowest query (O(max(T_query1, T_query2, T_query3))).
     const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
       prisma.userWeakKeys.findMany({
         where: { userId },
