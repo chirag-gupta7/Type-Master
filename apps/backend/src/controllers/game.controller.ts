@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { GameType, Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
+import { logger } from '../utils/logger';
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -99,7 +100,7 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
       },
     });
   } catch (error) {
-    console.error('Error saving game score:', error);
+    logger.error('Error saving game score:', error);
     res.status(500).json({ error: 'Failed to save game score' });
   }
 };
@@ -107,48 +108,98 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
 export const getLeaderboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const rawType = parseGameType(req.query.gameType);
-    const limit = Math.min(Number.parseInt(String(req.query.limit ?? '100'), 10) || 100, 100);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? '100'), 10);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1), 100);
 
     if (!rawType) {
       res.status(400).json({ error: 'Invalid or missing game type' });
       return;
     }
 
-    const topScores = await prisma.gameScore.findMany({
+    // --- OPTIMIZATION (Before vs. After) ---
+    // Before:
+    //   - We fetched up to `limit` raw gameScores in a single `findMany` query.
+    //   - Deduplication was done in-memory via Map: `bestByUser`.
+    //   - Correctness bug: If a single user held the top `limit` scores, the returned leaderboard
+    //     would contain only that 1 user instead of `limit` unique users. Also, other users' high
+    //     scores would be missed because they were pushed out of the raw `take: limit` fetch.
+    //   - Time Complexity: O(limit * log(limit)) sorting in memory after fetching.
+    // After:
+    //   - Two-stage database-level approach:
+    //     1. Database-level `groupBy` on `userId` fetches exactly the top `limit` unique users
+    //        and their max scores (`_max.score`). This is O(1) query complexity for the app layer.
+    //     2. Targeted `findMany` fetches the details of these unique `userId` and `score` pairings.
+    //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
+    //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
+    //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
+    const topGrouped = await prisma.gameScore.groupBy({
+      by: ['userId'],
       where: {
         gameType: rawType,
       },
+      _max: {
+        score: true,
+      },
       orderBy: {
-        score: 'desc',
+        _max: {
+          score: 'desc',
+        },
       },
       take: limit,
+    });
+
+    if (topGrouped.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          gameType: rawType,
+          leaderboard: [],
+          total: 0,
+        },
+      });
+      return;
+    }
+
+    // Batch query details for exactly the top unique users and their max scores
+    const scoresWithDetails = await prisma.gameScore.findMany({
+      where: {
+        gameType: rawType,
+        OR: topGrouped.map((g) => ({
+          userId: g.userId,
+          score: g._max.score as number,
+        })),
+      },
       include: {
         user: withUser,
       },
     });
 
-    const bestByUser = new Map<string, (typeof topScores)[number]>();
-
-    for (const score of topScores) {
-      const current = bestByUser.get(score.userId);
-      if (!current || score.score > current.score) {
-        bestByUser.set(score.userId, score);
+    // If a user has multiple scores matching their max score, pick the most recent one
+    const bestScoreMap = new Map<string, (typeof scoresWithDetails)[number]>();
+    for (const score of scoresWithDetails) {
+      const existing = bestScoreMap.get(score.userId);
+      if (!existing || score.createdAt > existing.createdAt) {
+        bestScoreMap.set(score.userId, score);
       }
     }
 
-    const leaderboard = Array.from(bestByUser.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((score, index) => ({
-        rank: index + 1,
-        userId: score.user.id,
-        username: score.user.username,
-        score: score.score,
-        wpm: score.wpm,
-        accuracy: score.accuracy,
-        duration: score.duration,
-        createdAt: score.createdAt,
-      }));
+    // Map topGrouped back to full records maintaining the exact database-sorted descending order
+    const leaderboard = topGrouped
+      .map((g, index) => {
+        const score = bestScoreMap.get(g.userId);
+        if (!score) return null;
+        return {
+          rank: index + 1,
+          userId: score.user.id,
+          username: score.user.username,
+          score: score.score,
+          wpm: score.wpm,
+          accuracy: score.accuracy,
+          duration: score.duration,
+          createdAt: score.createdAt,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     res.json({
       success: true,
@@ -159,7 +210,7 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
       },
     });
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
+    logger.error('Error fetching leaderboard:', error);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 };
@@ -173,9 +224,11 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Optimization: Fetch all high scores in a single query using DISTINCT ON (via Prisma distinct).
-    // We also fetch all available types to ensure we return a result for every game type even if no score exists.
-    const [availableTypes, userHighScores] = await Promise.all([
+    // Optimization: Resolve N+1 query pattern by fetching all "best scores" in a single database roundtrip.
+    // Instead of querying findFirst in a loop for each game type, we use 'distinct' combined with 'orderBy'.
+    // In PostgreSQL, using 'distinct' on 'gameType' with 'orderBy' 'score desc' ensures we get the top record per category.
+    // Note: When using distinct, the orderBy must start with the distinct fields to satisfy Postgres/Prisma requirements.
+    const [availableTypes, userBestScores] = await Promise.all([
       prisma.gameScore.findMany({
         distinct: ['gameType'],
         select: { gameType: true },
@@ -183,14 +236,19 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       prisma.gameScore.findMany({
         where: { userId },
         distinct: ['gameType'],
-        orderBy: [{ gameType: 'asc' }, { score: 'desc' }],
+        orderBy: [
+          { gameType: 'asc' }, // Required to be first when using distinct on gameType
+          { score: 'desc' }, // Ensures we get the highest score
+        ],
       }),
     ]);
 
-    const userBestMap = new Map(userHighScores.map((s) => [s.gameType, s]));
+    // Create a map for O(1) lookup of user's best scores
+    const bestScoresMap = new Map(userBestScores.map((score) => [score.gameType, score]));
 
     const highScores = availableTypes.map(({ gameType }) => {
-      const best = userBestMap.get(gameType);
+      const best = bestScoresMap.get(gameType);
+
       return {
         gameType,
         score: best?.score ?? 0,
@@ -206,7 +264,7 @@ export const getUserHighScores = async (req: AuthRequest, res: Response): Promis
       data: highScores,
     });
   } catch (error) {
-    console.error('Error fetching user high scores:', error);
+    logger.error('Error fetching user high scores:', error);
     res.status(500).json({ error: 'Failed to fetch high scores' });
   }
 };
@@ -221,7 +279,8 @@ export const getUserGameHistory = async (req: AuthRequest, res: Response): Promi
     }
 
     const requestedType = parseGameType(req.query.gameType);
-    const limit = Math.min(Number.parseInt(String(req.query.limit ?? '50'), 10) || 50, 100);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? '50'), 10);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 50 : parsedLimit, 1), 100);
 
     const where: Prisma.GameScoreWhereInput = {
       userId,
@@ -242,7 +301,7 @@ export const getUserGameHistory = async (req: AuthRequest, res: Response): Promi
       })),
     });
   } catch (error) {
-    console.error('Error fetching game history:', error);
+    logger.error('Error fetching game history:', error);
     res.status(500).json({ error: 'Failed to fetch game history' });
   }
 };
@@ -309,7 +368,7 @@ export const getGameStats = async (req: AuthRequest, res: Response): Promise<voi
       },
     });
   } catch (error) {
-    console.error('Error fetching game stats:', error);
+    logger.error('Error fetching game stats:', error);
     res.status(500).json({ error: 'Failed to fetch game stats' });
   }
 };
