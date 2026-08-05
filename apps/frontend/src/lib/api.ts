@@ -85,14 +85,8 @@ const getAuthToken = async (): Promise<string | null> => {
 
   try {
     session = await getSession();
-    console.log('[API] Session retrieved:', {
-      hasUser: !!session?.user,
-      email: session?.user?.email,
-      hasAccessToken: !!session?.accessToken,
-      hasBackendAccessToken: !!(session as any)?.backendAccessToken,
-    });
-  } catch (error) {
-    console.error('[API] Failed to get session:', error);
+  } catch {
+    // Ignore session errors and fall back to stored token
   }
 
   const candidates = [
@@ -101,28 +95,19 @@ const getAuthToken = async (): Promise<string | null> => {
     sanitizeToken(localStorage.getItem('accessToken')),
   ];
 
-  console.log('[API] Checking token candidates:', {
-    backendAccessToken: candidates[0] ? 'present' : 'missing',
-    sessionAccessToken: candidates[1] ? 'present' : 'missing',
-    localStorageToken: candidates[2] ? 'present' : 'missing',
-  });
-
   for (let i = 0; i < candidates.length; i++) {
     const candidate = candidates[i];
     if (candidate) {
       const isValid = isBackendJwt(candidate);
       const isExpired = isJwtExpired(candidate);
-      console.log(`[API] Candidate ${i}: valid=${isValid}, expired=${isExpired}`);
 
       if (isValid && !isExpired) {
-        console.log('[API] Using valid token from candidate', i);
         persistBackendToken(candidate);
         return candidate;
       }
     }
   }
 
-  console.error('[API] No valid backend token available in session or local storage');
   return null;
 }; /**
  * Generate a backend JWT token by calling the backend auth endpoint
@@ -136,9 +121,7 @@ const getAuthToken = async (): Promise<string | null> => {
 async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { cacheKey, cacheTtl, skipCache, ...requestInit } = options;
 
-  console.log(`[API] Fetching ${endpoint}`);
   const token = await getAuthToken();
-  console.log(`[API] Token for ${endpoint}:`, token ? 'present' : 'MISSING');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -155,31 +138,25 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   if (effectiveCacheKey) {
     const cached = getCache<T>(effectiveCacheKey);
     if (cached) {
-      console.log(`[API] Returning cached data for ${endpoint}`);
       return cached;
     }
   }
 
   const url = `${API_BASE_URL}/api/${API_VERSION}${endpoint}`;
-  console.log(`[API] Making request to: ${url}`);
 
   const response = await fetch(url, {
     ...requestInit,
     headers,
   });
 
-  console.log(`[API] Response from ${endpoint}:`, response.status, response.statusText);
-
   if (!response.ok) {
     const error = await response.json().catch(() => ({
       error: 'An error occurred',
     }));
-    console.error(`[API] Request failed for ${endpoint}:`, error);
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
   const data = (await response.json()) as T;
-  console.log(`[API] Data received from ${endpoint}:`, data);
 
   if (effectiveCacheKey) {
     setCache(effectiveCacheKey, data, cacheTtl ?? DEFAULT_CACHE_TTL);
@@ -217,6 +194,9 @@ export const authAPI = {
       localStorage.setItem('refreshToken', response.refreshToken);
     }
 
+    // Clear any cached data from a previous user to avoid cross-user data leaks
+    clearCache();
+
     return response;
   },
 
@@ -243,6 +223,9 @@ export const authAPI = {
       persistBackendToken(response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
     }
+
+    // Clear any cached data from a previous user to avoid cross-user data leaks
+    clearCache();
 
     return response;
   },
@@ -608,6 +591,8 @@ export const lessonAPI = {
         minAccuracy: number;
         exerciseType: string;
         content: string;
+        section: number;
+        isCheckpoint: boolean;
         userProgress?: Array<{
           completed: boolean;
           bestWpm: number;
@@ -657,8 +642,6 @@ export const lessonAPI = {
     invalidateCache('lessons:sections:coding');
     invalidateCache('lessons:sections:assessment');
     invalidateCacheByPrefix('lessons:section:');
-
-    console.log('[API] Invalidated lesson caches after progress save');
 
     return response;
   },
