@@ -155,7 +155,7 @@ const SENTENCE_BANK: TextTemplate[] = [
     category: 'literature',
     difficulty: 'medium',
     templates: [
-      'Shakespeare\'s plays explore timeless themes of love, power, and betrayal.',
+      "Shakespeare's plays explore timeless themes of love, power, and betrayal.",
       'Victorian literature reflected the social changes of Industrial Revolution England.',
       'Modernist writers experimented with stream-of-consciousness narrative techniques.',
       'Romantic poets celebrated nature and individual emotional experience.',
@@ -169,7 +169,7 @@ const SENTENCE_BANK: TextTemplate[] = [
       'Allegorical tales convey moral lessons through symbolic narratives.',
       'Epistolary novels unfold through letters and correspondence.',
       'Frame narratives contain stories within stories.',
-      'Unreliable narrators challenge readers\' perceptions of truth.',
+      "Unreliable narrators challenge readers' perceptions of truth.",
       'Foreshadowing hints at future events in the plot.',
       'Flashbacks provide crucial backstory and context.',
       'In medias res begins stories in the middle of action.',
@@ -194,7 +194,7 @@ const SENTENCE_BANK: TextTemplate[] = [
     templates: [
       'Postcolonial literature deconstructs imperial narratives and reclaims marginalized voices through subversive counter-discourse.',
       'Deconstructionist theory challenges the stability of meaning and exposes inherent contradictions within textual structures.',
-      'The Bloomsbury Group\'s experimental modernism rejected Victorian conventions in favor of psychological realism and formal innovation.',
+      "The Bloomsbury Group's experimental modernism rejected Victorian conventions in favor of psychological realism and formal innovation.",
       'Intertextuality reveals how texts reference, transform, and derive meaning from other literary and cultural works.',
       'Feminist literary criticism examines gender representations and challenges patriarchal assumptions embedded in canonical texts.',
       'Psychoanalytic approaches apply Freudian and Lacanian concepts to analyze unconscious desires and symbolic meanings in literature.',
@@ -208,7 +208,7 @@ const SENTENCE_BANK: TextTemplate[] = [
       'The carnivalesque inverts social hierarchies and celebrates grotesque bodily imagery as a form of cultural resistance.',
       'Mimesis refers to artistic representation and imitation of reality, debated since Plato and Aristotle.',
       'Defamiliarization makes familiar objects strange, forcing renewed perception through artistic techniques.',
-      'The anxiety of influence describes poets\' struggle with their predecessors\' overwhelming literary legacy.',
+      "The anxiety of influence describes poets' struggle with their predecessors' overwhelming literary legacy.",
       'Objective correlative externalizes emotion through concrete objects that evoke specific feelings.',
       'Negative capability embraces uncertainty and mystery without seeking definitive answers or resolutions.',
       'The intentional fallacy warns against reducing textual meaning to authorial intention.',
@@ -259,7 +259,7 @@ const SENTENCE_BANK: TextTemplate[] = [
       'Effective communication requires both clear expression and active listening skills.',
       'Critical thinking involves analyzing information objectively before forming conclusions.',
       'Time management helps balance multiple responsibilities and priorities effectively.',
-      'Emotional intelligence enables understanding and managing both personal and others\' feelings.',
+      "Emotional intelligence enables understanding and managing both personal and others' feelings.",
       'Problem-solving skills combine creativity with logical reasoning to overcome challenges.',
       'Adaptability allows individuals to thrive in changing circumstances and environments.',
       'Collaboration leverages diverse perspectives to achieve common goals more efficiently.',
@@ -303,7 +303,7 @@ const SENTENCE_BANK: TextTemplate[] = [
       'Quality assurance maintains product standards through systematic testing and review.',
       'Human resources departments recruit, develop, and retain talented employees.',
       'Performance metrics quantify progress toward business goals and objectives.',
-      'Competitive analysis examines rivals\' strengths, weaknesses, and market positions.',
+      "Competitive analysis examines rivals' strengths, weaknesses, and market positions.",
       'Value propositions articulate unique benefits that attract target customers.',
       'Sales funnels guide prospects through stages from awareness to purchase.',
       'Pricing strategies balance profitability with market demand and competition.',
@@ -331,7 +331,7 @@ const SENTENCE_BANK: TextTemplate[] = [
     difficulty: 'medium',
     templates: [
       'Photosynthesis converts light energy into chemical energy stored in glucose molecules.',
-      'Newton\'s laws of motion describe relationships between forces and object movement.',
+      "Newton's laws of motion describe relationships between forces and object movement.",
       'The periodic table organizes elements by atomic number and chemical properties.',
       'DNA contains genetic instructions for development and functioning of living organisms.',
       'Cellular respiration releases energy from glucose through metabolic processes.',
@@ -369,10 +369,10 @@ const SENTENCE_BANK: TextTemplate[] = [
     templates: [
       'Quantum entanglement exhibits correlations between particles that persist regardless of spatial separation, challenging classical locality.',
       'CRISPR-Cas9 gene editing technology enables precise modifications to DNA sequences through programmable nuclease enzymes.',
-      'Heisenberg\'s uncertainty principle establishes fundamental limits on simultaneous measurement precision of complementary variables.',
+      "Heisenberg's uncertainty principle establishes fundamental limits on simultaneous measurement precision of complementary variables.",
       'Telomeres protect chromosomal ends from degradation, with their shortening associated with cellular aging processes.',
       'The Standard Model describes fundamental particles and forces through quantum field theory frameworks.',
-      'Neuroplasticity demonstrates the brain\'s capacity to reorganize synaptic connections in response to experience and injury.',
+      "Neuroplasticity demonstrates the brain's capacity to reorganize synaptic connections in response to experience and injury.",
       'Dark matter comprises approximately 85% of universal mass, detectable only through gravitational effects.',
       'Epigenetic modifications regulate gene expression without altering underlying DNA sequences, influencing phenotypes.',
       'Superconductivity eliminates electrical resistance below critical temperatures through quantum mechanical phenomena.',
@@ -413,7 +413,9 @@ function getRandomSentence(category?: TextCategory, difficulty?: TextDifficulty)
   }
 
   // Get available sentences that haven't been used recently
-  let availableSentences = filteredTemplates.flatMap((t) => t.templates).filter((s) => !usedSentences.has(s));
+  let availableSentences = filteredTemplates
+    .flatMap((t) => t.templates)
+    .filter((s) => !usedSentences.has(s));
 
   // Reset used sentences if we've exhausted the pool
   if (availableSentences.length === 0) {
@@ -491,7 +493,10 @@ export function clearSentenceCache(): void {
  * Get statistics about available sentences
  */
 export function getSentenceBankStats() {
-  const totalSentences = SENTENCE_BANK.reduce((sum, template) => sum + template.templates.length, 0);
+  const totalSentences = SENTENCE_BANK.reduce(
+    (sum, template) => sum + template.templates.length,
+    0
+  );
 
   const byCategory = SENTENCE_BANK.reduce(
     (acc, template) => {

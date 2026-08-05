@@ -109,7 +109,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Optimization: Parallelize independent database queries using Promise.all to reduce latency.
+// Optimization: Parallelize independent database queries using Promise.all to reduce latency.
     // This executes all queries concurrently in a single roundtrip/parallel processing instead of sequentially.
     // Time complexity change: O(T1 + T2 + T3) -> O(max(T1, T2, T3))
     const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
@@ -130,7 +130,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
         GROUP BY "fingerUsed"
         ORDER BY count DESC
       `,
-      // 3. Get recent mistakes for context
+// 3. Get recent mistakes for context
       prisma.typingMistake.findMany({
         where: { userId },
         orderBy: { timestamp: 'desc' },

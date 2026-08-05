@@ -135,20 +135,23 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
     ]);
 
     const userAchievementMap = new Map<string, Date>(
-      userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt] as [string, Date])
+      userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt as Date] as const)
     );
 
     // Combine data
-    const achievementsWithStatus = achievements.map((achievement) => ({
-      id: achievement.id,
-      title: achievement.title,
-      description: achievement.description,
-      icon: achievement.icon,
-      points: achievement.points,
-      requirement: achievement.requirement,
-      unlocked: userAchievementMap.has(achievement.id),
-      unlockedAt: userAchievementMap.get(achievement.id)?.toISOString() || null,
-    }));
+    const achievementsWithStatus = achievements.map((achievement) => {
+      const unlockedAt = userAchievementMap.get(achievement.id);
+      return {
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon,
+        points: achievement.points,
+        requirement: achievement.requirement,
+        unlocked: !!unlockedAt,
+        unlockedAt: unlockedAt ? unlockedAt.toISOString() : null,
+      };
+    });
 
     return res.json({
       achievements: achievementsWithStatus,
@@ -187,6 +190,7 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
     ]);
 
     const unlockedAchievementIds = new Set(userAchievements.map((ua) => ua.achievementId));
+
     const toUnlock: typeof achievements = [];
 
     // Check each achievement using pre-fetched metrics
@@ -199,10 +203,15 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
         const requirement = JSON.parse(achievement.requirement);
         const checkerFn =
           checkAchievementRequirements[
-            requirement.type as keyof typeof checkAchievementRequirements
+            requirement?.type as keyof typeof checkAchievementRequirements
           ];
 
-        if (checkerFn && checkerFn(metrics)) {
+        if (!checkerFn) {
+          logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
+          continue;
+        }
+
+        if (checkerFn(metrics)) {
           toUnlock.push(achievement);
         }
       } catch (error) {
@@ -254,9 +263,10 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     }
 
     // Optimization: Parallelize independent aggregate and list queries
-    const [totalAchievements, totalPointsAgg, userAchievements, recentUnlocks] = await Promise.all([
-      prisma.achievement.count(),
+    // Further optimization: Consolidate redundant aggregate queries into a single call
+    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
       prisma.achievement.aggregate({
+        _count: { _all: true },
         _sum: { points: true },
       }),
       prisma.userAchievement.findMany({
@@ -279,7 +289,8 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       }),
     ]);
 
-    const totalPoints = totalPointsAgg._sum.points || 0;
+    const totalAchievements = achievementAggregates._count._all;
+    const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
 
@@ -319,10 +330,8 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Use optimized fetchUserMetrics helper to get all stats in parallel
     const metrics = await fetchUserMetrics(userId);
 
-    // Calculate progress for each achievement type using pre-fetched metrics
     const progress = {
       // Consistency achievements
       dedicated: Math.min((metrics.testCount / 10) * 100, 100),
