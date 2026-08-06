@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
 // Validation schemas
 const logMistakeSchema = z.object({
   lessonId: z.string().uuid('Invalid lesson ID'),
@@ -21,7 +25,7 @@ const logMistakeSchema = z.object({
  * Log typing mistakes from a lesson attempt
  * POST /api/v1/mistakes/log
  */
-export const logMistakes = async (req: Request, res: Response): Promise<void> => {
+export const logMistakes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { lessonId, mistakes } = logMistakeSchema.parse(req.body);
     const userId = req.userId;
@@ -92,7 +96,7 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
  * Get weak key analysis for a user
  * GET /api/v1/mistakes/analysis/:userId
  */
-export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<void> => {
+export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
@@ -123,7 +127,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
         orderBy: { errorCount: 'desc' },
         take: limit,
       }),
-      // 2. Get finger-specific error patterns
+      // 2. Get finger-specific error patterns via raw query
       prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
         SELECT
           "fingerUsed",
@@ -173,7 +177,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
  * Generate targeted practice text based on weak keys
  * GET /api/v1/mistakes/practice/:userId
  */
-export const generatePracticeText = async (req: Request, res: Response): Promise<void> => {
+export const generatePracticeText = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
