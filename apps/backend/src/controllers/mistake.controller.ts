@@ -113,10 +113,13 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // OPTIMIZATION: Shift from sequential (serial) execution of independent database queries
-    // to concurrent parallel execution using Promise.all. This prevents unnecessary blocking
-    // and reduces endpoint response time from the sum of all three queries (O(A + B + C))
-    // to only the latency of the slowest single query (O(max(A, B, C))).
+    /*
+     * PERFORMANCE OPTIMIZATION (Before vs. After):
+     * Before: Three independent database queries were executed sequentially using 'await'.
+     *         Latency: O(T1 + T2 + T3) where each T is the duration of an individual query.
+     * After:  All three queries are parallelized using 'Promise.all'.
+     *         Latency: O(max(T1, T2, T3)), significantly reducing endpoint response time.
+     */
     const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
       // 1. Get user's weak keys, sorted by error count
       prisma.userWeakKeys.findMany({
@@ -130,7 +133,7 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
           "fingerUsed",
           COUNT(*) as count
         FROM "typing_mistakes"
-        WHERE "userId" = ${userId}
+          WHERE "userId" = ${userId}
           AND "fingerUsed" IS NOT NULL
         GROUP BY "fingerUsed"
         ORDER BY count DESC
