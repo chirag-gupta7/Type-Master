@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 // Keyboard layout definition
@@ -97,6 +97,85 @@ interface VisualKeyboardProps {
   className?: string;
 }
 
+interface KeyboardKeyProps {
+  keyChar: string;
+  width: string;
+  homeRow?: boolean;
+  state: 'target' | 'correct' | 'incorrect' | 'neutral';
+  isAnimating: boolean;
+  compact: boolean;
+  showHomeRowMarkers: boolean;
+}
+
+// Extract KeyboardKey into a memoized component to avoid unnecessary re-renders.
+// Since keys are stateless components that only rely on clean, primitive inputs,
+// memoization avoids re-rendering all ~60+ keys in the layout on every key press event.
+const KeyboardKey = React.memo(function KeyboardKey({
+  keyChar,
+  width,
+  homeRow,
+  state,
+  isAnimating,
+  compact,
+  showHomeRowMarkers,
+}: KeyboardKeyProps) {
+  const keyClass = cn(
+    'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
+    'border-2 select-none',
+    compact ? 'text-xs' : 'text-sm',
+    width,
+    {
+      // Target key (yellow)
+      'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
+        state === 'target',
+
+      // Correct key (green)
+      'bg-green-500/20 border-green-600 text-green-700 dark:text-green-300 shadow-lg shadow-green-500/20':
+        state === 'correct',
+
+      // Incorrect key (red)
+      'bg-red-500/20 border-red-600 text-red-700 dark:text-red-300 shadow-lg shadow-red-500/20':
+        state === 'incorrect',
+
+      // Neutral key
+      'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
+    },
+    {
+      'scale-95': isAnimating,
+      'scale-100': !isAnimating,
+    },
+    {
+      'animate-pulse': state === 'target',
+    }
+  );
+
+  return (
+    <div className={keyClass} role="button" aria-label={keyChar}>
+      {/* Key label */}
+      <span className="relative z-10">{keyChar === 'Space' ? '' : keyChar}</span>
+
+      {/* Home row markers (bumps on F and J) */}
+      {showHomeRowMarkers && homeRow && (
+        <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2">
+          <div className="w-2 h-1 bg-current opacity-30 rounded-full" />
+        </div>
+      )}
+
+      {/* Target key indicator (pulsing dot) */}
+      {state === 'target' && (
+        <div className="absolute -top-1 -right-1">
+          <span className="flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+});
+
+KeyboardKey.displayName = 'KeyboardKey';
+
 /**
  * VisualKeyboard Component
  *
@@ -106,16 +185,6 @@ interface VisualKeyboardProps {
  * - Yellow: Target key to press
  * - Home row markers on F and J keys
  * - Responsive animations
- *
- * @example
- * ```tsx
- * <VisualKeyboard
- *   targetKey="a"
- *   pressedKey="a"
- *   isCorrect={true}
- *   showHomeRowMarkers={true}
- * />
- * ```
  */
 export function VisualKeyboard({
   targetKey,
@@ -153,107 +222,63 @@ export function VisualKeyboard({
     return undefined;
   }, [pressedKey]);
 
-  // Get key state (target, correct, incorrect, neutral)
-  const getKeyState = (keyCode: string, keyChar: string) => {
-    const normalizedTarget = targetKey ? normalizeKey(targetKey) : null;
-    const normalizedPressed = pressedKey ? normalizeKey(pressedKey) : null;
-    const normalizedKeyCode = keyCode;
-    const normalizedKeyChar = keyChar.toUpperCase();
-
-    // Check if this is the target key
-    const isTarget =
-      normalizedTarget === normalizedKeyCode ||
-      normalizedTarget === normalizedKeyChar ||
-      (normalizedTarget === 'SPACE' && keyCode === 'Space');
-
-    // Check if this key was just pressed
-    const wasPressed =
-      normalizedPressed === normalizedKeyCode ||
-      normalizedPressed === normalizedKeyChar ||
-      (normalizedPressed === 'SPACE' && keyCode === 'Space');
-
-    if (isTarget) return 'target';
-    if (wasPressed && isCorrect) return 'correct';
-    if (wasPressed && !isCorrect) return 'incorrect';
-    return 'neutral';
-  };
-
-  // Get key styling based on state
-  const getKeyClassName = (keyCode: string, keyChar: string, width: string) => {
-    const state = getKeyState(keyCode, keyChar);
-    const isAnimating = animatingKey === keyCode || animatingKey === keyChar.toUpperCase();
-
-    return cn(
-      // Base styles
-      'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
-      'border-2 select-none',
-      compact ? 'text-xs' : 'text-sm',
-      width,
-
-      // State-based colors
-      {
-        // Target key (yellow)
-        'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
-          state === 'target',
-
-        // Correct key (green)
-        'bg-green-500/20 border-green-600 text-green-700 dark:text-green-300 shadow-lg shadow-green-500/20':
-          state === 'correct',
-
-        // Incorrect key (red)
-        'bg-red-500/20 border-red-600 text-red-700 dark:text-red-300 shadow-lg shadow-red-500/20':
-          state === 'incorrect',
-
-        // Neutral key
-        'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
-      },
-
-      // Animation
-      {
-        'scale-95': isAnimating,
-        'scale-100': !isAnimating,
-      },
-
-      // Pulse animation for target key
-      {
-        'animate-pulse': state === 'target',
-      }
-    );
-  };
+  // --- OPTIMIZATION (Before vs. After) ---
+  // Before:
+  //   - Normalization helpers were executed repeatedly inside individual key lookups.
+  //   - Every key was a plain element, forcing all ~60+ keys to completely re-render on *every* single keystroke.
+  //   - Time Complexity: O(Keys) per keystroke due to complete Virtual DOM recreation and DOM tree checks.
+  // After:
+  //   - Pre-normalize comparison values once at the parent component using useMemo.
+  //   - Individual keys extracted into `KeyboardKey` wrapped in `React.memo`.
+  //   - Time Complexity: O(1) rendering overhead per keystroke, since only the active key and target key undergo state transition.
+  const normalizedTarget = useMemo(() => (targetKey ? normalizeKey(targetKey) : null), [targetKey]);
+  const normalizedPressed = useMemo(() => (pressedKey ? normalizeKey(pressedKey) : null), [pressedKey]);
 
   return (
     <div className={cn('w-full max-w-5xl mx-auto', className)}>
       <div className="space-y-2">
         {KEYBOARD_LAYOUT.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2 justify-center">
-            {row.map((keyData) => (
-              <div
-                key={keyData.code}
-                className={getKeyClassName(keyData.code, keyData.key, keyData.width)}
-                role="button"
-                aria-label={keyData.key}
-              >
-                {/* Key label */}
-                <span className="relative z-10">{keyData.key === 'Space' ? '' : keyData.key}</span>
+            {row.map((keyData) => {
+              const normalizedKeyCode = keyData.code;
+              const normalizedKeyChar = keyData.key.toUpperCase();
 
-                {/* Home row markers (bumps on F and J) */}
-                {showHomeRowMarkers && keyData.homeRow && (
-                  <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2">
-                    <div className="w-2 h-1 bg-current opacity-30 rounded-full" />
-                  </div>
-                )}
+              // Determine key state (target, correct, incorrect, neutral)
+              let state: 'target' | 'correct' | 'incorrect' | 'neutral' = 'neutral';
+              const isTarget =
+                normalizedTarget === normalizedKeyCode ||
+                normalizedTarget === normalizedKeyChar ||
+                (normalizedTarget === 'SPACE' && keyData.code === 'Space');
 
-                {/* Target key indicator (pulsing dot) */}
-                {getKeyState(keyData.code, keyData.key) === 'target' && (
-                  <div className="absolute -top-1 -right-1">
-                    <span className="flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+              if (isTarget) {
+                state = 'target';
+              } else {
+                const wasPressed =
+                  normalizedPressed === normalizedKeyCode ||
+                  normalizedPressed === normalizedKeyChar ||
+                  (normalizedPressed === 'SPACE' && keyData.code === 'Space');
+
+                if (wasPressed) {
+                  state = isCorrect ? 'correct' : 'incorrect';
+                }
+              }
+
+              const isAnimating =
+                animatingKey === keyData.code || animatingKey === keyData.key.toUpperCase();
+
+              return (
+                <KeyboardKey
+                  key={keyData.code}
+                  keyChar={keyData.key}
+                  width={keyData.width}
+                  homeRow={keyData.homeRow}
+                  state={state}
+                  isAnimating={isAnimating}
+                  compact={compact}
+                  showHomeRowMarkers={showHomeRowMarkers}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
