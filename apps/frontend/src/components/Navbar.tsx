@@ -49,11 +49,15 @@ export function Navbar() {
     setMounted(true);
   }, []);
 
+  // Reset loading state on route change
+  useEffect(() => {
+    setLoading(false);
+  }, [pathname, setLoading]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl+Number shortcuts
-      if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '7') {
         const link = navLinks.find((l) => l.shortcut === e.key);
         if (link) {
           e.preventDefault();
@@ -71,8 +75,12 @@ export function Navbar() {
   };
 
   const handleSignOut = async () => {
-    authAPI.logout();
-    await signOut({ callbackUrl: '/' });
+    try {
+      authAPI.logout();
+      await signOut({ callbackUrl: '/' });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   return (

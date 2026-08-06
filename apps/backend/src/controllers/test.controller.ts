@@ -75,8 +75,8 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const { page = '1', limit = '20', duration } = req.query;
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
+    const pageNum = Math.max(parseInt(page as string, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
     const where = {
@@ -161,7 +161,7 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const { duration, days = '30' } = req.query;
-    const daysNum = parseInt(days as string, 10);
+    const daysNum = Math.max(parseInt(days as string, 10) || 30, 1);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
@@ -171,8 +171,8 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       ...(duration && { duration: parseInt(duration as string, 10) }),
     };
 
-    // Optimization: Use database aggregation to calculate statistics instead of in-memory.
-    // This pushes the computation to the database and reduces data transfer from O(N) to O(1).
+    // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate'.
+    // We also parallelize the aggregate and findMany calls to minimize total response time.
     const [aggregates, recentTests] = await Promise.all([
       prisma.testResult.aggregate({
         where,
@@ -200,17 +200,15 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       }),
     ]);
 
-    const stats = {
-      averageWpm: Math.round(aggregates._avg.wpm || 0),
-      averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
-      bestWpm: aggregates._max.wpm || 0,
-      bestAccuracy: aggregates._max.accuracy || 0,
-      totalTests: aggregates._count._all,
-      recentTests,
-    };
-
     res.json({
-      stats,
+      stats: {
+        averageWpm: Math.round(aggregates._avg.wpm || 0),
+        averageAccuracy: Math.round(aggregates._avg.accuracy || 0),
+        bestWpm: aggregates._max.wpm || 0,
+        bestAccuracy: aggregates._max.accuracy || 0,
+        totalTests: aggregates._count._all,
+        recentTests,
+      },
       period: `Last ${daysNum} days`,
     });
   } catch (error) {

@@ -109,7 +109,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    /*
+/*
      * PERFORMANCE OPTIMIZATION (Before vs. After):
      * Before: Three independent database queries were executed sequentially using 'await'.
      *         Latency: O(T1 + T2 + T3) where each T is the duration of an individual query.
@@ -123,7 +123,6 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
         orderBy: { errorCount: 'desc' },
         take: limit,
       }),
-
       // 2. Get finger-specific error patterns
       prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
         SELECT
@@ -135,7 +134,6 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
         GROUP BY "fingerUsed"
         ORDER BY count DESC
       `,
-
       // 3. Get recent mistakes for context
       prisma.typingMistake.findMany({
         where: { userId },
