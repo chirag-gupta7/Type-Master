@@ -33,6 +33,7 @@ jest.mock('../utils/prisma', () => ({
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
+    warn: jest.fn(),
     error: jest.fn(),
   },
 }));
@@ -113,6 +114,7 @@ describe('AchievementController', () => {
         _count: { _all: 5 },
       });
       (prisma.testResult.count as jest.Mock).mockResolvedValue(2);
+      (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
       (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
       (prisma.testResult.findMany as jest.Mock).mockResolvedValue([
@@ -126,7 +128,7 @@ describe('AchievementController', () => {
       expect(prisma.achievement.findMany).toHaveBeenCalled();
       expect(prisma.testResult.aggregate).toHaveBeenCalledWith({
         where: { userId: 'user-123' },
-        _max: { wpm: true, accuracy: true },
+        _max: { wpm: true },
         _count: { _all: true },
       });
 

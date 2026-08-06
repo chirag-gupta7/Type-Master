@@ -15,14 +15,20 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
-// Security enhancement: Rely strictly on Express's secure, built-in req.ip to prevent IP spoofing
 export const getRequestIp = (req: Request): string => {
-  return req.ip || 'unknown';
+  // SECURITY FIX: Rely on Express's secure, built-in req.ip (which respects the trust proxy
+  // configuration set in index.ts) instead of manually parsing the potentially spoofable
+  // X-Forwarded-For header. This prevents IP spoofing rate limiter bypasses.
+  return req.ip || req.socket.remoteAddress || 'unknown';
 };
 
-// Security enhancement: Use strictly IP-based rate limiting keys to prevent password spraying attacks
 export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
+
+  // SECURITY FIX: Rate limit strictly by the client's IP address rather than the specific
+  // email-IP combination (email:${email}:ip:${ip}). This prevents credential stuffing
+  // and password spraying attacks where an attacker tests many different email addresses
+  // from a single IP, as each request will now increment the same IP-based limit pool.
   return `ip:${ip}`;
 };
 
