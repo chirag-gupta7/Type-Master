@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import { logMistakes, getWeakKeyAnalysis, generatePracticeText } from './mistake.controller';
 import { prisma } from '../utils/prisma';
 

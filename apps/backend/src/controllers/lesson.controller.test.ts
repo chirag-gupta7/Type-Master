@@ -27,7 +27,7 @@ jest.mock('../utils/logger', () => ({
   },
 }));
 
-describe('LessonController', () => {
+describe('LessonController - getLearningStats and getProgressVisualization', () => {
   let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
   let mockResponse: Partial<Response>;
   let nextMock: jest.Mock;
