@@ -45,3 +45,9 @@
 **Vulnerability:** The rate limiter manually parsed `X-Forwarded-For` without validating proxies, and utilized a combined `email:${email}:ip:${ip}` key for auth rate-limiting.
 **Learning:** Manual header parsing bypasses Express's secure `req.ip` trust-proxy negotiation, leading to IP spoofing. Additionally, combining email with IP in the rate-limiting key creates a credential stuffing blind spot, allowing attackers to test different emails from the same IP without hitting any limit.
 **Prevention:** Always rely on `req.ip` for IP-based validation, and rate limit authentication endpoints strictly by client IP address (`ip:${ip}`) to block brute-forcing and password spraying.
+
+## 2026-08-06 - [Insecure Input Validation in AI Proxy Endpoints]
+
+**Vulnerability:** The AI proxy endpoints (`/api/v1/ai/typing-feedback`, `/api/v1/ai/writing-feedback`, and `/api/v1/ai/story-response`) lacked any input validation schemas or constraints, allowing attackers to submit arbitrary types, excessively long strings/arrays, or negative/overflow numerical values.
+**Learning:** Lacking validation on AI proxy endpoints exposes the backend to severe prompt injection attacks, API abuse, and Denial of Service (DoS) / high-cost resource exhaustion from the third-party AI provider.
+**Prevention:** Always implement strict, schema-based Zod validation to enforce type constraints, range limits, and maximum string/array lengths on all inputs before proxying them to third-party AI APIs.
