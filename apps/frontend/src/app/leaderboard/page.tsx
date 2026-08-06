@@ -41,9 +41,11 @@ export default function LeaderboardPage() {
         >
           <div className="inline-flex items-center gap-2 bg-[var(--theme-primary)]/10 px-4 py-2 rounded-full mb-4">
             <Trophy className="w-5 h-5 text-[var(--theme-primary)]" />
-            <span className="text-sm font-medium text-[var(--theme-primary)]">Global Leaderboard</span>
+            <span className="text-sm font-medium text-[var(--theme-primary)]">
+              Global Leaderboard
+            </span>
           </div>
-          
+
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] bg-clip-text text-transparent">
             Top Typists Worldwide
           </h1>
@@ -75,28 +77,28 @@ export default function LeaderboardPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4, delay: 0.3 + index * 0.05 }}
               className={`grid grid-cols-12 gap-4 px-6 py-4 border-b border-border/50 hover:bg-[var(--theme-primary)]/5 transition-colors ${
-                entry.rank <= 3 ? 'bg-gradient-to-r from-[var(--theme-primary)]/10 to-transparent' : ''
+                entry.rank <= 3
+                  ? 'bg-gradient-to-r from-[var(--theme-primary)]/10 to-transparent'
+                  : ''
               }`}
             >
-              <div className="col-span-1 flex items-center">
-                {getRankIcon(entry.rank)}
-              </div>
-              
+              <div className="col-span-1 flex items-center">{getRankIcon(entry.rank)}</div>
+
               <div className="col-span-4 flex items-center">
                 <span className="font-semibold text-foreground">{entry.name}</span>
               </div>
-              
+
               <div className="col-span-2 flex items-center">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-[var(--theme-accent)]" />
                   <span className="text-lg font-bold text-[var(--theme-primary)]">{entry.wpm}</span>
                 </div>
               </div>
-              
+
               <div className="col-span-2 flex items-center">
                 <span className="text-foreground">{entry.accuracy}%</span>
               </div>
-              
+
               <div className="col-span-3 flex items-center">
                 <span className="text-muted-foreground">{entry.tests.toLocaleString()}</span>
               </div>

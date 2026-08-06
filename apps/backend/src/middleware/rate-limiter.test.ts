@@ -47,5 +47,26 @@ describe('Rate Limiting Middleware Helpers', () => {
 
       expect(getAuthRateLimitKey(req)).toBe('ip:192.168.1.2');
     });
+
+    it('should produce identical keys for different emails from the same IP (blocks credential stuffing)', () => {
+      const req1 = {
+        ip: '203.0.113.50',
+        body: { email: 'victim1@example.com' },
+        socket: { remoteAddress: '127.0.0.1' },
+      } as unknown as Request;
+
+      const req2 = {
+        ip: '203.0.113.50',
+        body: { email: 'victim2@example.com' },
+        socket: { remoteAddress: '127.0.0.1' },
+      } as unknown as Request;
+
+      const key1 = getAuthRateLimitKey(req1);
+      const key2 = getAuthRateLimitKey(req2);
+
+      expect(key1).toBe('ip:203.0.113.50');
+      expect(key2).toBe('ip:203.0.113.50');
+      expect(key1).toBe(key2);
+    });
   });
 });
