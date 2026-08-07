@@ -1,6 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+
+// Input validation schemas for strict types, range checks, and maximum lengths
+// to prevent prompt injection and Denial of Service (DoS) or high-cost resource exhaustion attacks.
+const typingFeedbackSchema = z.object({
+  wpm: z.number().nonnegative('WPM must be non-negative').max(1000, 'WPM is too high'),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100'),
+  errors: z.number().nonnegative('Errors must be non-negative').max(1000, 'Errors is too high'),
+  duration: z.number().positive('Duration must be positive').max(3600, 'Duration is too high'),
+});
+
+const writingFeedbackSchema = z.object({
+  text: z.string().min(1, 'Text is required').max(2000, 'Text exceeds maximum allowed length'),
+  type: z.enum(['prompt-dash', 'story-chain']).default('prompt-dash'),
+  priorFeedback: z.string().max(2000, 'Prior feedback exceeds maximum allowed length').nullable().optional(),
+});
+
+const storyResponseSchema = z.object({
+  story: z
+    .array(z.string().min(1, 'Story part cannot be empty').max(1000, 'Story part exceeds maximum allowed length'))
+    .min(1, 'Story history is required')
+    .max(50, 'Story history is too long'),
+});
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
@@ -80,11 +103,7 @@ const callGemini = async (
  */
 export const getTypingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { wpm, accuracy, errors, duration } = req.body;
-
-    if (wpm === undefined || accuracy === undefined) {
-      throw new AppError(400, 'Missing required performance metrics');
-    }
+    const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
     const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
@@ -113,15 +132,7 @@ export const generateWritingPrompt = async (_req: Request, res: Response, next: 
 
 export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { text, type, priorFeedback } = req.body as {
-      text?: string;
-      type?: 'prompt-dash' | 'story-chain';
-      priorFeedback?: string | null;
-    };
-
-    if (!text || !text.trim()) {
-      throw new AppError(400, 'Text is required');
-    }
+    const { text, type, priorFeedback } = writingFeedbackSchema.parse(req.body);
 
     const mode = type === 'story-chain' ? 'story-chain' : 'prompt-dash';
     const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${mode}.`;
@@ -138,10 +149,7 @@ export const getWritingFeedback = async (req: Request, res: Response, next: Next
 
 export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { story } = req.body as { story?: string[] };
-    if (!Array.isArray(story) || story.length === 0) {
-      throw new AppError(400, 'Story history is required');
-    }
+    const { story } = storyResponseSchema.parse(req.body);
 
     const storyContext = story.join('\n');
     const response = await callGemini(

@@ -45,3 +45,8 @@
 **Vulnerability:** The backend rate limiter manually extracted `X-Forwarded-For` headers instead of relying on Express's secure `req.ip` setting, allowing clients to bypass rate limiting entirely by spoofing proxy headers. Furthermore, the authentication rate limiter used a composite key of `email:${email}:ip:${ip}` when email was present, enabling credential stuffing and password spraying attacks against multiple users from a single IP.
 **Learning:** Manual extraction of client IPs from proxy headers bypasses the built-in, secure `trust proxy` mechanism of Express, introducing IP spoofing risks. In addition, authentication rate limiting must be strictly IP-based to ensure attackers cannot spray password attempts against different accounts from the same source.
 **Prevention:** Always rely strictly on Express's secure `req.ip` to determine the client IP (which correctly honors `trust proxy` configuration) and enforce strictly IP-based keys (`ip:${ip}`) for authentication-related endpoints.
+
+## 2026-08-07 - [Unbounded AI Input Prompt Injection and DoS]
+**Vulnerability:** The backend AI routes in `apps/backend/src/controllers/ai.controller.ts` (`getTypingFeedback`, `getWritingFeedback`, and `getStoryResponse`) lacked strict input validation and length limits, exposing them to prompt injection, high-cost resource abuse, and Denial of Service (DoS) attacks via oversized payloads.
+**Learning:** AI proxy endpoints that forward user inputs directly to LLM services must be strictly bounded to prevent both prompt hijacking and high-cost API utilization.
+**Prevention:** Always implement rigorous type and length validation (e.g., using Zod schemas with `.max()` bounds on arrays and string lengths) on all inputs passed to AI/LLM handlers.
