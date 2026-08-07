@@ -136,3 +136,7 @@
 ## 2026-06-21 - [Parallelizing dashboard metrics fetching]
 **Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
 **Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
+
+## 2026-08-07 - React Virtual Keyboard Keystroke Rendering Optimization
+**Learning:** Under high-frequency keystroke events, re-rendering an entire virtual keyboard with ~60 key nodes creates a notable performance bottleneck. Extracting the individual key node into a memoized subcomponent (`KeyboardKey`) and pre-normalizing comparison keys (like `targetKey` and `pressedKey`) in the parent component reduces rendering overhead from O(Keys) to O(1) per keystroke, guaranteeing steady 60fps responsiveness during typing tests.
+**Action:** For interactive grid or layout structures undergoing rapid state updates (like visual keyboards, dashboards, or spreadsheets), isolate individual cells/keys into memoized child components and lift heavy state normalization logic to the parent.
