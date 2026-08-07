@@ -41,7 +41,7 @@
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
 
-## 2026-07-27 - [IP Spoofing and Auth Rate Limiter Bypass / Credential Stuffing]
-**Vulnerability:** The backend rate limiter manually extracted `X-Forwarded-For` headers instead of relying on Express's secure `req.ip` setting, allowing clients to bypass rate limiting entirely by spoofing proxy headers. Furthermore, the authentication rate limiter used a composite key of `email:${email}:ip:${ip}` when email was present, enabling credential stuffing and password spraying attacks against multiple users from a single IP.
-**Learning:** Manual extraction of client IPs from proxy headers bypasses the built-in, secure `trust proxy` mechanism of Express, introducing IP spoofing risks. In addition, authentication rate limiting must be strictly IP-based to ensure attackers cannot spray password attempts against different accounts from the same source.
-**Prevention:** Always rely strictly on Express's secure `req.ip` to determine the client IP (which correctly honors `trust proxy` configuration) and enforce strictly IP-based keys (`ip:${ip}`) for authentication-related endpoints.
+## 2026-07-31 - IP Spoofing and Password Spraying Vulnerability in Rate Limiting Middleware
+**Vulnerability:** Manual parsing of the `X-Forwarded-For` header in `rate-limiter.ts` allowed clients to spoof arbitrary client IPs and completely bypass rate limits. Additionally, combining email addresses in authentication rate-limit keys enabled password spraying/credential stuffing attacks across many accounts from a single IP.
+**Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
+**Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
