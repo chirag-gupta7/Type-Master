@@ -134,8 +134,8 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
         : Promise.resolve([]),
     ]);
 
-const userAchievementMap = new Map<string, Date>(
-      userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt] as const)
+    const userAchievementMap = new Map<string, Date>(
+      userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt as Date] as const)
     );
 
     // Combine data
@@ -203,10 +203,15 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
         const requirement = JSON.parse(achievement.requirement);
         const checkerFn =
           checkAchievementRequirements[
-            requirement.type as keyof typeof checkAchievementRequirements
+            requirement?.type as keyof typeof checkAchievementRequirements
           ];
 
-        if (checkerFn && checkerFn(metrics)) {
+        if (!checkerFn) {
+          logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
+          continue;
+        }
+
+        if (checkerFn(metrics)) {
           toUnlock.push(achievement);
         }
       } catch (error) {
@@ -258,9 +263,10 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     }
 
     // Optimization: Parallelize independent aggregate and list queries
-    const [totalAchievements, totalPointsAgg, userAchievements, recentUnlocks] = await Promise.all([
-      prisma.achievement.count(),
+    // Further optimization: Consolidate redundant aggregate queries into a single call
+    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
       prisma.achievement.aggregate({
+        _count: { _all: true },
         _sum: { points: true },
       }),
       prisma.userAchievement.findMany({
@@ -283,7 +289,8 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       }),
     ]);
 
-    const totalPoints = totalPointsAgg._sum.points || 0;
+    const totalAchievements = achievementAggregates._count._all;
+    const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
 

@@ -125,7 +125,7 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
         orderBy: { errorCount: 'desc' },
         take: limit,
       }),
-      // 2. Get finger-specific error patterns
+// 2. Get finger-specific error patterns
       prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
         SELECT
           "fingerUsed",
