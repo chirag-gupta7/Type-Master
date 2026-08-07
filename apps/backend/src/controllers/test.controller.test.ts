@@ -21,7 +21,7 @@ jest.mock('../utils/logger', () => ({
 }));
 
 describe('TestController - getUserStats', () => {
-  let mockRequest: Partial<Request>;
+  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
   let mockResponse: Partial<Response>;
   let mockNext: NextFunction;
   let jsonMock: jest.Mock;
@@ -35,8 +35,8 @@ describe('TestController - getUserStats', () => {
       json: jsonMock,
       status: statusMock,
     };
-    mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
+mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
       query: { days: '30' },
     };
     jest.clearAllMocks();
@@ -136,6 +136,33 @@ describe('TestController - getUserStats', () => {
     expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
       period: 'Last 7 days',
     }));
+  });
+
+  it('should filter by duration if provided', async () => {
+    mockRequest.query = { duration: '60', days: '30' };
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+      _avg: { wpm: 70, accuracy: 95 },
+      _max: { wpm: 80, accuracy: 98 },
+      _count: { _all: 2 },
+    });
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(prisma.testResult.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          duration: 60,
+        }),
+      })
+    );
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          duration: 60,
+        }),
+      })
+    );
   });
 
   it('should handle errors', async () => {
