@@ -1,6 +1,6 @@
-## 2025-06-05 - Parallelizing independent query sets in getWeakKeyAnalysis
-**Learning:** Endpoints fetching multiple independent metrics/records (e.g., weak keys, finger-specific raw aggregates, and recent mistakes) sequentially create unnecessary serialization bottlenecks. Using `Promise.all` to execute them concurrently reduces the response latency from the sum of all queries to only the slowest query. Additionally, using custom `AuthRequest` interfaces avoids type augmentation issues on Express Request objects during compilation.
-**Action:** Always identify independent database calls in controller functions and group them using `Promise.all` to process concurrently. Always typecast or parameterize request objects securely.
+## 2026-06-10 - Parallelizing weak key analysis fetches
+**Learning:** Sequential database queries on independent datasets are a major cause of server-side latency. Combining these queries into a single concurrent batch with `Promise.all` allows the database engine to utilize parallelism, significantly reducing endpoint response time.
+**Action:** Identify independent `findMany` or `$queryRaw` queries within controllers and parallelize them with `Promise.all`.
 
 ## 2026-06-02 - Database-level aggregation for user statistics
 **Learning:** Fetching an entire history of records to calculate statistics (averages, maximums) in-memory is inefficient and doesn't scale. Using database aggregation (e.g., Prisma's `aggregate`) reduces network traffic and server memory usage from O(N) to O(1).

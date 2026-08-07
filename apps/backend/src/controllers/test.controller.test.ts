@@ -35,8 +35,8 @@ describe('TestController - getUserStats', () => {
       json: jsonMock,
       status: statusMock,
     };
-    mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
+mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
       query: { days: '30' },
     };
     jest.clearAllMocks();

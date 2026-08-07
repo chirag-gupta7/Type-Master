@@ -40,7 +40,7 @@ describe('LessonController - getLearningStats and getProgressVisualization', () 
       json: jsonMock,
     };
     mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
+      user: { userId: 'user-123', email: 'user@example.com' },
     };
     jest.clearAllMocks();
   });
