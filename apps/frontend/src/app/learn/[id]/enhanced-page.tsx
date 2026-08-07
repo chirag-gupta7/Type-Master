@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VisualKeyboard } from '@/components/VisualKeyboard';
-import { authAPI, lessonAPI, mistakeAPI } from '@/lib/api';
+import { userAPI, lessonAPI, mistakeAPI } from '@/lib/api';
 
 interface Lesson {
   id: string;
@@ -72,7 +72,7 @@ export default function EnhancedLessonPage() {
   useEffect(() => {
     async function loadUserProfile() {
       try {
-        const profile = await authAPI.getProfile();
+        const profile = await userAPI.getProfile();
         setUserId(profile.user.id);
       } catch (err) {
         console.warn('Proceeding without authenticated user profile', err);
@@ -151,7 +151,9 @@ export default function EnhancedLessonPage() {
       const charsTyped = currentIndex + 1;
       const wordsTyped = charsTyped / 5;
       const currentWpm = Math.round(wordsTyped / timeElapsed);
-      const currentAccuracy = ((charsTyped - mistakes.length) / charsTyped) * 100;
+      // Include the mistake just recorded this keystroke (setMistakes is async)
+      const currentMistakeCount = mistakes.length + (typedChar !== expectedChar ? 1 : 0);
+      const currentAccuracy = ((charsTyped - currentMistakeCount) / charsTyped) * 100;
 
       setWpm(currentWpm);
       setAccuracy(currentAccuracy);

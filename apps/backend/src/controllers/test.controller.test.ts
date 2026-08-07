@@ -21,7 +21,7 @@ jest.mock('../utils/logger', () => ({
 }));
 
 describe('TestController - getUserStats', () => {
-  let mockRequest: Partial<Request>;
+  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
   let mockResponse: Partial<Response>;
   let mockNext: NextFunction;
   let jsonMock: jest.Mock;
@@ -35,8 +35,8 @@ describe('TestController - getUserStats', () => {
       json: jsonMock,
       status: statusMock,
     };
-    mockRequest = {
-      user: { userId: 'user-123', email: 'test@example.com' },
+mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
       query: { days: '30' },
     };
     jest.clearAllMocks();
