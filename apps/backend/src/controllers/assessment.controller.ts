@@ -36,20 +36,21 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
 
     const userId = authUserId;
 
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    // PERFORMANCE OPTIMIZATION: Concurrently check if user exists and fetch the assessment lesson.
+    // This reduces latency by parallelizing the two independent database queries.
+    const [user, assessmentLesson] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+      }),
+      prisma.lesson.findFirst({
+        where: { level: 1 },
+        select: { content: true, targetWpm: true, minAccuracy: true },
+      }),
+    ]);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    // Get assessment text (Level 1 lesson content for baseline)
-    const assessmentLesson = await prisma.lesson.findFirst({
-      where: { level: 1 },
-      select: { content: true, targetWpm: true, minAccuracy: true },
-    });
 
     if (!assessmentLesson) {
       return res.status(500).json({ error: 'Assessment content not found' });
