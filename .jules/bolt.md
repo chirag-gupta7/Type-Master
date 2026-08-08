@@ -1,3 +1,7 @@
+## 2026-08-08 - Parallelizing User Validation and Resource Fetching in startAssessment
+**Learning:** Initializing/starting flow endpoints frequently perform sequential checks: verifying the authenticated user exists first, then fetching the initial lesson or assessment template content. Combining these completely independent queries inside `Promise.all` executes them concurrently, minimizing API response latency down to the maximum single query execution time instead of their sum.
+**Action:** Inspect initialization and bootstrap handlers for sequential validation and configuration database lookups, and execute them concurrently via `Promise.all`.
+
 ## 2026-07-30 - Parallelizing Independent Database Queries in getWeakKeyAnalysis
 **Learning:** Sequential await operations on multiple independent database queries (such as findMany and $queryRaw) cause latency to be the sum of all individual query times. Using Promise.all executes these queries concurrently, dropping the response latency down to that of the slowest single query.
 **Action:** Always inspect controllers for multiple independent await statements on Prisma queries and wrap them in Promise.all to achieve concurrency.
