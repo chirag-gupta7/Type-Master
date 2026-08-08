@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
@@ -18,6 +19,39 @@ type GeminiResponse = {
 const extractGeminiText = (data: GeminiResponse): string | null => {
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
 };
+
+// Zod Input Validation Schemas
+export const typingFeedbackSchema = z.object({
+  wpm: z.number().min(0, 'WPM must be at least 0').max(300, 'WPM is too high'),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100'),
+  errors: z.number().int().min(0, 'Errors must be at least 0').max(1000, 'Errors is too high').optional(),
+  duration: z.number().min(0, 'Duration must be at least 0').max(3600, 'Duration is too high').optional(),
+});
+
+export const writingFeedbackSchema = z.object({
+  text: z
+    .string()
+    .min(1, 'Text is required')
+    .max(1000, 'Text must not exceed 1000 characters'),
+  type: z.enum(['prompt-dash', 'story-chain']).optional(),
+  priorFeedback: z
+    .string()
+    .max(500, 'Prior feedback must not exceed 500 characters')
+    .nullable()
+    .optional(),
+});
+
+export const storyResponseSchema = z.object({
+  story: z
+    .array(
+      z
+        .string()
+        .min(1, 'Story part must not be empty')
+        .max(500, 'Story part must not exceed 500 characters')
+    )
+    .min(1, 'Story history is required')
+    .max(20, 'Story history must not exceed 20 parts'),
+});
 
 /**
  * Generic helper to call Gemini API
@@ -80,15 +114,11 @@ const callGemini = async (
  */
 export const getTypingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { wpm, accuracy, errors, duration } = req.body;
-
-    if (wpm === undefined || accuracy === undefined) {
-      throw new AppError(400, 'Missing required performance metrics');
-    }
+    const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
     const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${duration} seconds\n\nProvide helpful feedback.`;
+    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 'N/A'}\nDuration: ${duration ?? 'N/A'} seconds\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
     res.json({ feedback });
@@ -113,15 +143,7 @@ export const generateWritingPrompt = async (_req: Request, res: Response, next: 
 
 export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { text, type, priorFeedback } = req.body as {
-      text?: string;
-      type?: 'prompt-dash' | 'story-chain';
-      priorFeedback?: string | null;
-    };
-
-    if (!text || !text.trim()) {
-      throw new AppError(400, 'Text is required');
-    }
+    const { text, type, priorFeedback } = writingFeedbackSchema.parse(req.body);
 
     const mode = type === 'story-chain' ? 'story-chain' : 'prompt-dash';
     const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${mode}.`;
@@ -138,10 +160,7 @@ export const getWritingFeedback = async (req: Request, res: Response, next: Next
 
 export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { story } = req.body as { story?: string[] };
-    if (!Array.isArray(story) || story.length === 0) {
-      throw new AppError(400, 'Story history is required');
-    }
+    const { story } = storyResponseSchema.parse(req.body);
 
     const storyContext = story.join('\n');
     const response = await callGemini(
