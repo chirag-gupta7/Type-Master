@@ -203,10 +203,15 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
         const requirement = JSON.parse(achievement.requirement);
         const checkerFn =
           checkAchievementRequirements[
-            requirement.type as keyof typeof checkAchievementRequirements
+            requirement?.type as keyof typeof checkAchievementRequirements
           ];
 
-        if (checkerFn && checkerFn(metrics)) {
+        if (!checkerFn) {
+          logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
+          continue;
+        }
+
+        if (checkerFn(metrics)) {
           toUnlock.push(achievement);
         }
       } catch (error) {

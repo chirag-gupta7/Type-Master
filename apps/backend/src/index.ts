@@ -34,6 +34,8 @@ if (trustProxyEnv === undefined) {
   app.set('trust proxy', Number.isNaN(parsedTrustProxy) ? 1 : parsedTrustProxy);
 }
 
+import { isOriginAllowed } from './utils/cors';
+
 // Middleware
 app.use(helmet());
 
@@ -47,14 +49,9 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true); // allow same-origin / server-to-server
-      if (allowedOrigins.includes('*')) return callback(null, true);
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed === origin) return true;
-        // Only allow wildcard matching if the config explicitly allows a vercel domain
-        if (allowed.includes('.vercel.app') && origin.endsWith('.vercel.app')) return true;
-        return false;
-      });
-      if (isAllowed) return callback(null, true);
+      if (isOriginAllowed(origin, allowedOrigins)) {
+        return callback(null, true);
+      }
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,

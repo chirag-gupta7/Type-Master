@@ -36,9 +36,7 @@ export function MistakeAnalysis({
         className="text-center"
       >
         <h2 className="text-3xl font-bold mb-2">📊 Mistake Analysis</h2>
-        <p className="text-muted-foreground text-lg">
-          Let's identify areas for improvement
-        </p>
+        <p className="text-muted-foreground text-lg">Let's identify areas for improvement</p>
       </motion.div>
 
       {/* Summary Stats */}
@@ -53,9 +51,7 @@ export function MistakeAnalysis({
             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             <span className="font-semibold text-red-900 dark:text-red-100">Critical</span>
           </div>
-          <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-            {criticalKeys.length}
-          </p>
+          <p className="text-3xl font-bold text-red-600 dark:text-red-400">{criticalKeys.length}</p>
           <p className="text-xs text-muted-foreground">5+ errors</p>
         </div>
 
@@ -75,9 +71,7 @@ export function MistakeAnalysis({
             <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <span className="font-semibold text-blue-900 dark:text-blue-100">Minor</span>
           </div>
-          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-            {minorKeys.length}
-          </p>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{minorKeys.length}</p>
           <p className="text-xs text-muted-foreground">1-2 errors</p>
         </div>
       </motion.div>
@@ -199,7 +193,8 @@ export function MistakeAnalysis({
           <div className="mt-4 bg-purple-100 dark:bg-purple-900/30 rounded-lg p-3 text-sm text-purple-900 dark:text-purple-100">
             <p className="font-medium">💡 Pro Tip:</p>
             <p className="text-purple-800 dark:text-purple-200">
-              Type this slowly at first, focusing on accuracy over speed. Your speed will naturally improve as your accuracy increases.
+              Type this slowly at first, focusing on accuracy over speed. Your speed will naturally
+              improve as your accuracy increases.
             </p>
           </div>
         </motion.div>
@@ -212,7 +207,9 @@ export function MistakeAnalysis({
         transition={{ delay: 0.7 }}
         className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
       >
-        <h4 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">✋ Remember the Basics:</h4>
+        <h4 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">
+          ✋ Remember the Basics:
+        </h4>
         <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
           <li>• Keep your fingers on the home row (ASDF JKL;)</li>
           <li>• Use the correct finger for each key</li>
