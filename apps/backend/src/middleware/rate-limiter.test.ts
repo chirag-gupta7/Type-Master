@@ -1,43 +1,72 @@
 import { Request } from 'express';
 import { getRequestIp, getAuthRateLimitKey } from './rate-limiter';
 
-describe('rate-limiter helpers', () => {
+describe('Rate Limiting Middleware Helpers', () => {
   describe('getRequestIp', () => {
-    it('should return req.ip if present', () => {
-      const mockReq = {
-        ip: '127.0.0.1',
-      } as Partial<Request>;
+    it('should return req.ip when defined', () => {
+      const req = {
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '10.0.0.1' },
+      } as unknown as Request;
 
-      const ip = getRequestIp(mockReq as Request);
-      expect(ip).toBe('127.0.0.1');
+      expect(getRequestIp(req)).toBe('192.168.1.1');
     });
 
-    it('should return unknown if req.ip is not present', () => {
-      const mockReq = {} as Partial<Request>;
+    it('should fallback to remoteAddress if req.ip is undefined', () => {
+      const req = {
+        socket: { remoteAddress: '10.0.0.1' },
+      } as unknown as Request;
 
-      const ip = getRequestIp(mockReq as Request);
-      expect(ip).toBe('unknown');
+      expect(getRequestIp(req)).toBe('10.0.0.1');
+    });
+
+    it('should fallback to unknown if both req.ip and remoteAddress are undefined', () => {
+      const req = {
+        socket: {},
+      } as unknown as Request;
+
+      expect(getRequestIp(req)).toBe('unknown');
     });
   });
 
   describe('getAuthRateLimitKey', () => {
-    it('should return strictly IP-based rate limit key using the request IP', () => {
-      const mockReq = {
-        ip: '203.0.113.195',
-        body: {
-          email: 'test@example.com',
-        },
-      } as Partial<Request>;
+    it('should generate a strictly IP-based key with prefix', () => {
+      const req = {
+        ip: '192.168.1.2',
+        body: { email: 'target@example.com' },
+      } as unknown as Request;
 
-      const key = getAuthRateLimitKey(mockReq as Request);
-      expect(key).toBe('ip:203.0.113.195');
+      expect(getAuthRateLimitKey(req)).toBe('ip:192.168.1.2');
     });
 
-    it('should return default key if request IP is unknown', () => {
-      const mockReq = {} as Partial<Request>;
+    it('should not include email payload in key to prevent credential stuffing rate-limiting bypass', () => {
+      const req = {
+        ip: '192.168.1.2',
+        body: { email: 'another-email@example.com' },
+      } as unknown as Request;
 
-      const key = getAuthRateLimitKey(mockReq as Request);
-      expect(key).toBe('ip:unknown');
+      expect(getAuthRateLimitKey(req)).toBe('ip:192.168.1.2');
+    });
+
+    it('should produce identical keys for different emails from the same IP (blocks credential stuffing)', () => {
+      const req1 = {
+        ip: '203.0.113.50',
+        body: { email: 'victim1@example.com' },
+        socket: { remoteAddress: '127.0.0.1' },
+      } as unknown as Request;
+
+      const req2 = {
+        ip: '203.0.113.50',
+        body: { email: 'victim2@example.com' },
+        socket: { remoteAddress: '127.0.0.1' },
+      } as unknown as Request;
+
+      const key1 = getAuthRateLimitKey(req1);
+      const key2 = getAuthRateLimitKey(req2);
+
+      expect(key1).toBe('ip:203.0.113.50');
+      expect(key2).toBe('ip:203.0.113.50');
+      expect(key1).toBe(key2);
     });
   });
 });

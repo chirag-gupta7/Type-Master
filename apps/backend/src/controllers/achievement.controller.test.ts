@@ -1,4 +1,8 @@
-import { getAllAchievements, checkAndAwardAchievements, getAchievementProgress } from './achievement.controller';
+import {
+  getAllAchievements,
+  checkAndAwardAchievements,
+  getAchievementProgress,
+} from './achievement.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -33,6 +37,7 @@ jest.mock('../utils/prisma', () => ({
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
+    warn: jest.fn(),
     error: jest.fn(),
   },
 }));
@@ -100,12 +105,12 @@ describe('AchievementController', () => {
           icon: 'target',
           requirement: JSON.stringify({ type: 'firstSteps' }),
           points: 10,
-        }
+        },
       ];
       (prisma.achievement.findMany as jest.Mock).mockResolvedValue(mockAchievements);
 
       (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([
-        { achievementId: 'ach-2' }
+        { achievementId: 'ach-2' },
       ]);
 
       (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
@@ -116,9 +121,7 @@ describe('AchievementController', () => {
       (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
       (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
-      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([
-        { createdAt: new Date() }
-      ]);
+      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([{ createdAt: new Date() }]);
 
       (prisma.userAchievement.createMany as jest.Mock).mockResolvedValue({ count: 1 });
 
@@ -136,20 +139,22 @@ describe('AchievementController', () => {
           expect.objectContaining({
             userId: 'user-123',
             achievementId: 'ach-1',
-          })
+          }),
         ],
         skipDuplicates: true,
       });
 
-      expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
-        newlyUnlocked: [
-          expect.objectContaining({
-            id: 'ach-1',
-            title: 'Speed Demon',
-          })
-        ],
-        totalChecked: 2,
-      }));
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          newlyUnlocked: [
+            expect.objectContaining({
+              id: 'ach-1',
+              title: 'Speed Demon',
+            }),
+          ],
+          totalChecked: 2,
+        })
+      );
     });
 
     it('should handle errors during check', async () => {
@@ -164,26 +169,28 @@ describe('AchievementController', () => {
 
   describe('getAchievementProgress', () => {
     it('should return progress metrics', async () => {
-        (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
-            _count: { _all: 5 },
-            _max: { wpm: 40 },
-          });
-          (prisma.testResult.count as jest.Mock).mockResolvedValue(2);
-          (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(null);
-          (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
-          (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
-          (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
+        _count: { _all: 5 },
+        _max: { wpm: 40 },
+      });
+      (prisma.testResult.count as jest.Mock).mockResolvedValue(2);
+      (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
+      (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
+      (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
 
-          await getAchievementProgress(mockRequest, mockResponse);
+      await getAchievementProgress(mockRequest, mockResponse);
 
-          expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
-            progress: expect.objectContaining({
-                dedicated: 50,
-            }),
-            stats: expect.objectContaining({
-                testCount: 5,
-            })
-          }));
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          progress: expect.objectContaining({
+            dedicated: 50,
+          }),
+          stats: expect.objectContaining({
+            testCount: 5,
+          }),
+        })
+      );
     });
   });
 });

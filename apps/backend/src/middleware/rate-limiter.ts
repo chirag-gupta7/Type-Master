@@ -15,21 +15,20 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
-/**
- * Extracts client IP securely using Express's trusted req.ip property.
- * This respects the application's 'trust proxy' configuration,
- * preventing IP spoofing via attacker-controlled headers.
- */
 export const getRequestIp = (req: Request): string => {
-  return req.ip || 'unknown';
+  // SECURITY FIX: Rely on Express's secure, built-in req.ip (which respects the trust proxy
+  // configuration set in index.ts) instead of manually parsing the potentially spoofable
+  // X-Forwarded-For header. This prevents IP spoofing rate limiter bypasses.
+  return req.ip || req.socket.remoteAddress || 'unknown';
 };
 
-/**
- * Returns a strictly IP-based rate limit key to block password spraying
- * and credential stuffing attacks targeting different email addresses from a single IP.
- */
 export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
+
+  // SECURITY FIX: Strictly use IP-based rate limiting keys rather than the specific
+  // email-IP combination (email:${email}:ip:${ip}). This prevents credential stuffing
+  // and password spraying attacks where an attacker tests many different email addresses
+  // from a single IP, as each attempt now increments the same IP-based limit pool.
   return `ip:${ip}`;
 };
 

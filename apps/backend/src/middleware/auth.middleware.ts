@@ -41,10 +41,11 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
       req.userId = decoded.userId;
       next();
     } catch (jwtError) {
-      if (jwtError instanceof jwt.JsonWebTokenError) {
-        throw new AppError(401, 'Invalid token');
-      } else if (jwtError instanceof jwt.TokenExpiredError) {
+      // TokenExpiredError extends JsonWebTokenError, so it must be checked first.
+      if (jwtError instanceof jwt.TokenExpiredError) {
         throw new AppError(401, 'Token expired');
+      } else if (jwtError instanceof jwt.JsonWebTokenError) {
+        throw new AppError(401, 'Invalid token');
       } else {
         throw jwtError;
       }
