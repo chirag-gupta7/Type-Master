@@ -75,8 +75,8 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const { page = '1', limit = '20', duration } = req.query;
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
+    const pageNum = Math.max(parseInt(page as string, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
     const where = {
@@ -161,7 +161,7 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const { duration, days = '30' } = req.query;
-    const daysNum = parseInt(days as string, 10);
+    const daysNum = Math.max(parseInt(days as string, 10) || 30, 1);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 

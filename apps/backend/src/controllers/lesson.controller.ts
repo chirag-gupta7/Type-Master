@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
@@ -439,9 +439,9 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
-    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
-    const [totalLessons, completedLessons, aggregation] = await Promise.all([
+    // Optimization: Use database aggregation to calculate statistics.
+    // This reduces data transfer and processing from O(N) to O(1).
+    const [totalLessons, completedProgress, aggregateResult] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
@@ -461,16 +461,20 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
       }),
     ]);
 
+    const totalStars = aggregateResult._sum.stars || 0;
+    const avgWpm = aggregateResult._avg.bestWpm || 0;
+    const avgAccuracy = aggregateResult._avg.bestAccuracy || 0;
+
     res.json({
       stats: {
         totalLessons,
-        completedLessons,
+        completedLessons: completedProgress,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        totalStars: aggregation._sum.stars || 0,
+          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
+        totalStars,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
-        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
+        averageWpm: Math.round(avgWpm),
+        averageAccuracy: Math.round(avgAccuracy * 10) / 10,
       },
     });
   } catch (error) {
@@ -495,45 +499,89 @@ export const getProgressVisualization = async (
 
     const userId = req.user.userId;
 
-    // Get all lessons with progress
-    const lessonsWithProgress = await prisma.lesson.findMany({
-      orderBy: [{ level: 'asc' }, { order: 'asc' }],
-      include: {
-        userProgress: {
-          where: { userId },
-          select: {
-            completed: true,
-            bestWpm: true,
-            bestAccuracy: true,
-            stars: true,
-            attempts: true,
-            lastAttempt: true,
+    // Optimization: Consolidate data fetching and derivation.
+    // 1. Parallelize core independent queries (Lessons and Tests).
+    // 2. Eliminate redundant 'findMany' queries by deriving historical/activity metrics in-memory from the base dataset.
+    // 3. Optimize skill tree O(NÂ²) construction with O(1) Map lookups.
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    const [lessonsWithProgress, testActivity] = await Promise.all([
+      prisma.lesson.findMany({
+        orderBy: [{ level: 'asc' }, { order: 'asc' }],
+        include: {
+          userProgress: {
+            where: { userId },
+            select: {
+              completed: true,
+              bestWpm: true,
+              bestAccuracy: true,
+              stars: true,
+              attempts: true,
+              lastAttempt: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.testResult.findMany({
+        where: {
+          userId,
+          createdAt: { gte: oneYearAgo },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    // Calculate completion by level
-    const levelStats = lessonsWithProgress.reduce(
-      (acc, lesson) => {
-        const levelKey = `level${lesson.level}`;
-        if (!acc[levelKey]) {
-          acc[levelKey] = { total: 0, completed: 0, totalStars: 0, earnedStars: 0 };
+    // 1. Calculate completion by level & Derive lesson activity for heatmap & Group WPM history
+    const levelStats: Record<string, { total: number; completed: number; totalStars: number; earnedStars: number }> = {};
+    const activityByDate: Record<string, number> = {};
+    const wpmByLessonMap: Record<string, { lessonId: string; lessonTitle: string; level: number; data: Array<{ date: string; wpm: number; accuracy: number }> }> = {};
+
+    // Single pass through lessons to derive multiple metrics (O(N))
+    for (const lesson of lessonsWithProgress) {
+      // Level Stats
+      const levelKey = `level${lesson.level}`;
+      if (!levelStats[levelKey]) {
+        levelStats[levelKey] = { total: 0, completed: 0, totalStars: 0, earnedStars: 0 };
+      }
+      levelStats[levelKey].total++;
+      const progress = lesson.userProgress[0];
+      if (progress?.completed) {
+        levelStats[levelKey].completed++;
+      }
+      levelStats[levelKey].totalStars += 3;
+      levelStats[levelKey].earnedStars += progress?.stars || 0;
+
+      // Practice Activity & History derivation (instead of separate queries)
+      if (progress?.lastAttempt) {
+        // Activity for heatmap (1 year)
+        if (progress.lastAttempt >= oneYearAgo) {
+          const date = progress.lastAttempt.toISOString().split('T')[0];
+          activityByDate[date] = (activityByDate[date] || 0) + 1;
         }
-        acc[levelKey].total++;
-        const progress = lesson.userProgress[0];
-        if (progress?.completed) {
-          acc[levelKey].completed++;
+
+        // WPM history (90 days)
+        if (progress.lastAttempt >= ninetyDaysAgo) {
+          if (!wpmByLessonMap[lesson.id]) {
+            wpmByLessonMap[lesson.id] = {
+              lessonId: lesson.id,
+              lessonTitle: lesson.title,
+              level: lesson.level,
+              data: [],
+            };
+          }
+          wpmByLessonMap[lesson.id].data.push({
+            date: progress.lastAttempt.toISOString().split('T')[0],
+            wpm: progress.bestWpm,
+            accuracy: progress.bestAccuracy,
+          });
         }
-        acc[levelKey].totalStars += 3;
-        acc[levelKey].earnedStars += progress?.stars || 0;
-        return acc;
-      },
-      {} as Record<
-        string,
-        { total: number; completed: number; totalStars: number; earnedStars: number }
-      >
-    );
+      }
+    }
 
     // Format level completion data
     const completionByLevel = Object.entries(levelStats).map(([level, stats]) => ({
@@ -549,117 +597,60 @@ export const getProgressVisualization = async (
       maxStars: stats.totalStars,
     }));
 
-    // Get historical progress data for WPM improvement (last 90 days)
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-    const lessonHistory = await prisma.userLessonProgress.findMany({
-      where: {
-        userId,
-        lastAttempt: { gte: ninetyDaysAgo },
-      },
-      include: {
-        lesson: {
-          select: {
-            id: true,
-            title: true,
-            level: true,
-          },
-        },
-      },
-      orderBy: {
-        lastAttempt: 'asc',
-      },
-    });
-
-    // Group WPM data by lesson
-    const wpmByLesson = lessonHistory.reduce(
-      (acc, entry) => {
-        const lessonId = entry.lesson.id;
-        if (!acc[lessonId]) {
-          acc[lessonId] = {
-            lessonId,
-            lessonTitle: entry.lesson.title,
-            level: entry.lesson.level,
-            data: [],
-          };
-        }
-        acc[lessonId].data.push({
-          date: entry.lastAttempt.toISOString().split('T')[0],
-          wpm: entry.bestWpm,
-          accuracy: entry.bestAccuracy,
-        });
-        return acc;
-      },
-      {} as Record<
-        string,
-        {
-          lessonId: string;
-          lessonTitle: string;
-          level: number;
-          data: Array<{ date: string; wpm: number; accuracy: number }>;
-        }
-      >
-    );
-
-    // Get practice frequency for heat map (last 365 days)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const [testActivity, lessonActivity] = await Promise.all([
-      prisma.testResult.findMany({
-        where: {
-          userId,
-          createdAt: { gte: oneYearAgo },
-        },
-        select: {
-          createdAt: true,
-        },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: {
-          userId,
-          lastAttempt: { gte: oneYearAgo },
-        },
-        select: {
-          lastAttempt: true,
-        },
-      }),
-    ]);
-
-    // Combine and count activities by date
-    const activityByDate = [...testActivity, ...lessonActivity].reduce(
-      (acc, entry) => {
-        const date =
-          'createdAt' in entry
-            ? entry.createdAt.toISOString().split('T')[0]
-            : entry.lastAttempt.toISOString().split('T')[0];
-        acc[date] = (acc[date] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    // Merge test activity into activityByDate
+    for (const test of testActivity) {
+      const date = test.createdAt.toISOString().split('T')[0];
+      activityByDate[date] = (activityByDate[date] || 0) + 1;
+    }
 
     const practiceFrequency = Object.entries(activityByDate).map(([date, count]) => ({
       date,
       count,
     }));
 
-    // Build skill tree structure with dependencies
+    // PERFORMANCE OPTIMIZATION:
+    // Before: O(N^2) complexity due to nested .filter() and .find() on lessonsWithProgress array inside the .map loop.
+    // After: O(N) complexity by using precomputed index Maps and a completed lessons Set for O(1) lookups.
+
+    // 1. Precompute a set of completed lesson IDs for O(1) lookups
+    const completedLessonIds = new Set(
+      lessonsWithProgress
+        .filter((l) => l.userProgress[0]?.completed)
+        .map((l) => l.id)
+    );
+
+    // 2. Group lessons by level for quick prerequisite retrieval
+    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
+    for (const lesson of lessonsWithProgress) {
+      if (!lessonsByLevel.has(lesson.level)) {
+        lessonsByLevel.set(lesson.level, []);
+      }
+      lessonsByLevel.get(lesson.level)!.push(lesson);
+    }
+
+    // 3. Map lesson ID to its index within its level for O(1) index retrieval
+    const lessonIndexInLevel = new Map<string, number>();
+    for (const levelLessons of lessonsByLevel.values()) {
+      levelLessons.forEach((l, idx) => {
+        lessonIndexInLevel.set(l.id, idx);
+      });
+    }
+
+    // Build skill tree structure with dependencies in O(N)
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      const prerequisites =
-        lesson.order > 1
-          ? lessonsWithProgress
-              .filter((l) => l.level === lesson.level && l.order < lesson.order)
-              .slice(-1) // Only previous lesson in same level
-              .map((l) => l.id)
-          : lesson.level > 1
-            ? lessonsWithProgress
-                .filter((l) => l.level === lesson.level - 1)
-                .slice(-3) // Last 3 lessons from previous level
-                .map((l) => l.id)
-            : [];
+
+      let prerequisites: string[] = [];
+      if (lesson.order > 1) {
+        const levelLessons = lessonsByLevel.get(lesson.level) || [];
+        const idx = lessonIndexInLevel.get(lesson.id) ?? -1;
+        if (idx > 0) {
+          prerequisites = [levelLessons[idx - 1].id];
+        }
+      } else if (lesson.level > 1) {
+        const prevLevelLessons = lessonsByLevel.get(lesson.level - 1) || [];
+        prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
+      }
 
       return {
         id: lesson.id,
@@ -674,9 +665,7 @@ export const getProgressVisualization = async (
         attempts: progress?.attempts || 0,
         locked:
           prerequisites.length > 0
-            ? !prerequisites.every((preReqId) =>
-                lessonsWithProgress.find((l) => l.id === preReqId && l.userProgress[0]?.completed)
-              )
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
             : false,
         prerequisites,
       };
@@ -684,7 +673,7 @@ export const getProgressVisualization = async (
 
     res.json({
       completionByLevel,
-      wpmByLesson: Object.values(wpmByLesson),
+      wpmByLesson: Object.values(wpmByLessonMap),
       practiceFrequency,
       skillTree,
     });
@@ -970,14 +959,6 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
       orderBy: { assessmentDate: 'desc' },
     });
 
-    // Get all user's completed lessons
-    const completedProgress = await prisma.userLessonProgress.findMany({
-      where: { userId, completed: true },
-      select: { lessonId: true },
-    });
-
-    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
-
     // Determine starting section based on assessment or default to Section 1
     let startSection = 1;
     if (assessment) {
@@ -986,11 +967,21 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
       else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
     }
 
+    // Optimization: Replace a two-step query process (fetching completed IDs then filtering with 'notIn')
+    // with a single query using Prisma's relational 'none' filter.
+    // Instead of fetching all completed lesson IDs and using 'notIn',
+    // we use 'none' to filter for lessons where no 'completed' progress exists for this user.
+    // This reduces database roundtrips and memory overhead (O(1) database roundtrip).
     // Find first incomplete lesson in the appropriate section
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
         section: { gte: startSection },
-        id: { notIn: Array.from(completedLessonIds) },
+        userProgress: {
+          none: {
+            userId,
+            completed: true,
+          },
+        },
       },
       orderBy: [{ section: 'asc' }, { order: 'asc' }],
     });

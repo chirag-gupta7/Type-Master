@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
 // Validation schemas
 const logMistakeSchema = z.object({
   lessonId: z.string().uuid('Invalid lesson ID'),
@@ -21,7 +25,7 @@ const logMistakeSchema = z.object({
  * Log typing mistakes from a lesson attempt
  * POST /api/v1/mistakes/log
  */
-export const logMistakes = async (req: Request, res: Response): Promise<void> => {
+export const logMistakes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { lessonId, mistakes } = logMistakeSchema.parse(req.body);
     const userId = req.userId;
@@ -92,7 +96,7 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
  * Get weak key analysis for a user
  * GET /api/v1/mistakes/analysis/:userId
  */
-export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<void> => {
+export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
@@ -109,9 +113,9 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // OPTIMIZATION: Executing three independent database queries concurrently using Promise.all.
-    // This reduces latency from the sum of sequential execution times (O(3) queries sequentially)
-    // to the duration of the slowest single query (O(1) concurrent query round-trip).
+// OPTIMIZATION: Execute three independent database queries concurrently using Promise.all.
+    // This reduces latency from the sum of sequential execution times (O(3 * DB_Query) sequentially)
+    // to the duration of the slowest single query (O(max(DB_Query)) in a single round-trip).
     const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
       // 1. Get user's weak keys, sorted by error count
       prisma.userWeakKeys.findMany({
@@ -169,7 +173,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
  * Generate targeted practice text based on weak keys
  * GET /api/v1/mistakes/practice/:userId
  */
-export const generatePracticeText = async (req: Request, res: Response): Promise<void> => {
+export const generatePracticeText = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
