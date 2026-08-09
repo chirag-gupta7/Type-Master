@@ -151,7 +151,9 @@ export default function EnhancedLessonPage() {
       const charsTyped = currentIndex + 1;
       const wordsTyped = charsTyped / 5;
       const currentWpm = Math.round(wordsTyped / timeElapsed);
-      const currentAccuracy = ((charsTyped - mistakes.length) / charsTyped) * 100;
+      // Include the mistake just recorded this keystroke (setMistakes is async)
+      const currentMistakeCount = mistakes.length + (typedChar !== expectedChar ? 1 : 0);
+      const currentAccuracy = ((charsTyped - currentMistakeCount) / charsTyped) * 100;
 
       setWpm(currentWpm);
       setAccuracy(currentAccuracy);

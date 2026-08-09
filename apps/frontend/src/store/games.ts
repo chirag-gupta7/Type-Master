@@ -153,7 +153,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   resetGame: () => {
-    set({ ...INITIAL_STATE });
+    set((state) => ({
+      ...state,
+      currentGame: null,
+      score: 0,
+      highScore: 0,
+      isPlaying: false,
+      gameHistory: [],
+    }));
   },
 
   setHighScore: (gameId, score) => {
