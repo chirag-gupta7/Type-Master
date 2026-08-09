@@ -1,3 +1,7 @@
+## 2026-08-09 - Parallelizing onboarding flow database queries in Skill Assessment controller
+**Learning:** Placement tests or onboarding flows that sequentially store assessment results and fetch recommended starting content block on sequential database roundtrips. When these read and write queries are independent and rely on pre-calculated in-memory variables, they can be wrapped in `Promise.all` to execute concurrently, reducing latency by up to 50%.
+**Action:** When working on multi-step onboarding/placement endpoints, group and run independent queries in parallel using `Promise.all` instead of sequentially awaiting them.
+
 ## 2026-07-30 - Parallelizing Independent Database Queries in getWeakKeyAnalysis
 **Learning:** Sequential await operations on multiple independent database queries (such as findMany and $queryRaw) cause latency to be the sum of all individual query times. Using Promise.all executes these queries concurrently, dropping the response latency down to that of the slowest single query.
 **Action:** Always inspect controllers for multiple independent await statements on Prisma queries and wrap them in Promise.all to achieve concurrency.
