@@ -1,8 +1,13 @@
+## 2026-07-31 - Parallelizing weak key analysis queries
+**Learning:** Sequential await execution of multiple independent database queries (e.g., findMany, queryRaw) in controller endpoints introduces unnecessary cumulative network and DB roundtrip latencies. Using Promise.all parallelizes execution, reducing total API response time to that of the single slowest query.
+**Action:** Identify endpoints that perform separate, non-dependent database operations and wrap them using Promise.all.
+
 ## 2026-07-30 - Parallelizing Independent Database Queries in getWeakKeyAnalysis
 **Learning:** Sequential await operations on multiple independent database queries (such as findMany and $queryRaw) cause latency to be the sum of all individual query times. Using Promise.all executes these queries concurrently, dropping the response latency down to that of the slowest single query.
 **Action:** Always inspect controllers for multiple independent await statements on Prisma queries and wrap them in Promise.all to achieve concurrency.
 
 ## 2026-06-02 - Database-level aggregation for user statistics
+
 **Learning:** Fetching an entire history of records to calculate statistics (averages, maximums) in-memory is inefficient and doesn't scale. Using database aggregation (e.g., Prisma's `aggregate`) reduces network traffic and server memory usage from O(N) to O(1).
 **Action:** Offload statistical calculations to the database using Prisma's `aggregate` or `groupBy` features. Parallelize these with any other required fetches using `Promise.all`.
 
@@ -20,6 +25,12 @@
 
 **Learning:** When refactoring N+1 queries into bulk fetches, use `Promise.all` to execute independent `count`, `aggregate`, and `findMany` queries in parallel. This minimizes the total response time to the duration of the slowest query rather than the sum of all queries.
 **Action:** Always wrap independent bulk data retrieval queries in `Promise.all` when optimizing controllers.
+
+## 2025-05-25 - [WPMProgressChart.tsx]
+
+**Bottleneck/Context:** Array maps within chart renders recalculate expensive derived states on every render. Finding a specific point inside a nested array via `.find()` within an iteration makes the operation O(N²) or O(N³), causing severe UI lag when filtering datasets or typing fast.
+**Failed Attempt/Lesson:** N/A (Direct fix identified).
+**Action Pattern:** Always memoize derived arrays for charting components using `useMemo` and replace `.find()` inside mapping loops with pre-computed `Map` or `Set` lookups to reduce algorithmic complexity to O(N).
 
 ## 2026-07-25 - Concurrency in Weak Key Analysis
 **Learning:** Fetching separate kinds of analysis data (e.g., user weak keys, raw finger error queries, and recent typing mistakes) sequentially can introduce substantial network and query latency. Wrapping these independent queries inside a single `Promise.all` allows them to execute concurrently, lowering the overall request duration from the sum of the queries to the single slowest one.
