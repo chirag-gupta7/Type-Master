@@ -46,3 +46,9 @@
 **Vulnerability:** Manual parsing of the `X-Forwarded-For` header in `rate-limiter.ts` allowed clients to spoof arbitrary client IPs and completely bypass rate limits. Additionally, combining email addresses in authentication rate-limit keys enabled password spraying/credential stuffing attacks across many accounts from a single IP.
 **Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
 **Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
+
+## 2026-08-10 - [Insecure Input and Size Handling in AI Proxy Endpoints]
+
+**Vulnerability:** AI proxy endpoints `getTypingFeedback`, `getWritingFeedback`, and `getStoryResponse` accepted unvalidated bodies, allowing arbitrary payload types and unbounded string lengths.
+**Learning:** Lacking validation on AI proxy endpoints creates risks of Denial of Service (DoS) via resource exhaustion, extremely high-cost external API calls, and prompt injection vectors through oversized or unexpected request structures.
+**Prevention:** Enforce strict type constraints, reasonable string/array limits, and numeric bounds on all user inputs using a robust schema validation library like Zod. Enforce maximum input sizes (e.g. 1000 characters for text) before passing data to upstream LLM APIs.
