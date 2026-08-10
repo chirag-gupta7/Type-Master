@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
@@ -439,9 +439,9 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
 
     const userId = req.user.userId;
 
-    // Optimization: Offload statistical calculations to the database using Prisma's aggregate.
-    // This reduces the amount of data transferred and eliminates manual O(N) calculations in Node.js.
-    const [totalLessons, completedLessons, aggregation] = await Promise.all([
+    // Optimization: Use database aggregation to calculate statistics.
+    // This reduces data transfer and processing from O(N) to O(1).
+    const [totalLessons, completedProgress, aggregateResult] = await Promise.all([
       prisma.lesson.count(),
       prisma.userLessonProgress.count({
         where: { userId, completed: true },
@@ -461,16 +461,20 @@ export const getLearningStats = async (req: AuthRequest, res: Response, next: Ne
       }),
     ]);
 
+    const totalStars = aggregateResult._sum.stars || 0;
+    const avgWpm = aggregateResult._avg.bestWpm || 0;
+    const avgAccuracy = aggregateResult._avg.bestAccuracy || 0;
+
     res.json({
       stats: {
         totalLessons,
-        completedLessons,
+        completedLessons: completedProgress,
         completionPercentage:
-          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        totalStars: aggregation._sum.stars || 0,
+          totalLessons > 0 ? Math.round((completedProgress / totalLessons) * 100) : 0,
+        totalStars,
         maxStars: totalLessons * 3,
-        averageWpm: Math.round(aggregation._avg.bestWpm || 0),
-        averageAccuracy: Math.round((aggregation._avg.bestAccuracy || 0) * 10) / 10,
+        averageWpm: Math.round(avgWpm),
+        averageAccuracy: Math.round(avgAccuracy * 10) / 10,
       },
     });
   } catch (error) {
@@ -498,7 +502,7 @@ export const getProgressVisualization = async (
     // Optimization: Consolidate data fetching and derivation.
     // 1. Parallelize core independent queries (Lessons and Tests).
     // 2. Eliminate redundant 'findMany' queries by deriving historical/activity metrics in-memory from the base dataset.
-    // 3. Optimize skill tree O(N²) construction with O(1) Map lookups.
+    // 3. Optimize skill tree O(NÂ²) construction with O(1) Map lookups.
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const oneYearAgo = new Date();
@@ -604,43 +608,49 @@ export const getProgressVisualization = async (
       count,
     }));
 
-    // O(N) Optimization: Replace nested array scans (filter/find) with Map-based lookups
-    // for lesson completion status, level grouping, and prerequisite checking.
-    const lessonCompletionMap = new Map<string, boolean>();
-    const lessonsByLevelMap = new Map<number, typeof lessonsWithProgress>();
+    // PERFORMANCE OPTIMIZATION:
+    // Before: O(N^2) complexity due to nested .filter() and .find() on lessonsWithProgress array inside the .map loop.
+    // After: O(N) complexity by using precomputed index Maps and a completed lessons Set for O(1) lookups.
 
+    // 1. Precompute a set of completed lesson IDs for O(1) lookups
+    const completedLessonIds = new Set(
+      lessonsWithProgress
+        .filter((l) => l.userProgress[0]?.completed)
+        .map((l) => l.id)
+    );
+
+    // 2. Group lessons by level for quick prerequisite retrieval
+    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
     for (const lesson of lessonsWithProgress) {
-      lessonCompletionMap.set(lesson.id, !!lesson.userProgress[0]?.completed);
-
-      if (!lessonsByLevelMap.has(lesson.level)) {
-        lessonsByLevelMap.set(lesson.level, []);
+      if (!lessonsByLevel.has(lesson.level)) {
+        lessonsByLevel.set(lesson.level, []);
       }
-      lessonsByLevelMap.get(lesson.level)?.push(lesson);
+      lessonsByLevel.get(lesson.level)!.push(lesson);
     }
 
+    // 3. Map lesson ID to its index within its level for O(1) index retrieval
+    const lessonIndexInLevel = new Map<string, number>();
+    for (const levelLessons of lessonsByLevel.values()) {
+      levelLessons.forEach((l, idx) => {
+        lessonIndexInLevel.set(l.id, idx);
+      });
+    }
+
+    // Build skill tree structure with dependencies in O(N)
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      let prerequisites: string[] = [];
 
+      let prerequisites: string[] = [];
       if (lesson.order > 1) {
-        // Prerequisite is the lesson with the largest order less than the current lesson in the same level
-        const sameLevelLessons = lessonsByLevelMap.get(lesson.level) || [];
-        const prevInLevel = sameLevelLessons
-          .filter((l) => l.order < lesson.order)
-          .sort((a, b) => b.order - a.order)[0];
-        if (prevInLevel) {
-          prerequisites = [prevInLevel.id];
+        const levelLessons = lessonsByLevel.get(lesson.level) || [];
+        const idx = lessonIndexInLevel.get(lesson.id) ?? -1;
+        if (idx > 0) {
+          prerequisites = [levelLessons[idx - 1].id];
         }
       } else if (lesson.level > 1) {
-        // Prerequisites are the last 3 lessons from the previous level
-        const prevLevelLessons = lessonsByLevelMap.get(lesson.level - 1) || [];
+        const prevLevelLessons = lessonsByLevel.get(lesson.level - 1) || [];
         prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
       }
-
-      const isLocked =
-        prerequisites.length > 0
-          ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId))
-          : false;
 
       return {
         id: lesson.id,
@@ -653,7 +663,10 @@ export const getProgressVisualization = async (
         stars: progress?.stars || 0,
         bestWpm: progress?.bestWpm || 0,
         attempts: progress?.attempts || 0,
-        locked: isLocked,
+        locked:
+          prerequisites.length > 0
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
+            : false,
         prerequisites,
       };
     });
@@ -940,19 +953,11 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
 
     const userId = req.user.userId;
 
-    // Optimization: Parallelize independent assessment and progress lookups
-    const [assessment, completedProgress] = await Promise.all([
-      prisma.userSkillAssessment.findFirst({
-        where: { userId },
-        orderBy: { assessmentDate: 'desc' },
-      }),
-      prisma.userLessonProgress.findMany({
-        where: { userId, completed: true },
-        select: { lessonId: true },
-      }),
-    ]);
-
-    const completedLessonIds = new Set(completedProgress.map((p) => p.lessonId));
+    // Get user's latest assessment
+    const assessment = await prisma.userSkillAssessment.findFirst({
+      where: { userId },
+      orderBy: { assessmentDate: 'desc' },
+    });
 
     // Determine starting section based on assessment or default to Section 1
     let startSection = 1;
@@ -962,11 +967,21 @@ export const getRecommendedLesson = async (req: AuthRequest, res: Response, next
       else if (assessment.recommendedLevel === 'INTERMEDIATE') startSection = 2;
     }
 
+    // Optimization: Replace a two-step query process (fetching completed IDs then filtering with 'notIn')
+    // with a single query using Prisma's relational 'none' filter.
+    // Instead of fetching all completed lesson IDs and using 'notIn',
+    // we use 'none' to filter for lessons where no 'completed' progress exists for this user.
+    // This reduces database roundtrips and memory overhead (O(1) database roundtrip).
     // Find first incomplete lesson in the appropriate section
     let recommendedLesson = await prisma.lesson.findFirst({
       where: {
         section: { gte: startSection },
-        id: { notIn: Array.from(completedLessonIds) },
+        userProgress: {
+          none: {
+            userId,
+            completed: true,
+          },
+        },
       },
       orderBy: [{ section: 'asc' }, { order: 'asc' }],
     });

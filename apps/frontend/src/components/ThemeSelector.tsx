@@ -19,7 +19,14 @@ export function ThemeSelector() {
       if (saved) {
         try {
           const theme = JSON.parse(saved);
-          if (theme && typeof theme === 'object' && 'name' in theme && 'primary' in theme && 'secondary' in theme && 'accent' in theme) {
+          if (
+            theme &&
+            typeof theme === 'object' &&
+            'name' in theme &&
+            'primary' in theme &&
+            'secondary' in theme &&
+            'accent' in theme
+          ) {
             setTheme(theme as ThemeColors);
           } else {
             applyTheme();
@@ -49,7 +56,7 @@ export function ThemeSelector() {
             onClick={() => setIsOpen(!isOpen)}
             className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow"
             style={{
-              boxShadow: `0 0 20px ${(currentTheme?.primary || '#000')}40`,
+              boxShadow: `0 0 20px ${currentTheme?.primary || '#000'}40`,
             }}
             aria-label="Open theme picker"
           >
