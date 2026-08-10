@@ -262,9 +262,10 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Optimization: Parallelize independent aggregate and list queries
-    // Further optimization: Consolidate redundant aggregate queries into a single call
-    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
+    // Optimization: Parallelize aggregate and list queries, and eliminate the redundant
+    // userAchievement findMany query by deriving the recent unlocks and stats in-memory
+    // from a single sorted userAchievement query. This reduces DB roundtrips from 3 to 2.
+    const [achievementAggregates, userAchievements] = await Promise.all([
       prisma.achievement.aggregate({
         _count: { _all: true },
         _sum: { points: true },
@@ -272,20 +273,9 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       prisma.userAchievement.findMany({
         where: { userId },
         include: {
-          achievement: {
-            select: {
-              points: true,
-            },
-          },
-        },
-      }),
-      prisma.userAchievement.findMany({
-        where: { userId },
-        include: {
           achievement: true,
         },
         orderBy: { unlockedAt: 'desc' },
-        take: 5,
       }),
     ]);
 
@@ -293,6 +283,9 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
+
+    // Get the top 5 most recent unlocks in-memory from the already fetched and sorted list
+    const recentUnlocks = userAchievements.slice(0, 5);
 
     return res.json({
       stats: {

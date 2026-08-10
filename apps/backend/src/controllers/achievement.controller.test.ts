@@ -2,6 +2,7 @@ import {
   getAllAchievements,
   checkAndAwardAchievements,
   getAchievementProgress,
+  getAchievementStats,
 } from './achievement.controller';
 import { prisma } from '../utils/prisma';
 
@@ -191,6 +192,104 @@ describe('AchievementController', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('getAchievementStats', () => {
+    it('should return 401 if userId is missing', async () => {
+      mockRequest.userId = undefined;
+
+      await getAchievementStats(mockRequest as any, mockResponse as any);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    });
+
+    it('should correctly calculate user achievement statistics with 1 in-memory list query', async () => {
+      (prisma.achievement.aggregate as jest.Mock).mockResolvedValue({
+        _count: { _all: 10 },
+        _sum: { points: 150 },
+      });
+
+      const unlockedAtDate = new Date('2026-08-01T12:00:00Z');
+      (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'ua-1',
+          userId: 'user-123',
+          achievementId: 'ach-1',
+          unlockedAt: unlockedAtDate,
+          achievement: {
+            id: 'ach-1',
+            title: 'Speed Demon',
+            description: 'Reach 50 WPM',
+            icon: 'zap',
+            points: 25,
+          },
+        },
+        {
+          id: 'ua-2',
+          userId: 'user-123',
+          achievementId: 'ach-2',
+          unlockedAt: unlockedAtDate,
+          achievement: {
+            id: 'ach-2',
+            title: 'First Steps',
+            description: 'Complete first test',
+            icon: 'target',
+            points: 10,
+          },
+        },
+      ]);
+
+      await getAchievementStats(mockRequest, mockResponse);
+
+      expect(prisma.achievement.aggregate).toHaveBeenCalled();
+      expect(prisma.userAchievement.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        include: {
+          achievement: true,
+        },
+        orderBy: { unlockedAt: 'desc' },
+      });
+
+      expect(jsonMock).toHaveBeenCalledWith({
+        stats: {
+          totalAchievements: 10,
+          unlockedCount: 2,
+          lockedCount: 8,
+          completionPercentage: 20,
+          totalPoints: 150,
+          earnedPoints: 35,
+          pointsPercentage: (35 / 150) * 100,
+        },
+        recentUnlocks: [
+          {
+            id: 'ach-1',
+            title: 'Speed Demon',
+            description: 'Reach 50 WPM',
+            icon: 'zap',
+            points: 25,
+            unlockedAt: unlockedAtDate.toISOString(),
+          },
+          {
+            id: 'ach-2',
+            title: 'First Steps',
+            description: 'Complete first test',
+            icon: 'target',
+            points: 10,
+            unlockedAt: unlockedAtDate.toISOString(),
+          },
+        ],
+      });
+    });
+
+    it('should handle database errors when retrieving stats', async () => {
+      (prisma.achievement.aggregate as jest.Mock).mockRejectedValue(new Error('Aggregate error'));
+
+      await getAchievementStats(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch achievement statistics' });
     });
   });
 });

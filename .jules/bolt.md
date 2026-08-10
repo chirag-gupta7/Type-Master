@@ -151,3 +151,7 @@
 ## 2026-08-01 - Parallelizing weak key analysis fetches
 **Learning:** The `getWeakKeyAnalysis` endpoint was executing three independent database queries (finding user weak keys, querying finger error patterns via `$queryRaw`, and retrieving recent typing mistakes) sequentially. This sequentially blocks the Node event loop and accumulates latency. Parallelizing these queries using `Promise.all` reduces latency to the duration of the single slowest query.
 **Action:** Execute independent read operations concurrently via `Promise.all` to optimize backend endpoint performance.
+
+## 2026-08-10 - Consolidating redundant query in getAchievementStats
+**Learning:** Retrieving all user achievements to calculate total earned points and unlocked count, while simultaneously fetching a separate subset of the same table using another query to get the top 5 most recent unlocks, leads to redundant database round-trips. Since user achievements is a bounded and typically small dataset, fetching the complete list sorted by `unlockedAt: 'desc'` including full achievement details allows deriving both overall statistics and the top 5 recent unlocks in-memory. This drops database queries in the statistics endpoint from 3 to 2, reducing network and DB connection overhead.
+**Action:** Consolidate redundant sequential or parallel lists fetching identical or overlapping datasets by querying the most comprehensive sorted list once, then applying filters or slicing in-memory.
