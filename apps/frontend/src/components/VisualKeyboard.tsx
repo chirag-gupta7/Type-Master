@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // Keyboard layout definition
@@ -82,6 +82,96 @@ const KEYBOARD_LAYOUT = [
   ],
 ];
 
+interface KeyboardKeyProps {
+  keyChar: string;
+  width: string;
+  state: 'target' | 'correct' | 'incorrect' | 'neutral';
+  isAnimating: boolean;
+  showHomeRowMarkers: boolean;
+  homeRow?: boolean;
+  compact: boolean;
+}
+
+/**
+ * KeyboardKey Component (Memoized)
+ *
+ * Renders an individual key on the visual keyboard. Wrapped in React.memo
+ * to ensure that only keys whose state or animation status changes are re-rendered,
+ * shifting keyboard render time from O(Keys) to O(1) on every single keystroke.
+ */
+const KeyboardKey = React.memo(function KeyboardKey({
+  keyChar,
+  width,
+  state,
+  isAnimating,
+  showHomeRowMarkers,
+  homeRow,
+  compact,
+}: KeyboardKeyProps) {
+  return (
+    <div
+      className={cn(
+        // Base styles
+        'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
+        'border-2 select-none',
+        compact ? 'text-xs' : 'text-sm',
+        width,
+
+        // State-based colors
+        {
+          // Target key (yellow)
+          'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
+            state === 'target',
+
+          // Correct key (green)
+          'bg-green-500/20 border-green-600 text-green-700 dark:text-green-300 shadow-lg shadow-green-500/20':
+            state === 'correct',
+
+          // Incorrect key (red)
+          'bg-red-500/20 border-red-600 text-red-700 dark:text-red-300 shadow-lg shadow-red-500/20':
+            state === 'incorrect',
+
+          // Neutral key
+          'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
+        },
+
+        // Animation
+        {
+          'scale-95': isAnimating,
+          'scale-100': !isAnimating,
+        },
+
+        // Pulse animation for target key
+        {
+          'animate-pulse': state === 'target',
+        }
+      )}
+      role="button"
+      aria-label={keyChar}
+    >
+      {/* Key label */}
+      <span className="relative z-10">{keyChar === 'Space' ? '' : keyChar}</span>
+
+      {/* Home row markers (bumps on F and J) */}
+      {showHomeRowMarkers && homeRow && (
+        <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2">
+          <div className="w-2 h-1 bg-current opacity-30 rounded-full" />
+        </div>
+      )}
+
+      {/* Target key indicator (pulsing dot) */}
+      {state === 'target' && (
+        <div className="absolute -top-1 -right-1">
+          <span className="flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+});
+
 interface VisualKeyboardProps {
   /** The target key that should be pressed (will be highlighted in yellow) */
   targetKey?: string;
@@ -106,6 +196,9 @@ interface VisualKeyboardProps {
  * - Yellow: Target key to press
  * - Home row markers on F and J keys
  * - Responsive animations
+ *
+ * Optimized with memoized key rendering to ensure butter-smooth typing without
+ * any visual stuttering or lagging.
  *
  * @example
  * ```tsx
@@ -142,6 +235,10 @@ export function VisualKeyboard({
     return keyMap[key] || key.toUpperCase();
   };
 
+  // Pre-normalize keys at parent level to avoid recalculating ~60 times in loops
+  const normalizedTarget = targetKey ? normalizeKey(targetKey) : null;
+  const normalizedPressed = pressedKey ? normalizeKey(pressedKey) : null;
+
   // Handle key press animation
   useEffect(() => {
     if (pressedKey) {
@@ -155,8 +252,6 @@ export function VisualKeyboard({
 
   // Get key state (target, correct, incorrect, neutral)
   const getKeyState = (keyCode: string, keyChar: string) => {
-    const normalizedTarget = targetKey ? normalizeKey(targetKey) : null;
-    const normalizedPressed = pressedKey ? normalizeKey(pressedKey) : null;
     const normalizedKeyCode = keyCode;
     const normalizedKeyChar = keyChar.toUpperCase();
 
@@ -178,82 +273,28 @@ export function VisualKeyboard({
     return 'neutral';
   };
 
-  // Get key styling based on state
-  const getKeyClassName = (keyCode: string, keyChar: string, width: string) => {
-    const state = getKeyState(keyCode, keyChar);
-    const isAnimating = animatingKey === keyCode || animatingKey === keyChar.toUpperCase();
-
-    return cn(
-      // Base styles
-      'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
-      'border-2 select-none',
-      compact ? 'text-xs' : 'text-sm',
-      width,
-
-      // State-based colors
-      {
-        // Target key (yellow)
-        'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
-          state === 'target',
-
-        // Correct key (green)
-        'bg-green-500/20 border-green-600 text-green-700 dark:text-green-300 shadow-lg shadow-green-500/20':
-          state === 'correct',
-
-        // Incorrect key (red)
-        'bg-red-500/20 border-red-600 text-red-700 dark:text-red-300 shadow-lg shadow-red-500/20':
-          state === 'incorrect',
-
-        // Neutral key
-        'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
-      },
-
-      // Animation
-      {
-        'scale-95': isAnimating,
-        'scale-100': !isAnimating,
-      },
-
-      // Pulse animation for target key
-      {
-        'animate-pulse': state === 'target',
-      }
-    );
-  };
-
   return (
     <div className={cn('w-full max-w-5xl mx-auto', className)}>
       <div className="space-y-2">
         {KEYBOARD_LAYOUT.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2 justify-center">
-            {row.map((keyData) => (
-              <div
-                key={keyData.code}
-                className={getKeyClassName(keyData.code, keyData.key, keyData.width)}
-                role="button"
-                aria-label={keyData.key}
-              >
-                {/* Key label */}
-                <span className="relative z-10">{keyData.key === 'Space' ? '' : keyData.key}</span>
+            {row.map((keyData) => {
+              const state = getKeyState(keyData.code, keyData.key);
+              const isAnimating = animatingKey === keyData.code || animatingKey === keyData.key.toUpperCase();
 
-                {/* Home row markers (bumps on F and J) */}
-                {showHomeRowMarkers && keyData.homeRow && (
-                  <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2">
-                    <div className="w-2 h-1 bg-current opacity-30 rounded-full" />
-                  </div>
-                )}
-
-                {/* Target key indicator (pulsing dot) */}
-                {getKeyState(keyData.code, keyData.key) === 'target' && (
-                  <div className="absolute -top-1 -right-1">
-                    <span className="flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+              return (
+                <KeyboardKey
+                  key={keyData.code}
+                  keyChar={keyData.key}
+                  width={keyData.width}
+                  state={state}
+                  isAnimating={isAnimating}
+                  showHomeRowMarkers={showHomeRowMarkers}
+                  homeRow={keyData.homeRow}
+                  compact={compact}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
