@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
 
 // Validation schemas
 const typingFeedbackSchema = z.object({
@@ -103,7 +104,8 @@ export const getTypingFeedback = async (req: Request, res: Response, next: NextF
   try {
     const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
-    const systemPrompt = "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
+const systemPrompt =
+      "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
     const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 0}\nDuration: ${duration ?? 0} seconds\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
