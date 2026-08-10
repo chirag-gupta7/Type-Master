@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
 // Validation schemas
 const logMistakeSchema = z.object({
   lessonId: z.string().uuid('Invalid lesson ID'),
@@ -21,7 +25,7 @@ const logMistakeSchema = z.object({
  * Log typing mistakes from a lesson attempt
  * POST /api/v1/mistakes/log
  */
-export const logMistakes = async (req: Request, res: Response): Promise<void> => {
+export const logMistakes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { lessonId, mistakes } = logMistakeSchema.parse(req.body);
     const userId = req.userId;
@@ -92,7 +96,7 @@ export const logMistakes = async (req: Request, res: Response): Promise<void> =>
  * Get weak key analysis for a user
  * GET /api/v1/mistakes/analysis/:userId
  */
-export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<void> => {
+export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
@@ -109,16 +113,17 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
 
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Optimization: Parallelize independent userWeakKeys, queryRaw (fingerErrors), and typingMistake (recentMistakes) queries using Promise.all.
-    // This reduces the endpoint's database latency from O(T1 + T2 + T3) to O(max(T1, T2, T3)).
+    // Optimization: Execute three independent database queries (weak keys, finger errors, and recent
+    // mistakes) concurrently using Promise.all. This reduces the endpoint's database latency from
+    // O(T1 + T2 + T3) sequential execution to O(max(T1, T2, T3)).
     const [weakKeys, fingerErrors, recentMistakes] = await Promise.all([
-      // Get user's weak keys, sorted by error count
+      // 1. Get user's weak keys, sorted by error count
       prisma.userWeakKeys.findMany({
         where: { userId },
         orderBy: { errorCount: 'desc' },
         take: limit,
       }),
-      // Get finger-specific error patterns
+      // 2. Get finger-specific error patterns
       prisma.$queryRaw<Array<{ fingerUsed: string; count: bigint }>>`
         SELECT
           "fingerUsed",
@@ -129,7 +134,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
         GROUP BY "fingerUsed"
         ORDER BY count DESC
       `,
-      // Get recent mistakes for context
+      // 3. Get recent mistakes for context
       prisma.typingMistake.findMany({
         where: { userId },
         orderBy: { timestamp: 'desc' },
@@ -168,7 +173,7 @@ export const getWeakKeyAnalysis = async (req: Request, res: Response): Promise<v
  * Generate targeted practice text based on weak keys
  * GET /api/v1/mistakes/practice/:userId
  */
-export const generatePracticeText = async (req: Request, res: Response): Promise<void> => {
+export const generatePracticeText = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
