@@ -1,3 +1,7 @@
+## 2026-08-11 - Memoization of Calendar Grid and Stats Calculations in PracticeHeatMap
+**Learning:** Rendering complex charting components (like a 365-day calendar heatmap) on every single render can cause unnecessary computational and memory allocation overhead if helper computations (e.g. constructing dates, calculating streaks, grouping weeks, deriving month layouts) are run inline. Wrapping these multi-step algorithms in React `useMemo` hooks prevents garbage collection spikes and CPU cycles.
+**Action:** Always memoize derived visual layouts and statistic pipelines in visual components using `useMemo` when working with large historical ranges or arrays.
+
 ## 2026-07-31 - Parallelizing weak key analysis queries
 **Learning:** Sequential await execution of multiple independent database queries (e.g., findMany, queryRaw) in controller endpoints introduces unnecessary cumulative network and DB roundtrip latencies. Using Promise.all parallelizes execution, reducing total API response time to that of the single slowest query.
 **Action:** Identify endpoints that perform separate, non-dependent database operations and wrap them using Promise.all.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Flame } from 'lucide-react';
 import type { PracticeDay } from '@/types';
@@ -43,28 +44,45 @@ function getTooltipText(count: number, date: Date): string {
 }
 
 export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
-  const days = getLast365Days();
+  // Memoize the last 365 days generation to prevent redundant Date instantiations on every render
+  const days = useMemo(() => getLast365Days(), []);
 
-  // Create a map for quick lookup
-  const activityMap = new Map(data.map((d) => [d.date, d.count]));
+  // Memoize activity map for O(1) quick lookups
+  const activityMap = useMemo(() => new Map(data.map((d) => [d.date, d.count])), [data]);
 
-  // Group days by week
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
+  // Memoize the grouping of days by week to prevent redundant array allocations and traversals
+  const weeks = useMemo(() => {
+    const groupedWeeks: Date[][] = [];
+    let currentWeek: Date[] = [];
 
-  days.forEach((day, index) => {
-    currentWeek.push(day);
-    if (day.getDay() === 6 || index === days.length - 1) {
-      weeks.push([...currentWeek]);
-      currentWeek = [];
-    }
-  });
+    days.forEach((day, index) => {
+      currentWeek.push(day);
+      if (day.getDay() === 6 || index === days.length - 1) {
+        groupedWeeks.push([...currentWeek]);
+        currentWeek = [];
+      }
+    });
 
-  // Calculate statistics
-  const totalActivities = data.reduce((sum, d) => sum + d.count, 0);
-  const activeDays = data.filter((d) => d.count > 0).length;
-  const currentStreak = calculateCurrentStreak(data);
-  const longestStreak = calculateLongestStreak(data);
+    return groupedWeeks;
+  }, [days]);
+
+  // Memoize all statistics to avoid recalculating streaks and reductions on every render
+  const { totalActivities, activeDays, currentStreak, longestStreak } = useMemo(() => {
+    const total = data.reduce((sum, d) => sum + d.count, 0);
+    const active = data.filter((d) => d.count > 0).length;
+    const current = calculateCurrentStreak(data);
+    const longest = calculateLongestStreak(data);
+
+    return {
+      totalActivities: total,
+      activeDays: active,
+      currentStreak: current,
+      longestStreak: longest,
+    };
+  }, [data]);
+
+  // Memoize month labels derivation based on the memoized weeks structure
+  const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks]);
 
   return (
     <motion.div
@@ -131,7 +149,7 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
             {/* Month labels */}
             <div className="w-8" /> {/* Spacer for day labels */}
             <div className="flex-1 flex">
-              {getMonthLabels(weeks).map((month, index) => (
+              {monthLabels.map((month, index) => (
                 <div
                   key={index}
                   className="text-xs text-gray-400"
