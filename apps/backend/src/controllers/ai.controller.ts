@@ -44,6 +44,7 @@ const extractGeminiText = (data: GeminiResponse): string | null => {
 /**
  * Generic helper to call Gemini API
  * Securely uses x-goog-api-key header instead of query parameters
+ * Includes a 10-second timeout to prevent Denial of Service (DoS) due to slow or hung responses.
  */
 const callGemini = async (
   systemPrompt: string,
@@ -58,43 +59,60 @@ const callGemini = async (
     throw new AppError(500, 'AI Service unavailable');
   }
 
-  const response = await fetch(GEMINI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: `${systemPrompt}\n\n${userQuery}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(GEMINI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
       },
-    }),
-  });
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `${systemPrompt}\n\n${userQuery}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    logger.error('Gemini API error', { errorData });
-    throw new AppError(502, 'AI service currently unavailable');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      logger.error('Gemini API error', { errorData });
+      throw new AppError(502, 'AI service currently unavailable');
+    }
+
+    const data = (await response.json()) as GeminiResponse;
+    const text = extractGeminiText(data);
+
+    if (!text) {
+      throw new AppError(502, 'AI service failed to generate a response');
+    }
+
+    return text;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new AppError(504, 'AI service request timed out');
+    }
+    // Handle cases where the thrown error is a plain object (e.g. from tests)
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+      throw new AppError(504, 'AI service request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = (await response.json()) as GeminiResponse;
-  const text = extractGeminiText(data);
-
-  if (!text) {
-    throw new AppError(502, 'AI service failed to generate a response');
-  }
-
-  return text;
 };
 
 /**
