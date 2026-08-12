@@ -1,3 +1,7 @@
+## 2026-08-12 - Parallelizing skill assessment database queries in start and complete endpoints
+**Learning:** Executing independent database reads and writes sequentially inside placement test endpoints introduces cumulative network roundtrip times. Parallelizing them concurrently using Promise.all drops cumulative latency down to the single slowest query, reducing sequential blocking db calls from 2 to 1 in startAssessment and 4 to 2 in completeAssessment.
+**Action:** Audit endpoints that manage user skill assessments or startup flows for independent consecutive queries, and pack them concurrently via Promise.all.
+
 ## 2026-07-31 - Parallelizing weak key analysis queries
 **Learning:** Sequential await execution of multiple independent database queries (e.g., findMany, queryRaw) in controller endpoints introduces unnecessary cumulative network and DB roundtrip latencies. Using Promise.all parallelizes execution, reducing total API response time to that of the single slowest query.
 **Action:** Identify endpoints that perform separate, non-dependent database operations and wrap them using Promise.all.
