@@ -1,9 +1,31 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+
+// Validation schemas
+const typingFeedbackSchema = z.object({
+  wpm: z.number().min(0).max(300, 'WPM is out of realistic range'),
+  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100'),
+  errors: z.number().int().min(0).max(500).optional().nullable(),
+  duration: z.number().min(1).max(3600).optional().nullable(),
+});
+
+const writingFeedbackSchema = z.object({
+  text: z.string().min(1, 'Text is required').max(2000, 'Text must not exceed 2000 characters'),
+  type: z.enum(['prompt-dash', 'story-chain']).default('prompt-dash'),
+  priorFeedback: z.string().max(2000, 'Prior feedback must not exceed 2000 characters').nullable().optional(),
+});
+
+const storyResponseSchema = z.object({
+  story: z
+    .array(z.string().max(1000, 'Each story sentence must not exceed 1000 characters'))
+    .min(1, 'Story history is required')
+    .max(50, 'Story history can have at most 50 entries'),
+});
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -80,15 +102,11 @@ const callGemini = async (
  */
 export const getTypingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { wpm, accuracy, errors, duration } = req.body;
+    const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
-    if (wpm === undefined || accuracy === undefined) {
-      throw new AppError(400, 'Missing required performance metrics');
-    }
-
-    const systemPrompt =
+const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${duration} seconds\n\nProvide helpful feedback.`;
+    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 0}\nDuration: ${duration ?? 0} seconds\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
     res.json({ feedback });
@@ -113,18 +131,9 @@ export const generateWritingPrompt = async (_req: Request, res: Response, next: 
 
 export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { text, type, priorFeedback } = req.body as {
-      text?: string;
-      type?: 'prompt-dash' | 'story-chain';
-      priorFeedback?: string | null;
-    };
+    const { text, type, priorFeedback } = writingFeedbackSchema.parse(req.body);
 
-    if (!text || !text.trim()) {
-      throw new AppError(400, 'Text is required');
-    }
-
-    const mode = type === 'story-chain' ? 'story-chain' : 'prompt-dash';
-    const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${mode}.`;
+    const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${type}.`;
     const userQuery = priorFeedback
       ? `Text:\n${text}\n\nPrevious feedback:\n${priorFeedback}\n\nProvide improved, non-repetitive feedback.`
       : `Text:\n${text}\n\nProvide feedback.`;
@@ -138,10 +147,7 @@ export const getWritingFeedback = async (req: Request, res: Response, next: Next
 
 export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { story } = req.body as { story?: string[] };
-    if (!Array.isArray(story) || story.length === 0) {
-      throw new AppError(400, 'Story history is required');
-    }
+    const { story } = storyResponseSchema.parse(req.body);
 
     const storyContext = story.join('\n');
     const response = await callGemini(
