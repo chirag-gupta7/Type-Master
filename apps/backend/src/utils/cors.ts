@@ -1,59 +1,67 @@
 /**
- * CORS utility functions
- */
-
 /**
- * Checks if a given origin is allowed under the list of allowed origins.
- * Provides highly secure, customized validation for Vercel preview subdomains.
- *
- * @param origin - The incoming Request origin header value (e.g. "https://typemaster-git-main.vercel.app")
- * @param allowedOrigins - List of allowed origins from config (e.g. ["https://typemaster.vercel.app"])
+ * Helper to determine if a CORS origin is allowed.
+ * Prevents wildcard bypasses and ensures secure validation of Vercel preview deployment URLs.
  */
 export const isOriginAllowed = (origin: string, allowedOrigins: string[]): boolean => {
-  if (allowedOrigins.includes('*')) return true;
+  if (allowedOrigins.includes('*')) {
+    return true;
+  }
 
-  return allowedOrigins.some((allowed) => {
-    if (allowed === origin) return true;
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
 
-    try {
-      const allowedHostname = allowed.replace(/^https?:\/\//, '').split(':')[0];
-      const originHostname = origin.replace(/^https?:\/\//, '').split(':')[0];
+  try {
+    const originUrl = new URL(origin);
+    const originHost = originUrl.hostname;
+    const originProto = originUrl.protocol; // e.g., 'https:'
 
-      if (
-        allowedHostname &&
-        originHostname &&
-        allowedHostname.endsWith('.vercel.app') &&
-        originHostname.endsWith('.vercel.app')
-      ) {
-        const allowedPrefix = allowedHostname.substring(
-          0,
-          allowedHostname.length - '.vercel.app'.length
-        );
-        const originSubdomain = originHostname.substring(
-          0,
-          originHostname.length - '.vercel.app'.length
-        );
-
-        if (originHostname === allowedHostname) return true;
-        if (!originSubdomain.startsWith(allowedPrefix + '-')) return false;
-
-        const suffix = originSubdomain.substring(allowedPrefix.length + 1);
-        if (!/^[a-z0-9-]+$/.test(suffix)) return false;
-
-        // Vercel preview deploys are dynamic and contain either a git branch indicator (-git-)
-        // or a system-generated alphanumeric hash (usually 8-12 characters).
-        // This helps distinguish legitimate previews from custom-registered subdomains like "typemaster-evil".
-        // Note: While this heuristic significantly reduces the attack surface, it does not completely
-        // eliminate the risk of an attacker registering a prefix-spoofed project name (e.g. "typemaster-git-malicious") on Vercel.
-        const hasGit = suffix.includes('git-') || suffix.includes('-git');
-        const hasHash = /[a-z0-9]{8,}/.test(suffix);
-
-        return hasGit || hasHash;
-      }
-    } catch {
-      // Fallback on any parsing error
+    if (!originHost.endsWith('.vercel.app')) {
+      return false;
     }
 
+    for (const allowed of allowedOrigins) {
+      if (!allowed.startsWith('http://') && !allowed.startsWith('https://')) {
+        continue;
+      }
+
+      const allowedUrl = new URL(allowed);
+      const allowedHost = allowedUrl.hostname;
+      const allowedProto = allowedUrl.protocol;
+
+      // Protocol must match
+      if (originProto !== allowedProto) {
+        continue;
+      }
+
+      if (!allowedHost.endsWith('.vercel.app')) {
+        continue;
+      }
+
+      const prefix = allowedHost.substring(0, allowedHost.length - '.vercel.app'.length);
+      if (!prefix) {
+        continue;
+      }
+
+      // The origin hostname must start with the allowed prefix + '-'
+      if (!originHost.startsWith(`${prefix}-`)) {
+        continue;
+      }
+
+      const suffix = originHost.substring(prefix.length + 1, originHost.length - '.vercel.app'.length);
+
+      // Verify suffix has '-git-' or starts with 'git-' or is an alphanumeric hash of at least 8 characters
+      const hasGit = suffix.includes('-git-') || suffix.startsWith('git-');
+      const isAlphanumericHash = /^[a-zA-Z0-9]{8,}$/.test(suffix);
+
+      if (hasGit || isAlphanumericHash) {
+        return true;
+      }
+    }
+  } catch {
     return false;
-  });
+  }
+
+  return false;
 };

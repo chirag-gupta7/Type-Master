@@ -42,6 +42,11 @@
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
 
+## 2026-08-04 - [Overly Permissive CORS Config for Vercel Subdomains]
+**Vulnerability:** The CORS origin check in `apps/backend/src/index.ts` was overly permissive. It allowed wildcard suffix matching on `.vercel.app`, meaning any deployment hosted on Vercel could bypass CORS and make authenticated credential-sharing API requests.
+**Learning:** Checking for `.vercel.app` using general substring inclusion/suffix checks exposes the application to origin spoofing. Anyone with a Vercel-hosted project could issue malicious requests targeting our backend APIs.
+**Prevention:** Always extract and validate the specific project subdomain prefix before allowing wildcards for Vercel preview environments. Enforce strict suffix patterns matching either `-git-` preview segments or alphanumeric hashes of at least 8 characters.
+
 ## 2026-08-03 - Prompt Injection and DoS on AI Proxy Endpoints
 **Vulnerability:** The AI proxy endpoints accepted unvalidated numeric values and unsanitized text payloads of arbitrary length from clients, introducing risks of prompt injection and Denial of Service (DoS) due to excessive API resource/cost consumption.
 **Learning:** Endpoints that interface with third-party LLMs must enforce strict type constraints, ranges, and maximum input length limitations on the server side to protect backend assets and billing.

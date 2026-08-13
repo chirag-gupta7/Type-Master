@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler } from './middleware/error-handler';
+import { isOriginAllowed } from './utils/cors';
 import { rateLimiter } from './middleware/rate-limiter';
 import { logger } from './utils/logger';
 import authRoutes from './routes/auth.routes';
@@ -33,8 +34,6 @@ if (trustProxyEnv === undefined) {
   const parsedTrustProxy = Number.parseInt(trustProxyEnv, 10);
   app.set('trust proxy', Number.isNaN(parsedTrustProxy) ? 1 : parsedTrustProxy);
 }
-
-import { isOriginAllowed } from './utils/cors';
 
 // Middleware
 app.use(helmet());
