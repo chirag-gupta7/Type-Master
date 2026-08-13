@@ -51,3 +51,8 @@
 **Vulnerability:** Manual parsing of the `X-Forwarded-For` header in `rate-limiter.ts` allowed clients to spoof arbitrary client IPs and completely bypass rate limits. Additionally, combining email addresses in authentication rate-limit keys enabled password spraying/credential stuffing attacks across many accounts from a single IP.
 **Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
 **Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
+
+## 2026-08-13 - [AI Request Denial of Service / Timeout Resource Exhaustion]
+**Vulnerability:** The backend proxy to the third-party Gemini API lacked any request timeout constraints, making the Express server susceptible to resource exhaustion (Denial of Service) if Gemini hung or experienced extreme latency.
+**Learning:** Outgoing requests to critical external services must never be unbound. Unbounded requests tie up Node.js socket connections and event loop tasks, allowing external delays to degrade entire system availability.
+**Prevention:** Always wrap third-party API calls in an `AbortController`-configured `fetch` with a strict timeout (such as 10 seconds), properly clearing the timeout timer and translating abort events into generic 504 Gateway Timeout responses to avoid exposing internals.
