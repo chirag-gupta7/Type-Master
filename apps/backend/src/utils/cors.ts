@@ -1,4 +1,5 @@
 /**
+/**
  * Helper to determine if a CORS origin is allowed.
  * Prevents wildcard bypasses and ensures secure validation of Vercel preview deployment URLs.
  */
