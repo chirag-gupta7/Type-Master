@@ -15,45 +15,20 @@ const parsePositiveInt = (value: string | undefined, fallback: number): number =
   return parsed;
 };
 
-const extractPrimaryForwardedIp = (value: string): string => {
-  return value.split(',')[0]?.trim() || '';
-};
-
-const getRequestIp = (req: Request): string => {
-  const forwarded = req.headers['x-forwarded-for'];
-
-  if (typeof forwarded === 'string' && forwarded.trim().length > 0) {
-    return extractPrimaryForwardedIp(forwarded);
-  }
-
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    return extractPrimaryForwardedIp(forwarded[0] || '');
-  }
-
+export const getRequestIp = (req: Request): string => {
+  // SECURITY FIX: Rely on Express's secure, built-in req.ip (which respects the trust proxy
+  // configuration set in index.ts) instead of manually parsing the potentially spoofable
+  // X-Forwarded-For header. This prevents IP spoofing rate limiter bypasses.
   return req.ip || req.socket.remoteAddress || 'unknown';
 };
 
-const getEmailFromBody = (req: Request): string | null => {
-  const body = req.body as { email?: unknown } | undefined;
-  const rawEmail = body?.email;
-
-  if (typeof rawEmail !== 'string') {
-    return null;
-  }
-
-  const normalized = rawEmail.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-};
-
-const getAuthRateLimitKey = (req: Request): string => {
-  const email = getEmailFromBody(req);
+export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
 
-  if (email) {
-    // Prevent one noisy IP from blocking all users on shared networks.
-    return `email:${email}:ip:${ip}`;
-  }
-
+  // SECURITY FIX: Strictly use IP-based rate limiting keys rather than the specific
+  // email-IP combination (email:${email}:ip:${ip}). This prevents credential stuffing
+  // and password spraying attacks where an attacker tests many different email addresses
+  // from a single IP, as each attempt now increments the same IP-based limit pool.
   return `ip:${ip}`;
 };
 

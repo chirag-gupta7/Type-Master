@@ -199,6 +199,9 @@ interface VisualKeyboardProps {
  * - Home row markers on F and J keys
  * - Responsive animations
  *
+ * Optimized with memoized key rendering to ensure butter-smooth typing without
+ * any visual stuttering or lagging.
+ *
  * @example
  * ```tsx
  * <VisualKeyboard
