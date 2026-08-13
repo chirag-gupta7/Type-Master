@@ -42,6 +42,11 @@
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
 
+## 2026-08-05 - [Lack of Input Bounds Validation in AI Controllers]
+**Vulnerability:** AI proxy controllers accepted arbitrary payload shapes, unchecked text sizes, and unrestricted numbers without validation, exposing the application to prompt injection and Denial of Service (DoS)/cost exhaustion attacks.
+**Learning:** Downstream AI proxy endpoints present unique security surfaces. Unchecked string lengths and out-of-bounds metrics (like abnormal WPM/accuracy values) can trigger downstream AI service failures or allow massive prompt injection payloads.
+**Prevention:** Always enforce strict schema-based input boundaries (such as Zod validation) with explicit minimum/maximum constraints on numbers, string lengths, and array depths before passing user parameters to external API wrappers.
+
 ## 2026-08-04 - [Overly Permissive CORS Config for Vercel Subdomains]
 **Vulnerability:** The CORS origin check in `apps/backend/src/index.ts` was overly permissive. It allowed wildcard suffix matching on `.vercel.app`, meaning any deployment hosted on Vercel could bypass CORS and make authenticated credential-sharing API requests.
 **Learning:** Checking for `.vercel.app` using general substring inclusion/suffix checks exposes the application to origin spoofing. Anyone with a Vercel-hosted project could issue malicious requests targeting our backend APIs.

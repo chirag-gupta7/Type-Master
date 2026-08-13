@@ -6,25 +6,25 @@ import { logger } from '../utils/logger';
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
 
-// Validation schemas
+// Security: Enforce strict boundaries, type constraints, and max lengths to prevent prompt injection and DoS/resource exhaustion
 const typingFeedbackSchema = z.object({
-  wpm: z.number().min(0).max(300, 'WPM is out of realistic range'),
-  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100'),
-  errors: z.number().int().min(0).max(500).optional().nullable(),
-  duration: z.number().min(1).max(3600).optional().nullable(),
+  wpm: z.number().min(0, 'WPM must be at least 0').max(300, 'WPM must not exceed 300'),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy must not exceed 100'),
+  errors: z.number().int().min(0, 'Errors must be at least 0').max(1000, 'Errors must not exceed 1000').optional(),
+  duration: z.number().min(0, 'Duration must be at least 0').max(3600, 'Duration must not exceed 3600').optional(),
 });
 
 const writingFeedbackSchema = z.object({
   text: z.string().min(1, 'Text is required').max(2000, 'Text must not exceed 2000 characters'),
-  type: z.enum(['prompt-dash', 'story-chain']).default('prompt-dash'),
-  priorFeedback: z.string().max(2000, 'Prior feedback must not exceed 2000 characters').nullable().optional(),
+  type: z.enum(['prompt-dash', 'story-chain']).optional(),
+  priorFeedback: z.string().max(1000, 'Previous feedback must not exceed 1000 characters').nullable().optional(),
 });
 
 const storyResponseSchema = z.object({
   story: z
-    .array(z.string().max(1000, 'Each story sentence must not exceed 1000 characters'))
+    .array(z.string().max(500, 'Each story segment must not exceed 500 characters'))
     .min(1, 'Story history is required')
-    .max(50, 'Story history can have at most 50 entries'),
+    .max(20, 'Story history must not exceed 20 segments'),
 });
 
 type GeminiResponse = {
@@ -102,11 +102,12 @@ const callGemini = async (
  */
 export const getTypingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Validate input using strict Zod schema to prevent payload tampering/injection
     const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
-const systemPrompt =
+    const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 0}\nDuration: ${duration ?? 0} seconds\n\nProvide helpful feedback.`;
+    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 'N/A'}\nDuration: ${duration ? `${duration} seconds` : 'N/A'}\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
     res.json({ feedback });
@@ -131,9 +132,11 @@ export const generateWritingPrompt = async (_req: Request, res: Response, next: 
 
 export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Validate input using strict Zod schema to prevent massive text DoS/injection attacks
     const { text, type, priorFeedback } = writingFeedbackSchema.parse(req.body);
 
-    const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${type}.`;
+    const mode = type === 'story-chain' ? 'story-chain' : 'prompt-dash';
+    const systemPrompt = `You are a writing coach for a typing game. Give concise, constructive feedback in 2-4 sentences. Focus on clarity, grammar, and creativity. This text is from ${mode}.`;
     const userQuery = priorFeedback
       ? `Text:\n${text}\n\nPrevious feedback:\n${priorFeedback}\n\nProvide improved, non-repetitive feedback.`
       : `Text:\n${text}\n\nProvide feedback.`;
@@ -147,6 +150,7 @@ export const getWritingFeedback = async (req: Request, res: Response, next: Next
 
 export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Validate input using strict Zod schema to prevent deep recursive story nesting or excessively large payloads
     const { story } = storyResponseSchema.parse(req.body);
 
     const storyContext = story.join('\n');
