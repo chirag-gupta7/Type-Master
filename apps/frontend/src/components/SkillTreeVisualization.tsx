@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Lock, Star, Target, Zap } from 'lucide-react';
 import type { SkillTreeNode } from '@/types';
@@ -35,21 +35,26 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
   const [selectedNode, setSelectedNode] = useState<SkillTreeNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Group lessons by level
-  const lessonsByLevel = data.reduce(
-    (acc, lesson) => {
-      if (!acc[lesson.level]) {
-        acc[lesson.level] = [];
-      }
-      acc[lesson.level].push(lesson);
-      return acc;
-    },
-    {} as Record<number, SkillTreeNode[]>
-  );
+  // Optimization: Memoize the grouping of lessons by level so it's not re-computed on every node hover or selection (O(N) grouping)
+  const lessonsByLevel = useMemo(() => {
+    return data.reduce(
+      (acc, lesson) => {
+        if (!acc[lesson.level]) {
+          acc[lesson.level] = [];
+        }
+        acc[lesson.level].push(lesson);
+        return acc;
+      },
+      {} as Record<number, SkillTreeNode[]>
+    );
+  }, [data]);
 
-  const levels = Object.keys(lessonsByLevel)
-    .map(Number)
-    .sort((a, b) => a - b);
+  // Optimization: Memoize the levels array to prevent O(L log L) sorting operations on every single render
+  const levels = useMemo(() => {
+    return Object.keys(lessonsByLevel)
+      .map(Number)
+      .sort((a, b) => a - b);
+  }, [lessonsByLevel]);
 
   return (
     <motion.div

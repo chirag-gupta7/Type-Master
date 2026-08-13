@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Flame } from 'lucide-react';
 import type { PracticeDay } from '@/types';
@@ -43,28 +44,32 @@ function getTooltipText(count: number, date: Date): string {
 }
 
 export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
-  const days = getLast365Days();
+  // Optimization: Memoize getLast365Days to avoid generating 365 new Date objects and a new array on every render
+  const days = useMemo(() => getLast365Days(), []);
 
-  // Create a map for quick lookup
-  const activityMap = new Map(data.map((d) => [d.date, d.count]));
+  // Optimization: Memoize the activity map for quick O(1) lookups instead of rebuilding the Map on every render
+  const activityMap = useMemo(() => new Map(data.map((d) => [d.date, d.count])), [data]);
 
-  // Group days by week
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
+  // Optimization: Memoize grouping of 365 days by week to avoid O(N) weekly array grouping calculations on every render
+  const weeks = useMemo(() => {
+    const w: Date[][] = [];
+    let currentWeek: Date[] = [];
 
-  days.forEach((day, index) => {
-    currentWeek.push(day);
-    if (day.getDay() === 6 || index === days.length - 1) {
-      weeks.push([...currentWeek]);
-      currentWeek = [];
-    }
-  });
+    days.forEach((day, index) => {
+      currentWeek.push(day);
+      if (day.getDay() === 6 || index === days.length - 1) {
+        w.push([...currentWeek]);
+        currentWeek = [];
+      }
+    });
+    return w;
+  }, [days]);
 
-  // Calculate statistics
-  const totalActivities = data.reduce((sum, d) => sum + d.count, 0);
-  const activeDays = data.filter((d) => d.count > 0).length;
-  const currentStreak = calculateCurrentStreak(data);
-  const longestStreak = calculateLongestStreak(data);
+  // Optimization: Memoize statistics calculations (reductions, filters, streaks) to avoid expensive computations on every render
+  const totalActivities = useMemo(() => data.reduce((sum, d) => sum + d.count, 0), [data]);
+  const activeDays = useMemo(() => data.filter((d) => d.count > 0).length, [data]);
+  const currentStreak = useMemo(() => calculateCurrentStreak(data), [data]);
+  const longestStreak = useMemo(() => calculateLongestStreak(data), [data]);
 
   return (
     <motion.div
