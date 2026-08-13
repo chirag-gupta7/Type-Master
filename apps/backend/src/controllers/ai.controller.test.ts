@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import {
   getTypingFeedback,
+  generateWritingPrompt,
   getWritingFeedback,
   getStoryResponse,
 } from './ai.controller';
@@ -277,6 +278,17 @@ describe('AIController - Input Validation and Security Enhancements', () => {
 
       expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
+    });
+  });
+
+  describe('generateWritingPrompt', () => {
+    it('should successfully get writing prompt', async () => {
+      mockGeminiSuccess('Mocked AI Response');
+
+      await generateWritingPrompt(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockFetch).toHaveBeenCalled();
+      expect(jsonMock).toHaveBeenCalledWith({ prompt: 'Mocked AI Response' });
     });
   });
 });

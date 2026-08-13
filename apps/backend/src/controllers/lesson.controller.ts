@@ -608,43 +608,49 @@ export const getProgressVisualization = async (
       count,
     }));
 
-    // O(N) Optimization: Replace nested array scans (filter/find) with Map-based lookups
-    // for lesson completion status, level grouping, and prerequisite checking.
-    const lessonCompletionMap = new Map<string, boolean>();
-    const lessonsByLevelMap = new Map<number, typeof lessonsWithProgress>();
+    // PERFORMANCE OPTIMIZATION:
+    // Before: O(N^2) complexity due to nested .filter() and .find() on lessonsWithProgress array inside the .map loop.
+    // After: O(N) complexity by using precomputed index Maps and a completed lessons Set for O(1) lookups.
 
+    // 1. Precompute a set of completed lesson IDs for O(1) lookups
+    const completedLessonIds = new Set(
+      lessonsWithProgress
+        .filter((l) => l.userProgress[0]?.completed)
+        .map((l) => l.id)
+    );
+
+    // 2. Group lessons by level for quick prerequisite retrieval
+    const lessonsByLevel = new Map<number, typeof lessonsWithProgress>();
     for (const lesson of lessonsWithProgress) {
-      lessonCompletionMap.set(lesson.id, !!lesson.userProgress[0]?.completed);
-
-      if (!lessonsByLevelMap.has(lesson.level)) {
-        lessonsByLevelMap.set(lesson.level, []);
+      if (!lessonsByLevel.has(lesson.level)) {
+        lessonsByLevel.set(lesson.level, []);
       }
-      lessonsByLevelMap.get(lesson.level)?.push(lesson);
+      lessonsByLevel.get(lesson.level)!.push(lesson);
     }
 
+    // 3. Map lesson ID to its index within its level for O(1) index retrieval
+    const lessonIndexInLevel = new Map<string, number>();
+    for (const levelLessons of lessonsByLevel.values()) {
+      levelLessons.forEach((l, idx) => {
+        lessonIndexInLevel.set(l.id, idx);
+      });
+    }
+
+    // Build skill tree structure with dependencies in O(N)
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
-      let prerequisites: string[] = [];
 
+      let prerequisites: string[] = [];
       if (lesson.order > 1) {
-        // Prerequisite is the lesson with the largest order less than the current lesson in the same level
-        const sameLevelLessons = lessonsByLevelMap.get(lesson.level) || [];
-        const prevInLevel = sameLevelLessons
-          .filter((l) => l.order < lesson.order)
-          .sort((a, b) => b.order - a.order)[0];
-        if (prevInLevel) {
-          prerequisites = [prevInLevel.id];
+        const levelLessons = lessonsByLevel.get(lesson.level) || [];
+        const idx = lessonIndexInLevel.get(lesson.id) ?? -1;
+        if (idx > 0) {
+          prerequisites = [levelLessons[idx - 1].id];
         }
       } else if (lesson.level > 1) {
-        // Prerequisites are the last 3 lessons from the previous level
-        const prevLevelLessons = lessonsByLevelMap.get(lesson.level - 1) || [];
+        const prevLevelLessons = lessonsByLevel.get(lesson.level - 1) || [];
         prerequisites = prevLevelLessons.slice(-3).map((l) => l.id);
       }
-
-      const isLocked =
-        prerequisites.length > 0
-          ? !prerequisites.every((preReqId) => lessonCompletionMap.get(preReqId))
-          : false;
 
       return {
         id: lesson.id,
@@ -657,7 +663,10 @@ export const getProgressVisualization = async (
         stars: progress?.stars || 0,
         bestWpm: progress?.bestWpm || 0,
         attempts: progress?.attempts || 0,
-        locked: isLocked,
+        locked:
+          prerequisites.length > 0
+            ? !prerequisites.every((preReqId) => completedLessonIds.has(preReqId))
+            : false,
         prerequisites,
       };
     });
