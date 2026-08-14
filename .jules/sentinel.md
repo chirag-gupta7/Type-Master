@@ -61,3 +61,8 @@
 **Vulnerability:** Manual parsing of the `X-Forwarded-For` header in `rate-limiter.ts` allowed clients to spoof arbitrary client IPs and completely bypass rate limits. Additionally, combining email addresses in authentication rate-limit keys enabled password spraying/credential stuffing attacks across many accounts from a single IP.
 **Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
 **Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
+
+## 2026-08-14 - [Lack of Input Bounds Validation on Authentication Schemas]
+**Vulnerability:** `registerSchema` and `loginSchema` lacked maximum length limits on passwords, emails, and image URLs.
+**Learning:** Failing to restrict input string lengths, especially on credentials passed to computationally expensive hashing algorithms like `bcrypt`, exposes the backend to Denial of Service (DoS) and CPU/memory exhaustion attacks.
+**Prevention:** Always enforce strict upper bounds (e.g., `.max(100)` for passwords, `.max(255)` for emails) in validation schemas at the entry point of the application before downstream processing or storage.

@@ -103,6 +103,87 @@ describe('Auth Token Integration', () => {
 
       expect(response.body.error).toBeDefined();
     });
+
+    it('should reject emails exceeding 255 characters to prevent DoS', async () => {
+      const longEmail = 'a'.repeat(247) + '@test.com'; // Total length 256 chars
+      const response = await request(app)
+        .post('/api/v1/auth/token')
+        .set('X-Internal-Token', 'test-internal-secret')
+        .send({ email: longEmail })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('should reject image URLs exceeding 1000 characters to prevent resource exhaustion', async () => {
+      const longUrl = 'https://example.com/image.png?q=' + 'a'.repeat(975); // Total length 1008 chars
+      const response = await request(app)
+        .post('/api/v1/auth/token')
+        .set('X-Internal-Token', 'test-internal-secret')
+        .send({
+          email: 'test@example.com',
+          image: longUrl,
+        })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+  });
+
+  describe('POST /api/v1/auth/register input boundaries', () => {
+    it('should reject registration requests with passwords exceeding 100 characters to prevent bcrypt DoS', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: 'user@example.com',
+          username: 'valid_user',
+          password: 'A' + 'a'.repeat(99) + '1', // 101 characters
+        })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('should reject registration requests with emails exceeding 255 characters', async () => {
+      const longEmail = 'a'.repeat(247) + '@test.com'; // 256 characters
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: longEmail,
+          username: 'valid_user',
+          password: 'Password1',
+        })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+  });
+
+  describe('POST /api/v1/auth/login input boundaries', () => {
+    it('should reject login requests with passwords exceeding 100 characters to prevent bcrypt DoS', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'user@example.com',
+          password: 'a'.repeat(101), // 101 characters
+        })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('should reject login requests with emails exceeding 255 characters', async () => {
+      const longEmail = 'a'.repeat(247) + '@test.com'; // 256 characters
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: longEmail,
+          password: 'Password1',
+        })
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
   });
 
   describe('Integration with NextAuth', () => {
