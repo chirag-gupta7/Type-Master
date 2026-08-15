@@ -1,18 +1,151 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores, getLeaderboard } from './game.controller';
+import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
     gameScore: {
+      create: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
       groupBy: jest.fn(),
     },
   },
 }));
+
+describe('GameController - saveGameScore', () => {
+  let mockRequest: Partial<Request & { userId?: string }>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      userId: 'user-123',
+      body: {},
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if userId is missing', async () => {
+    mockRequest.userId = undefined;
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(401);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should return 400 validation error if payload is invalid (missing gameType)', async () => {
+    mockRequest.body = { score: 100 };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Validation error',
+      })
+    );
+  });
+
+  it('should return 400 validation error if score is out of bounds (negative)', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: -10,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Validation error',
+      })
+    );
+  });
+
+  it('should return 400 validation error if WPM exceeds maximum allowed limit', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 500,
+      wpm: 500, // exceeds max 300
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Validation error',
+      })
+    );
+  });
+
+  it('should successfully save game score when payload is valid', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 450,
+      wpm: 85,
+      accuracy: 98,
+      duration: 60,
+    };
+
+    const mockSavedScore = {
+      id: 'score-1',
+      userId: 'user-123',
+      gameType: GameType.WORD_BLITZ,
+      score: 450,
+      wpm: 85,
+      accuracy: 98,
+      duration: 60,
+      metadata: null,
+      createdAt: new Date(),
+      user: { id: 'user-123', username: 'TestUser' },
+    };
+
+    (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockSavedScore);
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-123',
+        gameType: GameType.WORD_BLITZ,
+        score: 450,
+        wpm: 85,
+        accuracy: 98,
+        duration: 60,
+        metadata: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    expect(statusMock).toHaveBeenCalledWith(201);
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        ...mockSavedScore,
+        metadata: null,
+      },
+    });
+  });
+});
 
 describe('GameController - getGameStats', () => {
   let mockRequest: Partial<Request & { userId?: string }>;
