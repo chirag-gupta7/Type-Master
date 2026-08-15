@@ -36,20 +36,21 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
 
     const userId = authUserId;
 
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    // Optimization: Parallelize independent user validity and baseline lesson queries using Promise.all
+    // to reduce blocking database round-trips from 2 to 1.
+    const [user, assessmentLesson] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+      }),
+      prisma.lesson.findFirst({
+        where: { level: 1 },
+        select: { content: true, targetWpm: true, minAccuracy: true },
+      }),
+    ]);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    // Get assessment text (Level 1 lesson content for baseline)
-    const assessmentLesson = await prisma.lesson.findFirst({
-      where: { level: 1 },
-      select: { content: true, targetWpm: true, minAccuracy: true },
-    });
 
     if (!assessmentLesson) {
       return res.status(500).json({ error: 'Assessment content not found' });
@@ -131,22 +132,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       'pinky-right': wpm * 0.8,
     });
 
-    // Store assessment results
-    const assessment = await prisma.userSkillAssessment.create({
-      data: {
-        userId,
-        overallWpm: wpm,
-        overallAccuracy: accuracy,
-        recommendedLevel: recommendedSkillLevel,
-        weakFingers,
-        problematicKeys,
-        fingerWpmScores,
-        assessmentData: JSON.stringify({ mistakesByKey, timeSpent }),
-      },
-    });
-
-    // UNLOCK LESSONS BASED ON SKILL LEVEL
-    // Get all lessons up to the recommended section
+    // Determine sections to unlock based on skill level
     let sectionsToUnlock: number[] = [];
 
     if (recommendedSkillLevel === 'EXPERT') {
@@ -158,17 +144,47 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
     }
     // BEGINNER starts at lesson 1, no need to unlock
 
-    if (sectionsToUnlock.length > 0) {
-      // Get all lessons in the sections to unlock
-      const lessonsToUnlock = await prisma.lesson.findMany({
-        where: {
-          section: {
-            in: sectionsToUnlock,
-          },
+    // Optimization: Parallelize independent database queries (assessment record creation,
+    // lesson unlocking query, and recommended lesson details fetch) using Promise.all to reduce
+    // blocking database round-trips from 4 sequential queries to 2.
+    const [assessment, lessonsToUnlock, recommendedLesson] = await Promise.all([
+      prisma.userSkillAssessment.create({
+        data: {
+          userId,
+          overallWpm: wpm,
+          overallAccuracy: accuracy,
+          recommendedLevel: recommendedSkillLevel,
+          weakFingers,
+          problematicKeys,
+          fingerWpmScores,
+          assessmentData: JSON.stringify({ mistakesByKey, timeSpent }),
         },
-        select: { id: true },
-      });
+      }),
+      sectionsToUnlock.length > 0
+        ? prisma.lesson.findMany({
+            where: {
+              section: {
+                in: sectionsToUnlock,
+              },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+      prisma.lesson.findFirst({
+        where: { level: recommendedLessonLevel },
+        select: {
+          id: true,
+          level: true,
+          title: true,
+          description: true,
+          section: true,
+          targetWpm: true,
+          minAccuracy: true,
+        },
+      }),
+    ]);
 
+    if (lessonsToUnlock.length > 0) {
       // Create UserLessonProgress records to unlock these lessons
       // Mark them as "completed" with basic stats so they show as unlocked
       const unlockData = lessonsToUnlock.map((lesson) => ({
@@ -191,20 +207,6 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
         `Unlocked ${lessonsToUnlock.length} lessons in sections ${sectionsToUnlock.join(', ')} for user: ${userId}`
       );
     }
-
-    // Get the recommended lesson details
-    const recommendedLesson = await prisma.lesson.findFirst({
-      where: { level: recommendedLessonLevel },
-      select: {
-        id: true,
-        level: true,
-        title: true,
-        description: true,
-        section: true,
-        targetWpm: true,
-        minAccuracy: true,
-      },
-    });
 
     logger.info(
       `Assessment completed for user: ${userId}, recommended level: ${recommendedLessonLevel}, unlocked ${sectionsToUnlock.length} section(s)`
