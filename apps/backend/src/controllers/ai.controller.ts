@@ -5,6 +5,8 @@ import { logger } from '../utils/logger';
 
 // Input validation schemas for strict types, range checks, and maximum lengths
 // to prevent prompt injection and Denial of Service (DoS) or high-cost resource exhaustion attacks.
+// Input validation schemas for AI proxy endpoints to prevent prompt injection and resource/cost DoS
+// Security: Enforce strict boundaries, type constraints, and max lengths to prevent prompt injection and DoS/resource exhaustion
 const typingFeedbackSchema = z.object({
   wpm: z.number().nonnegative('WPM must be non-negative').max(1000, 'WPM is too high'),
   accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100'),
@@ -103,11 +105,12 @@ const callGemini = async (
  */
 export const getTypingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
+// Validate input using strict Zod schema to prevent payload tampering/injection
     const { wpm, accuracy, errors, duration } = typingFeedbackSchema.parse(req.body);
 
     const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-    const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${duration} seconds\n\nProvide helpful feedback.`;
+const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 'N/A'}\nDuration: ${duration ? `${duration} seconds` : 'N/A'}\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
     res.json({ feedback });
@@ -132,6 +135,7 @@ export const generateWritingPrompt = async (_req: Request, res: Response, next: 
 
 export const getWritingFeedback = async (req: Request, res: Response, next: NextFunction) => {
   try {
+// Validate input using strict Zod schema to prevent massive text DoS/injection attacks
     const { text, type, priorFeedback } = writingFeedbackSchema.parse(req.body);
 
     const mode = type === 'story-chain' ? 'story-chain' : 'prompt-dash';
@@ -149,6 +153,7 @@ export const getWritingFeedback = async (req: Request, res: Response, next: Next
 
 export const getStoryResponse = async (req: Request, res: Response, next: NextFunction) => {
   try {
+// Validate input using strict Zod schema to prevent deep recursive story nesting or excessively large payloads
     const { story } = storyResponseSchema.parse(req.body);
 
     const storyContext = story.join('\n');

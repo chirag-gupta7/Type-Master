@@ -1,8 +1,7 @@
-﻿import { Request, Response } from 'express';
 import { logMistakes, getWeakKeyAnalysis, generatePracticeText } from './mistake.controller';
 import { prisma } from '../utils/prisma';
 
-// Mock Prisma Client
+// Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
     typingMistake: {
@@ -13,12 +12,12 @@ jest.mock('../utils/prisma', () => ({
       upsert: jest.fn(),
       findMany: jest.fn(),
     },
-    $transaction: jest.fn(),
+    $transaction: jest.fn((promises) => Promise.all(promises)),
     $queryRaw: jest.fn(),
   },
 }));
 
-// Mock logger
+// Mock Logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -41,7 +40,9 @@ describe('MistakeController', () => {
     };
     mockRequest = {
       userId: 'user-123',
+      params: {},
       query: {},
+      body: {},
     };
     jest.clearAllMocks();
   });
@@ -50,30 +51,57 @@ describe('MistakeController', () => {
     it('should return 401 if userId is missing', async () => {
       mockRequest.userId = undefined;
       mockRequest.body = {
-        lessonId: '00000000-0000-0000-0000-000000000000',
-        mistakes: [],
+        lessonId: '6b6c7b95-ef1b-4b1d-84e0-798df673ea14',
+        mistakes: [
+          { keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
+        ],
       };
-
-      await logMistakes(mockRequest as Request, mockResponse as Response);
+      await logMistakes(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(401);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
-    it('should log mistakes and return counts', async () => {
+    it('should successfully log mistakes and update userWeakKeys in transaction', async () => {
+      const lessonId = '6b6c7b95-ef1b-4b1d-84e0-798df673ea14';
       mockRequest.body = {
-        lessonId: 'c2e2f3d4-1a2b-3c4d-5e6f-7a8b9c0d1e2f',
+        lessonId,
         mistakes: [
           { keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
-          { keyPressed: 's', keyExpected: 'd', fingerUsed: 'middle-left' },
-          { keyPressed: 'x', keyExpected: 's', fingerUsed: 'index-left' },
+          { keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
+          { keyPressed: 'f', keyExpected: 'd', fingerUsed: 'middle-left' },
         ],
       };
 
-      (prisma.typingMistake.createMany as jest.Mock).mockReturnValue({ count: 3 });
-      (prisma.$transaction as jest.Mock).mockResolvedValue([{ count: 3 }]);
+      (prisma.typingMistake.createMany as jest.Mock).mockResolvedValue({ count: 3 });
+      (prisma.userWeakKeys.upsert as jest.Mock).mockResolvedValue({ id: 'wk-1' });
 
-      await logMistakes(mockRequest as Request, mockResponse as Response);
+      await logMistakes(mockRequest, mockResponse);
+
+      expect(prisma.typingMistake.createMany).toHaveBeenCalledWith({
+        data: [
+          { userId: 'user-123', lessonId, keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
+          { userId: 'user-123', lessonId, keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
+          { userId: 'user-123', lessonId, keyPressed: 'f', keyExpected: 'd', fingerUsed: 'middle-left' },
+        ],
+      });
+
+      // s was incorrect 2 times, d was incorrect 1 time
+      expect(prisma.userWeakKeys.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_keyChar: { userId: 'user-123', keyChar: 's' } },
+          create: expect.objectContaining({ userId: 'user-123', keyChar: 's', errorCount: 2 }),
+          update: expect.objectContaining({ errorCount: { increment: 2 } }),
+        })
+      );
+
+      expect(prisma.userWeakKeys.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_keyChar: { userId: 'user-123', keyChar: 'd' } },
+          create: expect.objectContaining({ userId: 'user-123', keyChar: 'd', errorCount: 1 }),
+          update: expect.objectContaining({ errorCount: { increment: 1 } }),
+        })
+      );
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(jsonMock).toHaveBeenCalledWith({
@@ -82,14 +110,15 @@ describe('MistakeController', () => {
       });
     });
 
-    it('should handle errors gracefully during logging', async () => {
+    it('should return 500 when database transaction fails', async () => {
       mockRequest.body = {
-        lessonId: 'c2e2f3d4-1a2b-3c4d-5e6f-7a8b9c0d1e2f',
-        mistakes: [],
+        lessonId: '6b6c7b95-ef1b-4b1d-84e0-798df673ea14',
+        mistakes: [{ keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' }],
       };
-      (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('Transaction Error'));
 
-      await logMistakes(mockRequest as Request, mockResponse as Response);
+      (prisma.typingMistake.createMany as jest.Mock).mockRejectedValue(new Error('DB Error'));
+
+      await logMistakes(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(500);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to log mistakes' });
@@ -97,118 +126,173 @@ describe('MistakeController', () => {
   });
 
   describe('getWeakKeyAnalysis', () => {
-    it('should return 401 if unauthorized', async () => {
+    it('should return 401 if userId is missing', async () => {
       mockRequest.userId = undefined;
-      mockRequest.params = { userId: 'user-123' };
-
-      await getWeakKeyAnalysis(mockRequest as Request, mockResponse as Response);
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(401);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
-    it('should return 403 if path userId does not match authenticated userId', async () => {
+    it('should return 403 if params userId does not match authenticated userId', async () => {
       mockRequest.params = { userId: 'user-456' };
-
-      await getWeakKeyAnalysis(mockRequest as Request, mockResponse as Response);
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
     });
 
-    it('should retrieve weak key analysis with parallelized execution', async () => {
+    it('should successfully return analysis and data parallelized', async () => {
       mockRequest.params = { userId: 'user-123' };
       mockRequest.query = { limit: '5' };
 
       const mockWeakKeys = [
-        { keyChar: 's', errorCount: 15, lastError: new Date() },
-        { keyChar: 'd', errorCount: 8, lastError: new Date() },
+        { keyChar: 'e', errorCount: 15, lastError: new Date('2023-01-01') },
+        { keyChar: 't', errorCount: 10, lastError: new Date('2023-01-02') },
       ];
+
       const mockFingerErrors = [
-        { fingerUsed: 'index-left', count: BigInt(22) },
-        { fingerUsed: 'middle-left', count: BigInt(12) },
+        { fingerUsed: 'middle-left', count: BigInt(15) },
+        { fingerUsed: 'index-left', count: BigInt(8) },
       ];
+
       const mockRecentMistakes = [
-        { keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left', timestamp: new Date() },
+        { keyPressed: 'r', keyExpected: 'e', fingerUsed: 'middle-left', timestamp: new Date() },
       ];
 
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue(mockWeakKeys);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue(mockFingerErrors);
       (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue(mockRecentMistakes);
 
-      await getWeakKeyAnalysis(mockRequest as Request, mockResponse as Response);
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-123' },
         orderBy: { errorCount: 'desc' },
         take: 5,
       });
+
       expect(prisma.$queryRaw).toHaveBeenCalled();
-      expect(prisma.typingMistake.findMany).toHaveBeenCalled();
+      expect(prisma.typingMistake.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        orderBy: { timestamp: 'desc' },
+        take: 20,
+        select: {
+          keyPressed: true,
+          keyExpected: true,
+          fingerUsed: true,
+          timestamp: true,
+        },
+      });
 
       expect(jsonMock).toHaveBeenCalledWith(
         expect.objectContaining({
           weakKeys: [
-            { key: 's', errorCount: 15, lastError: expect.any(Date) },
-            { key: 'd', errorCount: 8, lastError: expect.any(Date) },
+            { key: 'e', errorCount: 15, lastError: mockWeakKeys[0].lastError },
+            { key: 't', errorCount: 10, lastError: mockWeakKeys[1].lastError },
           ],
           fingerErrors: [
-            { finger: 'index-left', count: 22 },
-            { finger: 'middle-left', count: 12 },
+            { finger: 'middle-left', count: 15 },
+            { finger: 'index-left', count: 8 },
           ],
-          recentMistakes: expect.any(Array),
-          analysis: expect.stringContaining('Your most problematic key is "s" with 15 errors'),
+          recentMistakes: mockRecentMistakes,
+          analysis: expect.stringContaining('Your most problematic key is "e" with 15 errors.'),
         })
       );
     });
 
-    it('should return default analysis summary if no weak keys exist', async () => {
+    it('should return empty analysis and friendly message when user has no weak keys', async () => {
       mockRequest.params = { userId: 'user-123' };
-      mockRequest.query = {};
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
       (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
 
-      await getWeakKeyAnalysis(mockRequest as Request, mockResponse as Response);
-
-      expect(jsonMock).toHaveBeenCalledWith({
-        weakKeys: [],
-        fingerErrors: [],
-        recentMistakes: [],
-        analysis: 'Excellent work! No significant weak keys detected.',
-      });
-    });
-  });
-
-  describe('generatePracticeText', () => {
-    it('should generate targeted practice content', async () => {
-      mockRequest.params = { userId: 'user-123' };
-      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([
-        { keyChar: 'e' },
-        { keyChar: 't' },
-      ]);
-
-      await generatePracticeText(mockRequest as Request, mockResponse as Response);
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(jsonMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Practice text generated',
-          weakKeys: ['e', 't'],
-          practiceText: expect.stringContaining('e e e e e'),
+          weakKeys: [],
+          fingerErrors: [],
+          recentMistakes: [],
+          analysis: 'Excellent work! No significant weak keys detected.',
         })
       );
     });
 
-    it('should return message if no weak keys found', async () => {
+    it('should handle errors gracefully and return 500 status', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Database offline'));
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to retrieve analysis' });
+    });
+  });
+
+  describe('generatePracticeText', () => {
+    it('should return 401 if userId is missing', async () => {
+      mockRequest.userId = undefined;
+      await generatePracticeText(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    });
+
+    it('should return 403 if params userId does not match authenticated userId', async () => {
+      mockRequest.params = { userId: 'user-456' };
+      await generatePracticeText(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(403);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
+    });
+
+    it('should return no weak keys message when user has no weak keys', async () => {
       mockRequest.params = { userId: 'user-123' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
 
-      await generatePracticeText(mockRequest as Request, mockResponse as Response);
+      await generatePracticeText(mockRequest, mockResponse);
 
       expect(jsonMock).toHaveBeenCalledWith({
         message: 'No weak keys found. Great job!',
         practiceText: '',
       });
+    });
+
+    it('should successfully generate targeted practice text with weak keys', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      const mockWeakKeys = [
+        { keyChar: 'e', errorCount: 10 },
+        { keyChar: 't', errorCount: 8 },
+      ];
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue(mockWeakKeys);
+
+      await generatePracticeText(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        orderBy: { errorCount: 'desc' },
+        take: 5,
+      });
+
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Practice text generated',
+          weakKeys: ['e', 't'],
+          instructions: expect.stringContaining('Focus on these keys: e, t.'),
+          practiceText: expect.any(String),
+        })
+      );
+    });
+
+    it('should handle errors gracefully and return 500 status', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Connection timed out'));
+
+      await generatePracticeText(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to generate practice text' });
     });
   });
 });
