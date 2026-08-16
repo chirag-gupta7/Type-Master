@@ -82,6 +82,16 @@ const KEYBOARD_LAYOUT = [
   ],
 ];
 
+interface KeyboardKeyProps {
+  keyChar: string;
+  width: string;
+  homeRow?: boolean;
+  state: 'target' | 'correct' | 'incorrect' | 'neutral';
+  isAnimating: boolean;
+  showHomeRowMarkers: boolean;
+  compact: boolean;
+}
+
 interface VisualKeyboardProps {
   /** The target key that should be pressed (will be highlighted in yellow) */
   targetKey?: string;
@@ -95,16 +105,6 @@ interface VisualKeyboardProps {
   compact?: boolean;
   /** Custom className for the container */
   className?: string;
-}
-
-interface KeyboardKeyProps {
-  keyChar: string;
-  width: string;
-  homeRow?: boolean;
-  state: 'target' | 'correct' | 'incorrect' | 'neutral';
-  isAnimating: boolean;
-  compact: boolean;
-  showHomeRowMarkers: boolean;
 }
 
 // Extract KeyboardKey into a memoized component to avoid unnecessary re-renders.
@@ -185,6 +185,19 @@ KeyboardKey.displayName = 'KeyboardKey';
  * - Yellow: Target key to press
  * - Home row markers on F and J keys
  * - Responsive animations
+ *
+ * Optimized with memoized key rendering to ensure butter-smooth typing without
+ * any visual stuttering or lagging.
+ *
+ * @example
+ * ```tsx
+ * <VisualKeyboard
+ *   targetKey="a"
+ *   pressedKey="a"
+ *   isCorrect={true}
+ *   showHomeRowMarkers={true}
+ * />
+ * ```
  */
 export function VisualKeyboard({
   targetKey,
@@ -211,6 +224,16 @@ export function VisualKeyboard({
     return keyMap[key] || key.toUpperCase();
   };
 
+  // Pre-normalize target and pressed keys at parent level using useMemo
+  // This reduces keypress check overhead to O(1) in the render pass.
+  const normalizedTarget = useMemo(() => {
+    return targetKey ? normalizeKey(targetKey) : null;
+  }, [targetKey]);
+
+  const normalizedPressed = useMemo(() => {
+    return pressedKey ? normalizeKey(pressedKey) : null;
+  }, [pressedKey]);
+
   // Handle key press animation
   useEffect(() => {
     if (pressedKey) {
@@ -222,7 +245,7 @@ export function VisualKeyboard({
     return undefined;
   }, [pressedKey]);
 
-  // --- OPTIMIZATION (Before vs. After) ---
+// --- OPTIMIZATION (Before vs. After) ---
   // Before:
   //   - Normalization helpers were executed repeatedly inside individual key lookups.
   //   - Every key was a plain element, forcing all ~60+ keys to completely re-render on *every* single keystroke.
@@ -231,8 +254,6 @@ export function VisualKeyboard({
   //   - Pre-normalize comparison values once at the parent component using useMemo.
   //   - Individual keys extracted into `KeyboardKey` wrapped in `React.memo`.
   //   - Time Complexity: O(1) rendering overhead per keystroke, since only the active key and target key undergo state transition.
-  const normalizedTarget = useMemo(() => (targetKey ? normalizeKey(targetKey) : null), [targetKey]);
-  const normalizedPressed = useMemo(() => (pressedKey ? normalizeKey(pressedKey) : null), [pressedKey]);
 
   return (
     <div className={cn('w-full max-w-5xl mx-auto', className)}>
@@ -240,7 +261,7 @@ export function VisualKeyboard({
         {KEYBOARD_LAYOUT.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2 justify-center">
             {row.map((keyData) => {
-              const normalizedKeyCode = keyData.code;
+const normalizedKeyCode = keyData.code;
               const normalizedKeyChar = keyData.key.toUpperCase();
 
               // Determine key state (target, correct, incorrect, neutral)
