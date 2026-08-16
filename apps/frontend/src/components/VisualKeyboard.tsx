@@ -92,32 +92,38 @@ interface KeyboardKeyProps {
   compact: boolean;
 }
 
-/**
- * KeyboardKey component represents a single key on the visual keyboard.
- * Wrapped in React.memo to ensure that key components are only re-rendered when
- * their individual state, isAnimating, or styling changes, improving performance
- * from O(Keys) to O(1) per keypress.
- *
- * Before optimization: Re-rendering VisualKeyboard forced all ~60 keys to rebuild and re-evaluate logic.
- * After optimization: Only the target and/or active key component update on keystrokes.
- */
+interface VisualKeyboardProps {
+  /** The target key that should be pressed (will be highlighted in yellow) */
+  targetKey?: string;
+  /** The last key that was pressed */
+  pressedKey?: string;
+  /** Whether the last key press was correct */
+  isCorrect?: boolean;
+  /** Show home row markers on F and J keys */
+  showHomeRowMarkers?: boolean;
+  /** Compact mode for smaller displays */
+  compact?: boolean;
+  /** Custom className for the container */
+  className?: string;
+}
+
+// Extract KeyboardKey into a memoized component to avoid unnecessary re-renders.
+// Since keys are stateless components that only rely on clean, primitive inputs,
+// memoization avoids re-rendering all ~60+ keys in the layout on every key press event.
 const KeyboardKey = React.memo(function KeyboardKey({
   keyChar,
   width,
   homeRow,
   state,
   isAnimating,
-  showHomeRowMarkers,
   compact,
+  showHomeRowMarkers,
 }: KeyboardKeyProps) {
-  const keyClassName = cn(
-    // Base styles
+  const keyClass = cn(
     'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
     'border-2 select-none',
     compact ? 'text-xs' : 'text-sm',
     width,
-
-    // State-based colors
     {
       // Target key (yellow)
       'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
@@ -134,21 +140,17 @@ const KeyboardKey = React.memo(function KeyboardKey({
       // Neutral key
       'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
     },
-
-    // Animation
     {
       'scale-95': isAnimating,
       'scale-100': !isAnimating,
     },
-
-    // Pulse animation for target key
     {
       'animate-pulse': state === 'target',
     }
   );
 
   return (
-    <div className={keyClassName} role="button" aria-label={keyChar}>
+    <div className={keyClass} role="button" aria-label={keyChar}>
       {/* Key label */}
       <span className="relative z-10">{keyChar === 'Space' ? '' : keyChar}</span>
 
@@ -173,21 +175,6 @@ const KeyboardKey = React.memo(function KeyboardKey({
 });
 
 KeyboardKey.displayName = 'KeyboardKey';
-
-interface VisualKeyboardProps {
-  /** The target key that should be pressed (will be highlighted in yellow) */
-  targetKey?: string;
-  /** The last key that was pressed */
-  pressedKey?: string;
-  /** Whether the last key press was correct */
-  isCorrect?: boolean;
-  /** Show home row markers on F and J keys */
-  showHomeRowMarkers?: boolean;
-  /** Compact mode for smaller displays */
-  compact?: boolean;
-  /** Custom className for the container */
-  className?: string;
-}
 
 /**
  * VisualKeyboard Component
@@ -258,29 +245,44 @@ export function VisualKeyboard({
     return undefined;
   }, [pressedKey]);
 
+// --- OPTIMIZATION (Before vs. After) ---
+  // Before:
+  //   - Normalization helpers were executed repeatedly inside individual key lookups.
+  //   - Every key was a plain element, forcing all ~60+ keys to completely re-render on *every* single keystroke.
+  //   - Time Complexity: O(Keys) per keystroke due to complete Virtual DOM recreation and DOM tree checks.
+  // After:
+  //   - Pre-normalize comparison values once at the parent component using useMemo.
+  //   - Individual keys extracted into `KeyboardKey` wrapped in `React.memo`.
+  //   - Time Complexity: O(1) rendering overhead per keystroke, since only the active key and target key undergo state transition.
+
   return (
     <div className={cn('w-full max-w-5xl mx-auto', className)}>
       <div className="space-y-2">
         {KEYBOARD_LAYOUT.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2 justify-center">
             {row.map((keyData) => {
+const normalizedKeyCode = keyData.code;
+              const normalizedKeyChar = keyData.key.toUpperCase();
+
+              // Determine key state (target, correct, incorrect, neutral)
+              let state: 'target' | 'correct' | 'incorrect' | 'neutral' = 'neutral';
               const isTarget =
-                normalizedTarget === keyData.code ||
-                normalizedTarget === keyData.key.toUpperCase() ||
+                normalizedTarget === normalizedKeyCode ||
+                normalizedTarget === normalizedKeyChar ||
                 (normalizedTarget === 'SPACE' && keyData.code === 'Space');
 
-              const wasPressed =
-                normalizedPressed === keyData.code ||
-                normalizedPressed === keyData.key.toUpperCase() ||
-                (normalizedPressed === 'SPACE' && keyData.code === 'Space');
+              if (isTarget) {
+                state = 'target';
+              } else {
+                const wasPressed =
+                  normalizedPressed === normalizedKeyCode ||
+                  normalizedPressed === normalizedKeyChar ||
+                  (normalizedPressed === 'SPACE' && keyData.code === 'Space');
 
-              const state = isTarget
-                ? 'target'
-                : wasPressed && isCorrect
-                  ? 'correct'
-                  : wasPressed && !isCorrect
-                    ? 'incorrect'
-                    : 'neutral';
+                if (wasPressed) {
+                  state = isCorrect ? 'correct' : 'incorrect';
+                }
+              }
 
               const isAnimating =
                 animatingKey === keyData.code || animatingKey === keyData.key.toUpperCase();
@@ -293,8 +295,8 @@ export function VisualKeyboard({
                   homeRow={keyData.homeRow}
                   state={state}
                   isAnimating={isAnimating}
-                  showHomeRowMarkers={showHomeRowMarkers}
                   compact={compact}
+                  showHomeRowMarkers={showHomeRowMarkers}
                 />
               );
             })}
