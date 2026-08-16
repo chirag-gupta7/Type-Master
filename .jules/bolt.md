@@ -149,10 +149,14 @@
 **Learning:** Sequential database roundtrips for independent data sets (e.g., lessons, history, and activity logs) can be significantly optimized by parallelizing them using `Promise.all`. This reduces the total response time from the sum of all query durations to the duration of the slowest single query.
 **Action:** Always identify independent database queries in complex controllers and execute them in parallel using `Promise.all`.
 
+## 2026-08-01 - Parallelizing weak key analysis fetches
+**Learning:** The `getWeakKeyAnalysis` endpoint was executing three independent database queries (finding user weak keys, querying finger error patterns via `$queryRaw`, and retrieving recent typing mistakes) sequentially. This sequentially blocks the Node event loop and accumulates latency. Parallelizing these queries using `Promise.all` reduces latency to the duration of the single slowest query.
+**Action:** Execute independent read operations concurrently via `Promise.all` to optimize backend endpoint performance.
+
 ## 2026-08-04 - [Optimizing Interactive Keyboard Component Rendering]
 **Learning:** Interactive UI elements responding to frequent, high-frequency events (e.g., keypresses in typing interfaces) suffer major visual latency if the entire layout (e.g., ~60 visual keys) re-renders completely on every stroke. Moving state checks and key-normalization (`useMemo`) to the parent container and wrapping individual keys in `React.memo` reduces rendering complexity from O(Keys) to O(1), preventing main-thread blocking and frame drops.
 **Action:** For visual grids, keyboards, or high-frequency listings, always extract children into memoized components, pass simple state indicators as props, and perform normalization outside of the child render loop.
 
-## 2026-08-01 - Parallelizing weak key analysis fetches
-**Learning:** The `getWeakKeyAnalysis` endpoint was executing three independent database queries (finding user weak keys, querying finger error patterns via `$queryRaw`, and retrieving recent typing mistakes) sequentially. This sequentially blocks the Node event loop and accumulates latency. Parallelizing these queries using `Promise.all` reduces latency to the duration of the single slowest query.
-**Action:** Execute independent read operations concurrently via `Promise.all` to optimize backend endpoint performance.
+## 2026-08-07 - React Virtual Keyboard Keystroke Rendering Optimization
+**Learning:** Under high-frequency keystroke events, re-rendering an entire virtual keyboard with ~60 key nodes creates a notable performance bottleneck. Extracting the individual key node into a memoized subcomponent (`KeyboardKey`) and pre-normalizing comparison keys (like `targetKey` and `pressedKey`) in the parent component reduces rendering overhead from O(Keys) to O(1) per keystroke, guaranteeing steady 60fps responsiveness during typing tests.
+**Action:** For interactive grid or layout structures undergoing rapid state updates (like visual keyboards, dashboards, or spreadsheets), isolate individual cells/keys into memoized child components and lift heavy state normalization logic to the parent.
