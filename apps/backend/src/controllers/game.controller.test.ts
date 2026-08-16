@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores, getLeaderboard } from './game.controller';
+import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -10,9 +10,152 @@ jest.mock('../utils/prisma', () => ({
       findMany: jest.fn(),
       findFirst: jest.fn(),
       groupBy: jest.fn(),
+      create: jest.fn(),
     },
   },
 }));
+
+describe('GameController - saveGameScore', () => {
+  let mockRequest: Partial<Request & { userId?: string }>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      userId: 'user-123',
+      body: {
+        gameType: GameType.WORD_BLITZ,
+        score: 250,
+        wpm: 65,
+        accuracy: 95,
+        duration: 60,
+      },
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if userId is missing', async () => {
+    mockRequest.userId = undefined;
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(401);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should successfully save game score with valid input', async () => {
+    const mockCreatedScore = {
+      id: 'score-1',
+      userId: 'user-123',
+      gameType: GameType.WORD_BLITZ,
+      score: 250,
+      wpm: 65,
+      accuracy: 95,
+      duration: 60,
+      metadata: null,
+      createdAt: new Date(),
+      user: { id: 'user-123', username: 'PlayerOne' },
+    };
+
+    (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockCreatedScore);
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(prisma.gameScore.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-123',
+        gameType: GameType.WORD_BLITZ,
+        score: 250,
+        wpm: 65,
+        accuracy: 95,
+        duration: 60,
+        metadata: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    expect(statusMock).toHaveBeenCalledWith(201);
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        ...mockCreatedScore,
+        metadata: null,
+      },
+    });
+  });
+
+  it('should return 400 for invalid gameType', async () => {
+    mockRequest.body = {
+      gameType: 'INVALID_GAME',
+      score: 100,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid game type' });
+  });
+
+  it('should return 400 for negative score or score exceeding maximum limit', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: -10,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid score value' });
+
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 2000000,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Score exceeds maximum limit' });
+  });
+
+  it('should return 400 for out-of-bounds WPM or accuracy', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 100,
+      wpm: 500,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'WPM exceeds maximum limit' });
+
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 100,
+      accuracy: 150,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Accuracy cannot exceed 100' });
+  });
+});
 
 describe('GameController - getGameStats', () => {
   let mockRequest: Partial<Request & { userId?: string }>;
