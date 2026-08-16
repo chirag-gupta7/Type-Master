@@ -25,10 +25,10 @@ export const getRequestIp = (req: Request): string => {
 export const getAuthRateLimitKey = (req: Request): string => {
   const ip = getRequestIp(req);
 
-  // SECURITY FIX: Rate limit strictly by the client's IP address rather than the specific
+  // SECURITY FIX: Strictly use IP-based rate limiting keys rather than the specific
   // email-IP combination (email:${email}:ip:${ip}). This prevents credential stuffing
   // and password spraying attacks where an attacker tests many different email addresses
-  // from a single IP, as each request will now increment the same IP-based limit pool.
+  // from a single IP, as each attempt now increments the same IP-based limit pool.
   return `ip:${ip}`;
 };
 

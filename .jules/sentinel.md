@@ -37,14 +37,35 @@
 **Prevention:** Always use purpose-built, server-defined AI endpoints with hardcoded system prompts and strict input validation. Avoid creating generic "catch-all" AI proxy routes.
 
 ## 2026-05-16 - Timing side-channel in internal auth
+
 **Vulnerability:** `internalOnly` middleware compared token lengths before `crypto.timingSafeEqual`, leaking the secret's length.
 **Learning:** `crypto.timingSafeEqual` requires equal-length buffers. Checking length beforehand introduces a timing leak.
 **Prevention:** Hash both buffers with SHA-256 before comparison to ensure equal length and prevent length leakage.
+
+## 2026-07-31 - IP Spoofing and Password Spraying Vulnerability in Rate Limiting Middleware
+**Vulnerability:** Manual parsing of the `X-Forwarded-For` header in `rate-limiter.ts` allowed clients to spoof arbitrary client IPs and completely bypass rate limits. Additionally, combining email addresses in authentication rate-limit keys enabled password spraying/credential stuffing attacks across many accounts from a single IP.
+**Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
+**Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
 
 ## 2026-07-25 - [IP Spoofing and Credential Stuffing in Auth Rate Limiting]
 **Vulnerability:** The rate limiter manually parsed `X-Forwarded-For` without validating proxies, and utilized a combined `email:${email}:ip:${ip}` key for auth rate-limiting.
 **Learning:** Manual header parsing bypasses Express's secure `req.ip` trust-proxy negotiation, leading to IP spoofing. Additionally, combining email with IP in the rate-limiting key creates a credential stuffing blind spot, allowing attackers to test different emails from the same IP without hitting any limit.
 **Prevention:** Always rely on `req.ip` for IP-based validation, and rate limit authentication endpoints strictly by client IP address (`ip:${ip}`) to block brute-forcing and password spraying.
+
+## 2026-08-03 - Prompt Injection and DoS on AI Proxy Endpoints
+**Vulnerability:** The AI proxy endpoints accepted unvalidated numeric values and unsanitized text payloads of arbitrary length from clients, introducing risks of prompt injection and Denial of Service (DoS) due to excessive API resource/cost consumption.
+**Learning:** Endpoints that interface with third-party LLMs must enforce strict type constraints, ranges, and maximum input length limitations on the server side to protect backend assets and billing.
+**Prevention:** Always use Zod or comparable validation middleware to strictly enforce type safety (e.g., numeric ranges for metrics) and maximum string length limits (e.g., maximum characters for user text inputs) before forwarding data to downstream AI APIs.
+
+## 2026-08-04 - [Overly Permissive CORS Config for Vercel Subdomains]
+**Vulnerability:** The CORS origin check in `apps/backend/src/index.ts` was overly permissive. It allowed wildcard suffix matching on `.vercel.app`, meaning any deployment hosted on Vercel could bypass CORS and make authenticated credential-sharing API requests.
+**Learning:** Checking for `.vercel.app` using general substring inclusion/suffix checks exposes the application to origin spoofing. Anyone with a Vercel-hosted project could issue malicious requests targeting our backend APIs.
+**Prevention:** Always extract and validate the specific project subdomain prefix before allowing wildcards for Vercel preview environments. Enforce strict suffix patterns matching either `-git-` preview segments or alphanumeric hashes of at least 8 characters.
+
+## 2026-08-05 - [Lack of Input Bounds Validation in AI Controllers]
+**Vulnerability:** AI proxy controllers accepted arbitrary payload shapes, unchecked text sizes, and unrestricted numbers without validation, exposing the application to prompt injection and Denial of Service (DoS)/cost exhaustion attacks.
+**Learning:** Downstream AI proxy endpoints present unique security surfaces. Unchecked string lengths and out-of-bounds metrics (like abnormal WPM/accuracy values) can trigger downstream AI service failures or allow massive prompt injection payloads.
+**Prevention:** Always enforce strict schema-based input boundaries (such as Zod validation) with explicit minimum/maximum constraints on numbers, string lengths, and array depths before passing user parameters to external API wrappers.
 
 ## 2026-08-06 - [Insecure Input Validation in AI Proxy Endpoints]
 
