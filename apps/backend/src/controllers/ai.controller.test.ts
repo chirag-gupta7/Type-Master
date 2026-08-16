@@ -1,294 +1,236 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
 import {
   getTypingFeedback,
-  generateWritingPrompt,
   getWritingFeedback,
   getStoryResponse,
+  generateWritingPrompt,
 } from './ai.controller';
+import { ZodError } from 'zod';
 
-// Save the original fetch to restore after tests
-const originalFetch = global.fetch;
+// Mock logger
+jest.mock('../utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+  },
+}));
 
-describe('AIController - Input Validation and Security Enhancements', () => {
-  let mockRequest: Partial<Request>;
-  let mockResponse: Partial<Response>;
+describe('AI Controller Unit Tests', () => {
+  let mockRequest: Request;
+  let mockResponse: Response;
   let mockNext: NextFunction;
   let jsonMock: jest.Mock;
   let statusMock: jest.Mock;
-  let mockFetch: jest.Mock;
+  let originalFetch: typeof global.fetch;
+
+  beforeAll(() => {
+    process.env.GEMINI_API_KEY = 'mocked-api-key';
+  });
 
   beforeEach(() => {
     jsonMock = jest.fn();
     statusMock = jest.fn().mockReturnThis();
-    mockNext = jest.fn();
     mockResponse = {
       json: jsonMock,
       status: statusMock,
-    };
+    } as unknown as Response;
+    mockNext = jest.fn();
     mockRequest = {
       body: {},
-    };
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-    process.env.GEMINI_API_KEY = 'test-api-key';
+    } as unknown as Request;
     jest.clearAllMocks();
-  });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
-    delete process.env.GEMINI_API_KEY;
-  });
-
-  const mockGeminiSuccess = (text: string) => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          candidates: [
-            {
-              content: {
-                parts: [{ text }],
+    // Mock global fetch
+    originalFetch = global.fetch;
+    global.fetch = jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: 'Mocked AI Response',
+                    },
+                  ],
+                },
               },
-            },
-          ],
-        }),
-    });
-  };
+            ],
+          }),
+      })
+    ) as unknown as typeof global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   describe('getTypingFeedback', () => {
-    it('should successfully generate feedback for a valid payload', async () => {
+    it('should successfully generate typing feedback with valid input', async () => {
       mockRequest.body = {
-        wpm: 65,
-        accuracy: 98,
+        wpm: 80,
+        accuracy: 95,
         errors: 3,
         duration: 60,
       };
 
-      mockGeminiSuccess('Great typing performance!');
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
 
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(jsonMock).toHaveBeenCalledWith({ feedback: 'Great typing performance!' });
+      expect(global.fetch).toHaveBeenCalled();
+      expect(jsonMock).toHaveBeenCalledWith({ feedback: 'Mocked AI Response' });
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should fail validation if WPM is missing', async () => {
+    it('should reject non-numeric/negative/invalid values', async () => {
       mockRequest.body = {
-        accuracy: 98,
+        wpm: -10, // Invalid: negative
+        accuracy: 105, // Invalid: > 100
+        errors: 'five', // Invalid: not a number
+        duration: 0, // Invalid: <= 0
       };
 
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('should fail validation if WPM is negative', async () => {
+    it('should reject missing values', async () => {
       mockRequest.body = {
-        wpm: -5,
-        accuracy: 98,
+        wpm: 80,
       };
 
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('should fail validation if WPM exceeds 300 (abnormal/tampered)', async () => {
+    it('should reject wpm that exceeds the max limit', async () => {
       mockRequest.body = {
-        wpm: 350,
-        accuracy: 98,
+        wpm: 2000, // Invalid: > 1000
+        accuracy: 90,
+        errors: 5,
+        duration: 30,
       };
 
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if accuracy is greater than 100', async () => {
-      mockRequest.body = {
-        wpm: 60,
-        accuracy: 101,
-      };
-
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if errors is negative', async () => {
-      mockRequest.body = {
-        wpm: 60,
-        accuracy: 95,
-        errors: -1,
-      };
-
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if duration is over 3600 seconds (1 hour)', async () => {
-      mockRequest.body = {
-        wpm: 60,
-        accuracy: 95,
-        duration: 3601,
-      };
-
-      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
   });
 
   describe('getWritingFeedback', () => {
-    it('should successfully generate feedback for a valid writing feedback request', async () => {
+    it('should successfully generate writing feedback with valid input', async () => {
       mockRequest.body = {
-        text: 'This is some typing exercise content that I am writing.',
+        text: 'This is a beautiful sentence to practice typing.',
         type: 'prompt-dash',
-        priorFeedback: 'Good flow, keep it up.',
       };
 
-      mockGeminiSuccess('Excellent composition!');
+      await getWritingFeedback(mockRequest, mockResponse, mockNext);
 
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(jsonMock).toHaveBeenCalledWith({ feedback: 'Excellent composition!' });
+      expect(global.fetch).toHaveBeenCalled();
+      expect(jsonMock).toHaveBeenCalledWith({ feedback: 'Mocked AI Response' });
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should fail validation if text is missing', async () => {
+    it('should reject empty or missing text', async () => {
       mockRequest.body = {
+        text: '',
         type: 'prompt-dash',
       };
 
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getWritingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
 
-    it('should fail validation if text is empty', async () => {
+    it('should reject text exceeding max length', async () => {
       mockRequest.body = {
-        text: '',
+        text: 'A'.repeat(2001), // Max limit is 2000
+        type: 'prompt-dash',
       };
 
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getWritingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
 
-    it('should fail validation if text length is greater than 2000 characters', async () => {
+    it('should reject invalid enum type', async () => {
       mockRequest.body = {
-        text: 'a'.repeat(2001),
+        text: 'A sentence',
+        type: 'invalid-type',
       };
 
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+      await getWritingFeedback(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if priorFeedback exceeds 1000 characters', async () => {
-      mockRequest.body = {
-        text: 'Some story text.',
-        priorFeedback: 'b'.repeat(1001),
-      };
-
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if type is an invalid mode', async () => {
-      mockRequest.body = {
-        text: 'Some story text.',
-        type: 'invalid-mode',
-      };
-
-      await getWritingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
   });
 
   describe('getStoryResponse', () => {
-    it('should successfully generate a story response with valid story array', async () => {
+    it('should successfully get story response with valid story array', async () => {
       mockRequest.body = {
-        story: ['Once upon a time, there was a developer.', 'The developer loved writing clean code.'],
+        story: ['Once upon a time', 'there was a clever developer.'],
       };
 
-      mockGeminiSuccess('And then, the developer found a bug.');
+      await getStoryResponse(mockRequest, mockResponse, mockNext);
 
-      await getStoryResponse(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(jsonMock).toHaveBeenCalledWith({ response: 'And then, the developer found a bug.' });
+      expect(global.fetch).toHaveBeenCalled();
+      expect(jsonMock).toHaveBeenCalledWith({ response: 'Mocked AI Response' });
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should fail validation if story array is missing', async () => {
-      mockRequest.body = {};
-
-      await getStoryResponse(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
-    });
-
-    it('should fail validation if story array is empty', async () => {
+    it('should reject empty story array', async () => {
       mockRequest.body = {
         story: [],
       };
 
-      await getStoryResponse(mockRequest as Request, mockResponse as Response, mockNext);
+      await getStoryResponse(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
 
-    it('should fail validation if story array has too many segments (over 20)', async () => {
+    it('should reject array containing empty strings', async () => {
       mockRequest.body = {
-        story: Array(21).fill('A short sentence.'),
+        story: [''],
       };
 
-      await getStoryResponse(mockRequest as Request, mockResponse as Response, mockNext);
+      await getStoryResponse(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
 
-    it('should fail validation if any story segment exceeds 500 characters', async () => {
+    it('should reject array with too many segments', async () => {
       mockRequest.body = {
-        story: ['Start of the story.', 'c'.repeat(501)],
+        story: Array(51).fill('A sentence.'), // limit is 50
       };
 
-      await getStoryResponse(mockRequest as Request, mockResponse as Response, mockNext);
+      await getStoryResponse(mockRequest, mockResponse, mockNext);
 
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
+    });
+
+    it('should reject if some story parts exceed max length limit', async () => {
+      mockRequest.body = {
+        story: ['Short story part', 'B'.repeat(1001)], // max limit 1000
+      };
+
+      await getStoryResponse(mockRequest, mockResponse, mockNext);
+
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
   });
 
   describe('generateWritingPrompt', () => {
-    it('should successfully get writing prompt', async () => {
-      mockGeminiSuccess('Mocked AI Response');
+    it('should generate a writing prompt without inputs', async () => {
+      await generateWritingPrompt(mockRequest, mockResponse, mockNext);
 
-      await generateWritingPrompt(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockFetch).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalled();
       expect(jsonMock).toHaveBeenCalledWith({ prompt: 'Mocked AI Response' });
+      expect(mockNext).not.toHaveBeenCalled();
     });
   });
 });

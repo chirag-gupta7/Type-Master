@@ -3,30 +3,32 @@ import { z } from 'zod';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
+// Input validation schemas for strict types, range checks, and maximum lengths
+// to prevent prompt injection and Denial of Service (DoS) or high-cost resource exhaustion attacks.
 // Input validation schemas for AI proxy endpoints to prevent prompt injection and resource/cost DoS
 // Security: Enforce strict boundaries, type constraints, and max lengths to prevent prompt injection and DoS/resource exhaustion
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
-
 const typingFeedbackSchema = z.object({
-  wpm: z.number().min(0, 'WPM must be at least 0').max(300, 'WPM must not exceed 300'),
-  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy must not exceed 100'),
-  errors: z.number().int().min(0, 'Errors must be at least 0').max(1000, 'Errors must not exceed 1000').optional(),
-  duration: z.number().min(0, 'Duration must be at least 0').max(3600, 'Duration must not exceed 3600').optional(),
+  wpm: z.number().nonnegative('WPM must be non-negative').max(1000, 'WPM is too high'),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100'),
+  errors: z.number().nonnegative('Errors must be non-negative').max(1000, 'Errors is too high'),
+  duration: z.number().positive('Duration must be positive').max(3600, 'Duration is too high'),
 });
 
 const writingFeedbackSchema = z.object({
-  text: z.string().min(1, 'Text is required').max(2000, 'Text must not exceed 2000 characters'),
-  type: z.enum(['prompt-dash', 'story-chain']).optional(),
-  priorFeedback: z.string().max(1000, 'Previous feedback must not exceed 1000 characters').nullable().optional(),
+  text: z.string().min(1, 'Text is required').max(2000, 'Text exceeds maximum allowed length'),
+  type: z.enum(['prompt-dash', 'story-chain']).default('prompt-dash'),
+  priorFeedback: z.string().max(2000, 'Prior feedback exceeds maximum allowed length').nullable().optional(),
 });
 
 const storyResponseSchema = z.object({
   story: z
-    .array(z.string().max(500, 'Each story segment must not exceed 500 characters'))
+    .array(z.string().min(1, 'Story part cannot be empty').max(1000, 'Story part exceeds maximum allowed length'))
     .min(1, 'Story history is required')
-    .max(20, 'Story history must not exceed 20 segments'),
+    .max(50, 'Story history is too long'),
 });
+
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
 
 type GeminiResponse = {
   candidates?: Array<{
