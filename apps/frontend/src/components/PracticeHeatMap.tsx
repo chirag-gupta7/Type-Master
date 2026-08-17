@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Flame } from 'lucide-react';
 import type { PracticeDay } from '@/types';
@@ -43,28 +44,39 @@ function getTooltipText(count: number, date: Date): string {
 }
 
 export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
-  const days = getLast365Days();
+  // Optimization: Memoize 365-day generation, activity map creation, and week grouping
+  const { activityMap, weeks } = useMemo(() => {
+    const daysList = getLast365Days();
+    const map = new Map(data.map((d) => [d.date, d.count]));
 
-  // Create a map for quick lookup
-  const activityMap = new Map(data.map((d) => [d.date, d.count]));
+    const weekGroups: Date[][] = [];
+    let currentWeek: Date[] = [];
 
-  // Group days by week
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
+    daysList.forEach((day, index) => {
+      currentWeek.push(day);
+      if (day.getDay() === 6 || index === daysList.length - 1) {
+        weekGroups.push([...currentWeek]);
+        currentWeek = [];
+      }
+    });
 
-  days.forEach((day, index) => {
-    currentWeek.push(day);
-    if (day.getDay() === 6 || index === days.length - 1) {
-      weeks.push([...currentWeek]);
-      currentWeek = [];
-    }
-  });
+    return { activityMap: map, weeks: weekGroups };
+  }, [data]);
 
-  // Calculate statistics
-  const totalActivities = data.reduce((sum, d) => sum + d.count, 0);
-  const activeDays = data.filter((d) => d.count > 0).length;
-  const currentStreak = calculateCurrentStreak(data);
-  const longestStreak = calculateLongestStreak(data);
+  // Optimization: Memoize statistics calculations (array reductions, filtering, and streak sorting)
+  const { totalActivities, activeDays, currentStreak, longestStreak } = useMemo(() => {
+    const total = data.reduce((sum, d) => sum + d.count, 0);
+    const active = data.filter((d) => d.count > 0).length;
+    const curStreak = calculateCurrentStreak(data);
+    const maxStreak = calculateLongestStreak(data);
+
+    return {
+      totalActivities: total,
+      activeDays: active,
+      currentStreak: curStreak,
+      longestStreak: maxStreak,
+    };
+  }, [data]);
 
   return (
     <motion.div
