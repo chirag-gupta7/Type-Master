@@ -10,18 +10,22 @@ const startAssessmentSchema = z.object({
 
 const completeAssessmentSchema = z.object({
   userId: z.string().optional(),
-  wpm: z.number().min(0),
-  accuracy: z.number().min(0).max(100),
-  mistakesByKey: z.record(z.number()),
-  weakFingers: z.array(z.string()),
-  timeSpent: z.number().min(0),
+  wpm: z.number().min(0).max(300, 'WPM must be between 0 and 300'),
+  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100'),
+  mistakesByKey: z.record(z.string().max(10), z.number().min(0).max(1000)),
+  weakFingers: z.array(z.string().max(50)).max(20, 'Cannot exceed 20 weak fingers'),
+  timeSpent: z.number().min(0).max(86400, 'Time spent must not exceed 24 hours'),
 });
 
 /**
  * Start a new skill assessment (placement test)
  * POST /api/v1/assessment/start
  */
-export const startAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const startAssessment = async (
+  req: Request,
+  res: Response,
+  next: (err?: any) => void
+): Promise<Response | void> => {
   try {
     const { userId: bodyUserId } = startAssessmentSchema.parse(req.body);
     const authUserId = req.userId;
@@ -65,8 +69,7 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
       minAccuracy: assessmentLesson.minAccuracy,
     });
   } catch (error) {
-    logger.error('Error starting assessment:', error);
-    return res.status(500).json({ error: 'Failed to start assessment' });
+    next(error);
   }
 };
 
@@ -74,7 +77,11 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
  * Complete assessment and get recommended starting lesson
  * POST /api/v1/assessment/complete
  */
-export const completeAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const completeAssessment = async (
+  req: Request,
+  res: Response,
+  next: (err?: any) => void
+): Promise<Response | void> => {
   try {
     const {
       userId: bodyUserId,
@@ -226,8 +233,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       feedback: generateFeedback(wpm, accuracy),
     });
   } catch (error) {
-    logger.error('Error completing assessment:', error);
-    return res.status(500).json({ error: 'Failed to complete assessment' });
+    next(error);
   }
 };
 
@@ -235,7 +241,11 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
  * Get user's latest assessment results
  * GET /api/v1/assessment/latest/:userId
  */
-export const getLatestAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const getLatestAssessment = async (
+  req: Request,
+  res: Response,
+  next: (err?: any) => void
+): Promise<Response | void> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;
@@ -271,8 +281,7 @@ export const getLatestAssessment = async (req: Request, res: Response): Promise<
       },
     });
   } catch (error) {
-    logger.error('Error retrieving assessment:', error);
-    return res.status(500).json({ error: 'Failed to retrieve assessment' });
+    next(error);
   }
 };
 
