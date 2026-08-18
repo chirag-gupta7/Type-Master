@@ -82,3 +82,9 @@
 **Vulnerability:** The backend AI routes in `apps/backend/src/controllers/ai.controller.ts` (`getTypingFeedback`, `getWritingFeedback`, and `getStoryResponse`) lacked strict input validation and length limits, exposing them to prompt injection, high-cost resource abuse, and Denial of Service (DoS) attacks via oversized payloads.
 **Learning:** AI proxy endpoints that forward user inputs directly to LLM services must be strictly bounded to prevent both prompt hijacking and high-cost API utilization.
 **Prevention:** Always implement rigorous type and length validation (e.g., using Zod schemas with `.max()` bounds on arrays and string lengths) on all inputs passed to AI/LLM handlers.
+
+## 2026-08-18 - [Missing Zod Schema Bounds on Game Score Endpoint]
+
+**Vulnerability:** The game score submission endpoint (`/api/v1/games/score`) relied on manual type assertions (`req.body as GameScorePayload`) without strict numerical bounds or schema validation on score, WPM, accuracy, duration, or metadata.
+**Learning:** Endpoints accepting game/test metrics without schema bounds allow score spoofing, out-of-bounds parameter pollution, and DoS payload injection (e.g. through unbounded JSON metadata objects or extreme numbers).
+**Prevention:** Always enforce strict Zod schema validation (`.min()`, `.max()`, and object shape restrictions) on all submission endpoints to reject malformed or out-of-bounds payloads before hitting database layer or serialization logic.

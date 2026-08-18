@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores, getLeaderboard } from './game.controller';
+import { saveGameScore, getGameStats, getUserHighScores, getLeaderboard } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
     gameScore: {
+      create: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
       groupBy: jest.fn(),
@@ -116,6 +117,117 @@ describe('GameController - getGameStats', () => {
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to fetch game stats' });
+  });
+});
+
+describe('GameController - saveGameScore', () => {
+  let mockRequest: Partial<Request & { userId?: string }>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      userId: 'user-123',
+      body: {},
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if userId is missing', async () => {
+    mockRequest.userId = undefined;
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(401);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+  });
+
+  it('should return 400 if gameType is invalid', async () => {
+    mockRequest.body = { gameType: 'INVALID_GAME', score: 100 };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid game type' });
+  });
+
+  it('should return 400 if score is negative', async () => {
+    mockRequest.body = { gameType: GameType.WORD_BLITZ, score: -10 };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid score value' });
+  });
+
+  it('should return 400 if wpm exceeds maximum allowed bound', async () => {
+    mockRequest.body = { gameType: GameType.WORD_BLITZ, score: 100, wpm: 500 };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Validation error',
+      })
+    );
+  });
+
+  it('should return 400 if accuracy exceeds 100', async () => {
+    mockRequest.body = { gameType: GameType.WORD_BLITZ, score: 100, accuracy: 150 };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Validation error',
+      })
+    );
+  });
+
+  it('should successfully save game score when payload is valid', async () => {
+    const validBody = {
+      gameType: GameType.WORD_BLITZ,
+      score: 150,
+      wpm: 85,
+      accuracy: 98,
+      duration: 60,
+      metadata: { level: 2 },
+    };
+    mockRequest.body = validBody;
+
+    const mockCreatedScore = {
+      id: 'score-1',
+      userId: 'user-123',
+      gameType: GameType.WORD_BLITZ,
+      score: 150,
+      wpm: 85,
+      accuracy: 98,
+      duration: 60,
+      metadata: JSON.stringify({ level: 2 }),
+      user: { id: 'user-123', username: 'TestUser' },
+    };
+
+    (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockCreatedScore);
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(201);
+    expect(jsonMock).toHaveBeenCalledWith({
+      success: true,
+      data: {
+        ...mockCreatedScore,
+        metadata: { level: 2 },
+      },
+    });
   });
 });
 
