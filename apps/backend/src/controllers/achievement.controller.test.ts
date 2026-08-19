@@ -1,6 +1,7 @@
 import {
   getAllAchievements,
   checkAndAwardAchievements,
+  getAchievementStats,
   getAchievementProgress,
 } from './achievement.controller';
 import { prisma } from '../utils/prisma';
@@ -164,6 +165,78 @@ describe('AchievementController', () => {
 
       expect(statusMock).toHaveBeenCalledWith(500);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to check achievements' });
+    });
+  });
+
+  describe('getAchievementStats', () => {
+    it('should return 401 if userId is missing', async () => {
+      mockRequest.userId = undefined;
+
+      await getAchievementStats(mockRequest as any, mockResponse as any);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    });
+
+    it('should return achievement stats and recent unlocks from a single userAchievement query', async () => {
+      (prisma.achievement.aggregate as jest.Mock).mockResolvedValue({
+        _count: { _all: 10 },
+        _sum: { points: 100 },
+      });
+
+      const now = new Date();
+      const mockUserAchievements = [
+        {
+          achievementId: 'ach-1',
+          unlockedAt: now,
+          achievement: {
+            id: 'ach-1',
+            title: 'Speed Demon',
+            description: 'Reach 50 WPM',
+            icon: 'zap',
+            points: 25,
+          },
+        },
+      ];
+
+      (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue(mockUserAchievements);
+
+      await getAchievementStats(mockRequest as any, mockResponse as any);
+
+      expect(prisma.achievement.aggregate).toHaveBeenCalledWith({
+        _count: { _all: true },
+        _sum: { points: true },
+      });
+
+      expect(prisma.userAchievement.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        include: {
+          achievement: true,
+        },
+        orderBy: { unlockedAt: 'desc' },
+      });
+
+      expect(jsonMock).toHaveBeenCalledWith({
+        stats: {
+          totalAchievements: 10,
+          unlockedCount: 1,
+          lockedCount: 9,
+          completionPercentage: 10,
+          totalPoints: 100,
+          earnedPoints: 25,
+          pointsPercentage: 25,
+        },
+        recentUnlocks: [
+          {
+            id: 'ach-1',
+            title: 'Speed Demon',
+            description: 'Reach 50 WPM',
+            icon: 'zap',
+            points: 25,
+            unlockedAt: now.toISOString(),
+          },
+        ],
+      });
     });
   });
 

@@ -262,9 +262,12 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Optimization: Parallelize independent aggregate and list queries
-    // Further optimization: Consolidate redundant aggregate queries into a single call
-    const [achievementAggregates, userAchievements, recentUnlocks] = await Promise.all([
+    // Optimization: Consolidate two separate userAchievement queries into a single sorted database fetch.
+    // Instead of querying userAchievements twice (once for total count/points and once for recent unlocks),
+    // we fetch all user achievements for the user sorted by unlockedAt desc in a single query.
+    // We then derive unlockedCount, earnedPoints, and the 5 most recentUnlocks in-memory (O(1) memory slicing).
+    // This reduces database roundtrips from 3 to 2.
+    const [achievementAggregates, userAchievements] = await Promise.all([
       prisma.achievement.aggregate({
         _count: { _all: true },
         _sum: { points: true },
@@ -272,20 +275,9 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
       prisma.userAchievement.findMany({
         where: { userId },
         include: {
-          achievement: {
-            select: {
-              points: true,
-            },
-          },
-        },
-      }),
-      prisma.userAchievement.findMany({
-        where: { userId },
-        include: {
           achievement: true,
         },
         orderBy: { unlockedAt: 'desc' },
-        take: 5,
       }),
     ]);
 
@@ -293,6 +285,16 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
     const totalPoints = achievementAggregates._sum.points || 0;
     const unlockedCount = userAchievements.length;
     const earnedPoints = userAchievements.reduce((sum, ua) => sum + ua.achievement.points, 0);
+
+    // Derive top 5 recent unlocks in-memory from the sorted list
+    const recentUnlocks = userAchievements.slice(0, 5).map((ua) => ({
+      id: ua.achievement.id,
+      title: ua.achievement.title,
+      description: ua.achievement.description,
+      icon: ua.achievement.icon,
+      points: ua.achievement.points,
+      unlockedAt: ua.unlockedAt.toISOString(),
+    }));
 
     return res.json({
       stats: {
@@ -304,14 +306,7 @@ export const getAchievementStats = async (req: AuthRequest, res: Response) => {
         earnedPoints,
         pointsPercentage: totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0,
       },
-      recentUnlocks: recentUnlocks.map((ua) => ({
-        id: ua.achievement.id,
-        title: ua.achievement.title,
-        description: ua.achievement.description,
-        icon: ua.achievement.icon,
-        points: ua.achievement.points,
-        unlockedAt: ua.unlockedAt.toISOString(),
-      })),
+      recentUnlocks,
     });
   } catch (error) {
     logger.error('Get achievement stats error:', error);
