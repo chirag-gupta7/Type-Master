@@ -13,7 +13,12 @@ const updateProfileSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
     .optional()
     .or(z.literal('')),
-  image: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  image: z
+    .string()
+    .url('Must be a valid URL')
+    .max(1000, 'Image URL must not exceed 1000 characters')
+    .optional()
+    .or(z.literal('')),
 });
 
 /**
