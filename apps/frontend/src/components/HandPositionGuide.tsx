@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +52,8 @@ const FINGER_COLORS: Record<FingerType, FingerColor> = {
     shadowColor: 'shadow-blue-500/50',
   },
 };
+
+const FINGER_COLOR_ENTRIES = Object.entries(FINGER_COLORS);
 
 // Key-to-finger mapping for QWERTY layout
 interface KeyMapping {
@@ -129,6 +132,11 @@ const KEY_MAPPINGS: KeyMapping[] = [
   { key: 'Space', finger: 'thumb', hand: 'right', row: 4, position: 0 },
 ];
 
+// Pre-compute O(1) hash map lookup for key mapping instead of O(N) array scanning on every keystroke
+const KEY_MAPPINGS_MAP = new Map<string, KeyMapping>(
+  KEY_MAPPINGS.map((m) => [m.key.toUpperCase(), m])
+);
+
 const FINGER_KEY_CLUSTERS: Record<FingerType, string[]> = KEY_MAPPINGS.reduce(
   (acc, mapping) => {
     const keyLabel = mapping.key === ' ' ? 'Space' : mapping.key;
@@ -146,6 +154,8 @@ const FINGER_KEY_CLUSTERS: Record<FingerType, string[]> = KEY_MAPPINGS.reduce(
   } as Record<FingerType, string[]>
 );
 
+const FINGER_KEY_CLUSTER_ENTRIES = Object.entries(FINGER_KEY_CLUSTERS) as Array<[FingerType, string[]]>;
+
 interface HandPositionGuideProps {
   targetKey?: string;
   showArrow?: boolean;
@@ -160,6 +170,11 @@ interface HandPositionGuideProps {
  *
  * Displays animated hand silhouettes with finger-to-key mapping.
  * Shows which finger should press which key with color coding and animations.
+ *
+ * Performance Optimization:
+ * - Uses static `KEY_MAPPINGS_MAP` to replace O(N) `.find()` scans with O(1) hash map lookups on every keystroke.
+ * - Sub-component `Hand` is wrapped with `React.memo` to avoid re-rendering unaffected hand elements during typing.
+ * - Static entries `FINGER_COLOR_ENTRIES` and `FINGER_KEY_CLUSTER_ENTRIES` avoid dynamic array allocations on render.
  */
 export function HandPositionGuide({
   targetKey,
@@ -172,13 +187,13 @@ export function HandPositionGuide({
   // Normalize target key
   const normalizedTarget = targetKey
     ? targetKey === ' '
-      ? 'Space'
+      ? 'SPACE'
       : targetKey.toUpperCase()
     : null;
 
-  // Find the finger and hand for the target key
+  // Find the finger and hand for the target key in O(1)
   const targetMapping = normalizedTarget
-    ? KEY_MAPPINGS.find((m) => m.key.toUpperCase() === normalizedTarget)
+    ? KEY_MAPPINGS_MAP.get(normalizedTarget)
     : null;
 
   const targetFinger = targetMapping?.finger;
@@ -238,7 +253,7 @@ export function HandPositionGuide({
       {/* Finger Legend */}
       {showFingerLabels && (
         <div className="flex flex-wrap justify-center gap-3">
-          {Object.entries(FINGER_COLORS).map(([finger, colors]) => (
+          {FINGER_COLOR_ENTRIES.map(([finger, colors]) => (
             <div
               key={finger}
               className={cn(
@@ -257,7 +272,7 @@ export function HandPositionGuide({
 
       {showKeyClusters && (
         <div className="grid gap-4 md:grid-cols-2">
-          {(Object.entries(FINGER_KEY_CLUSTERS) as Array<[FingerType, string[]]>).map(
+          {FINGER_KEY_CLUSTER_ENTRIES.map(
             ([finger, keys]) => {
               const colors = FINGER_COLORS[finger];
               const isActive = targetFinger === finger;
@@ -312,7 +327,7 @@ export function HandPositionGuide({
 }
 
 /**
- * Hand Component - Renders a single hand with finger highlights
+ * Hand Component - Renders a single hand with finger highlights (Memoized)
  */
 interface HandProps {
   hand: 'left' | 'right';
@@ -320,7 +335,7 @@ interface HandProps {
   compact?: boolean;
 }
 
-function Hand({ hand, activeFinger, compact = false }: HandProps) {
+const Hand = memo(function Hand({ hand, activeFinger, compact = false }: HandProps) {
   const fingers: FingerType[] =
     hand === 'left'
       ? ['pinky', 'ring', 'middle', 'index', 'thumb']
@@ -448,7 +463,7 @@ function Hand({ hand, activeFinger, compact = false }: HandProps) {
       </div>
     </div>
   );
-}
+});
 
 /**
  * AnimatedArrow Component - Shows arrow pointing to target key
@@ -513,8 +528,8 @@ export function getFingerForKey(key: string): {
   hand: 'left' | 'right';
   color: FingerColor;
 } | null {
-  const normalizedKey = key === ' ' ? 'Space' : key.toUpperCase();
-  const mapping = KEY_MAPPINGS.find((m) => m.key.toUpperCase() === normalizedKey);
+  const normalizedKey = key === ' ' ? 'SPACE' : key.toUpperCase();
+  const mapping = KEY_MAPPINGS_MAP.get(normalizedKey);
 
   if (!mapping) return null;
 

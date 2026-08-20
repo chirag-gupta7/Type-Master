@@ -160,3 +160,7 @@
 ## 2026-08-07 - React Virtual Keyboard Keystroke Rendering Optimization
 **Learning:** Under high-frequency keystroke events, re-rendering an entire virtual keyboard with ~60 key nodes creates a notable performance bottleneck. Extracting the individual key node into a memoized subcomponent (`KeyboardKey`) and pre-normalizing comparison keys (like `targetKey` and `pressedKey`) in the parent component reduces rendering overhead from O(Keys) to O(1) per keystroke, guaranteeing steady 60fps responsiveness during typing tests.
 **Action:** For interactive grid or layout structures undergoing rapid state updates (like visual keyboards, dashboards, or spreadsheets), isolate individual cells/keys into memoized child components and lift heavy state normalization logic to the parent.
+
+## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
+**Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
+**Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
