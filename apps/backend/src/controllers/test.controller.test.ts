@@ -177,6 +177,22 @@ mockRequest = {
     );
   });
 
+  it('should reject invalid days parameter below 1', async () => {
+    mockRequest.query = { days: '0' };
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: 'ZodError' }));
+  });
+
+  it('should reject invalid days parameter exceeding max limit', async () => {
+    mockRequest.query = { days: '10000' };
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: 'ZodError' }));
+  });
+
   it('should handle errors', async () => {
     const error = new Error('DB Error');
     (prisma.testResult.findMany as jest.Mock).mockRejectedValue(error);

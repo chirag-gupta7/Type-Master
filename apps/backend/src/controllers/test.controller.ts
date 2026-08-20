@@ -21,6 +21,11 @@ const createTestResultSchema = z.object({
   mode: z.enum(['WORDS', 'TIME', 'QUOTE']).default('WORDS'),
 });
 
+const getUserStatsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1, 'Days must be at least 1').max(3650, 'Days cannot exceed 3650').default(30),
+  duration: z.coerce.number().int().positive('Duration must be positive').optional(),
+});
+
 /**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
@@ -160,15 +165,17 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError(401, 'User not authenticated');
     }
 
-    const { duration, days = '30' } = req.query;
-    const daysNum = Math.max(parseInt(days as string, 10) || 30, 1);
+    const query = getUserStatsQuerySchema.parse(req.query);
+    const daysNum = query.days;
+    const durationNum = query.duration;
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
     const where = {
       userId: req.user.userId,
       createdAt: { gte: startDate },
-      ...(duration && { duration: parseInt(duration as string, 10) }),
+      ...(durationNum !== undefined && { duration: durationNum }),
     };
 
     // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate'.
