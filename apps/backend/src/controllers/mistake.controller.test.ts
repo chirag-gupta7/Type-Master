@@ -52,9 +52,7 @@ describe('MistakeController', () => {
       mockRequest.userId = undefined;
       mockRequest.body = {
         lessonId: '6b6c7b95-ef1b-4b1d-84e0-798df673ea14',
-        mistakes: [
-          { keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
-        ],
+        mistakes: [{ keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' }],
       };
       await logMistakes(mockRequest, mockResponse);
 
@@ -80,9 +78,27 @@ describe('MistakeController', () => {
 
       expect(prisma.typingMistake.createMany).toHaveBeenCalledWith({
         data: [
-          { userId: 'user-123', lessonId, keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
-          { userId: 'user-123', lessonId, keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' },
-          { userId: 'user-123', lessonId, keyPressed: 'f', keyExpected: 'd', fingerUsed: 'middle-left' },
+          {
+            userId: 'user-123',
+            lessonId,
+            keyPressed: 'a',
+            keyExpected: 's',
+            fingerUsed: 'index-left',
+          },
+          {
+            userId: 'user-123',
+            lessonId,
+            keyPressed: 'a',
+            keyExpected: 's',
+            fingerUsed: 'index-left',
+          },
+          {
+            userId: 'user-123',
+            lessonId,
+            keyPressed: 'f',
+            keyExpected: 'd',
+            fingerUsed: 'middle-left',
+          },
         ],
       });
 
@@ -219,6 +235,23 @@ describe('MistakeController', () => {
       );
     });
 
+    it('should clamp excessively large or negative limit query parameters between 1 and 100', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: '999999' };
+
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 100,
+        })
+      );
+    });
+
     it('should handle errors gracefully and return 500 status', async () => {
       mockRequest.params = { userId: 'user-123' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Database offline'));
@@ -287,7 +320,9 @@ describe('MistakeController', () => {
 
     it('should handle errors gracefully and return 500 status', async () => {
       mockRequest.params = { userId: 'user-123' };
-      (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Connection timed out'));
+      (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(
+        new Error('Connection timed out')
+      );
 
       await generatePracticeText(mockRequest, mockResponse);
 

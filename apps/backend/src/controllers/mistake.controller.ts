@@ -111,7 +111,8 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    const limit = parseInt(req.query.limit as string) || 10;
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const limit = Math.min(Math.max(Number.isNaN(rawLimit) ? 10 : rawLimit, 1), 100);
 
     // Optimization: Execute three independent database queries (weak keys, finger errors, and recent
     // mistakes) concurrently using Promise.all. This reduces the endpoint's database latency from
