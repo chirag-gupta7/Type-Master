@@ -251,4 +251,55 @@ describe('AI Controller Unit Tests', () => {
       expect(error.message).toContain('AI service request timed out');
     });
   });
+
+  describe('Error handling and edge cases', () => {
+    it('should throw 500 AppError if GEMINI_API_KEY is not defined', async () => {
+      delete process.env.GEMINI_API_KEY;
+
+      mockRequest.body = { wpm: 60, accuracy: 95 };
+
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.statusCode).toBe(500);
+      expect(error.message).toBe('AI Service unavailable');
+
+      process.env.GEMINI_API_KEY = 'mocked-api-key';
+    });
+
+    it('should throw 502 AppError if Gemini API fails', async () => {
+      mockRequest.body = { wpm: 60, accuracy: 95 };
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      });
+
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.statusCode).toBe(502);
+      expect(error.message).toBe('AI service currently unavailable');
+    });
+
+    it('should throw 502 AppError if response does not contain parts text', async () => {
+      mockRequest.body = { wpm: 60, accuracy: 95 };
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [],
+        }),
+      });
+
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.statusCode).toBe(502);
+      expect(error.message).toBe('AI service failed to generate a response');
+    });
+  });
 });
