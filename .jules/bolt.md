@@ -1,3 +1,7 @@
+## 2026-08-09 - Parallelizing onboarding flow database queries in Skill Assessment controller
+**Learning:** Placement tests or onboarding flows that sequentially store assessment results and fetch recommended starting content block on sequential database roundtrips. When these read and write queries are independent and rely on pre-calculated in-memory variables, they can be wrapped in `Promise.all` to execute concurrently, reducing latency by up to 50%.
+**Action:** When working on multi-step onboarding/placement endpoints, group and run independent queries in parallel using `Promise.all` instead of sequentially awaiting them.
+
 ## 2026-08-08 - Parallelizing User Validation and Resource Fetching in startAssessment
 **Learning:** Initializing/starting flow endpoints frequently perform sequential checks: verifying the authenticated user exists first, then fetching the initial lesson or assessment template content. Combining these completely independent queries inside `Promise.all` executes them concurrently, minimizing API response latency down to the maximum single query execution time instead of their sum.
 **Action:** Inspect initialization and bootstrap handlers for sequential validation and configuration database lookups, and execute them concurrently via `Promise.all`.
