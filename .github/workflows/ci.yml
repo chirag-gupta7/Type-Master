@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-env:
-  NODE_MODULES_CACHE_KEY: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
-
 jobs:
   install:
     name: Install Dependencies
@@ -31,7 +28,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ env.NODE_MODULES_CACHE_KEY }}
+          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
@@ -58,7 +55,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ env.NODE_MODULES_CACHE_KEY }}
+          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
 
       - name: Run linter
         run: npm run lint --workspace=apps/frontend
@@ -111,7 +108,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ env.NODE_MODULES_CACHE_KEY }}
+          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
 
       - name: Run linter
         run: npm run lint --workspace=apps/backend
@@ -161,7 +158,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ env.NODE_MODULES_CACHE_KEY }}
+          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
 
       - name: Build
         run: npm run build --workspace=apps/frontend
@@ -189,7 +186,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ env.NODE_MODULES_CACHE_KEY }}
+          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
 
       - name: Build
         run: npm run build --workspace=apps/backend
