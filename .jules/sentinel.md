@@ -57,6 +57,11 @@
 **Learning:** Direct inspection of forwarded IP headers in application code bypasses the web framework's native, secure, trust-proxy IP extraction rules, introducing a spoofing vector. Authentication rate limiting keys must target the source IP rather than per-email combinations to effectively block single-source brute force campaigns.
 **Prevention:** Always rely strictly on the framework's native `req.ip` rather than manually extracting IPs from request headers, and ensure `trust proxy` configuration is securely defined on the Express server instance. Use strictly IP-based keys for authentication rate limits.
 
+## 2026-08-08 - [Unvalidated AI Proxy Inputs]
+**Vulnerability:** AI proxy endpoints `getTypingFeedback`, `getWritingFeedback`, and `getStoryResponse` had no input validation or input size limits, allowing clients to send excessively large payloads or malformed data to the Gemini API, leading to potential Denial of Service (DoS), high-cost resource exhaustion, and prompt injection attacks.
+**Learning:** Even though internal and client-side access is authenticated, external API wrappers must validate all input fields (e.g. enforcing max character lengths for strings and max sizes for arrays) before passing data to costly downstream AI APIs.
+**Prevention:** Always define strict Zod input schemas for AI proxy endpoints to enforce data types, value boundaries, and maximum payload/string lengths.
+
 ## 2026-08-03 - Prompt Injection and DoS on AI Proxy Endpoints
 **Vulnerability:** The AI proxy endpoints accepted unvalidated numeric values and unsanitized text payloads of arbitrary length from clients, introducing risks of prompt injection and Denial of Service (DoS) due to excessive API resource/cost consumption.
 **Learning:** Endpoints that interface with third-party LLMs must enforce strict type constraints, ranges, and maximum input length limitations on the server side to protect backend assets and billing.
