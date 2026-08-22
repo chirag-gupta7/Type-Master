@@ -211,7 +211,7 @@ export function MilestoneCelebration({ isOpen, onClose, milestone }: MilestoneCe
                 className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 mb-6"
               >
                 <p className="text-sm italic text-muted-foreground">
-                  "Every keystroke is a step towards mastery. Keep up the amazing work!"
+                  &quot;Every keystroke is a step towards mastery. Keep up the amazing work!&quot;
                 </p>
               </motion.div>
 

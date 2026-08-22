@@ -112,7 +112,7 @@ export function FeatureCards() {
             Everything You Need to Master Typing
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            From beginner lessons to competitive leaderboards, we've got all the tools to accelerate
+            From beginner lessons to competitive leaderboards, we&apos;ve got all the tools to accelerate
             your typing journey.
           </p>
         </motion.div>

@@ -36,7 +36,7 @@ export function MistakeAnalysis({
         className="text-center"
       >
         <h2 className="text-3xl font-bold mb-2">📊 Mistake Analysis</h2>
-        <p className="text-muted-foreground text-lg">Let's identify areas for improvement</p>
+        <p className="text-muted-foreground text-lg">Let&apos;s identify areas for improvement</p>
       </motion.div>
 
       {/* Summary Stats */}

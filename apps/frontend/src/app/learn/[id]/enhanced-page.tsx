@@ -540,7 +540,7 @@ export default function EnhancedLessonPage() {
                   📊 We detected some mistakes
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Click "View Analysis" to see which keys you should practice more.
+                  Click &quot;View Analysis&quot; to see which keys you should practice more.
                 </p>
               </motion.div>
             )}

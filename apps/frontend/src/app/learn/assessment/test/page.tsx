@@ -404,7 +404,7 @@ export default function AssessmentPage() {
                     Skill Assessment
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 text-lg">
-                    Let's find the perfect starting point for your typing journey
+                    Let&apos;s find the perfect starting point for your typing journey
                   </p>
                 </div>
 
@@ -428,7 +428,7 @@ export default function AssessmentPage() {
                         Personalized Path
                       </h3>
                       <p className="text-gray-600 dark:text-gray-400 text-sm">
-                        We'll recommend lessons based on your current skill level
+                        We&apos;ll recommend lessons based on your current skill level
                       </p>
                     </div>
                   </div>
@@ -457,7 +457,7 @@ export default function AssessmentPage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                      We'll measure your speed (WPM) and accuracy
+                      We&apos;ll measure your speed (WPM) and accuracy
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>

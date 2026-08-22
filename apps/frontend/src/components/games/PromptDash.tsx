@@ -134,7 +134,7 @@ export function PromptDash() {
   if (gameState === 'finished') {
     return (
       <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg w-full max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold mb-6">Time's Up!</h2>
+        <h2 className="text-3xl font-bold mb-6">Time&apos;s Up!</h2>
         <div className="text-center mb-8">
           <p className="text-muted-foreground mb-2">Your WPM</p>
           <p className="text-5xl font-bold text-primary mb-4">{score}</p>
@@ -182,7 +182,7 @@ export function PromptDash() {
             <li>
               Your score is your final <strong>Words Per Minute (WPM)</strong>.
             </li>
-            <li>After the game, you'll get AI feedback on your writing!</li>
+            <li>After the game, you&apos;ll get AI feedback on your writing!</li>
           </ul>
           <Button onClick={startGame} size="lg" disabled={isLoading}>
             {isLoading ? (
@@ -207,7 +207,7 @@ export function PromptDash() {
             </div>
           </div>
           <p className="text-lg text-muted-foreground italic mb-4 p-4 bg-background/50 rounded-md w-full text-center">
-            "{prompt}"
+            &quot;{prompt}&quot;
           </p>
           <textarea
             ref={textAreaRef}

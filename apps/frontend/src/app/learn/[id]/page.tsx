@@ -565,7 +565,7 @@ export default function LessonPracticePage() {
                   👋 Welcome to TypeMaster!
                 </h2>
                 <p className="text-xl text-muted-foreground">
-                  Before we start, let's learn proper hand positioning
+                  Before we start, let&apos;s learn proper hand positioning
                 </p>
               </div>
 
@@ -622,7 +622,7 @@ export default function LessonPracticePage() {
 
               <div className="flex gap-4 justify-center">
                 <Button size="lg" onClick={() => setShowOnboarding(false)} className="px-12">
-                  Got it! Let's Start Typing
+                  Got it! Let&apos;s Start Typing
                 </Button>
               </div>
             </motion.div>
@@ -909,7 +909,7 @@ export default function LessonPracticePage() {
                   ðŸ“Š We detected some mistakes
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Click "View Analysis" to see which keys you should practice more.
+                  Click &quot;View Analysis&quot; to see which keys you should practice more.
                 </p>
               </motion.div>
             )}

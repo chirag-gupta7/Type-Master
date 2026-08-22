@@ -276,7 +276,7 @@ export default function GamesClient() {
             <Lock className="w-16 h-16 mx-auto mb-4 text-yellow-400" />
             <h2 className="text-2xl font-bold mb-2">Unlock Unlimited Games</h2>
             <p className="text-muted-foreground mb-6">
-              You've played your free game! Login to unlock unlimited access to all typing games.
+              You&apos;ve played your free game! Login to unlock unlimited access to all typing games.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button

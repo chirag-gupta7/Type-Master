@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
@@ -223,7 +223,7 @@ export function WordBlitz() {
             <li>
               Press the <strong>Spacebar</strong> after each correct word to score.
             </li>
-            <li>Don't let the words reach the bottom!</li>
+            <li>Don&apos;t let the words reach the bottom!</li>
           </ul>
           <Button onClick={startGame} size="lg">
             Start Game
