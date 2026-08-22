@@ -6,6 +6,7 @@ import {
   generateWritingPrompt,
 } from './ai.controller';
 import { ZodError } from 'zod';
+import { AppError } from '../middleware/error-handler';
 
 // Mock logger
 jest.mock('../utils/logger', () => ({
@@ -231,6 +232,23 @@ describe('AI Controller Unit Tests', () => {
       expect(global.fetch).toHaveBeenCalled();
       expect(jsonMock).toHaveBeenCalledWith({ prompt: 'Mocked AI Response' });
       expect(mockNext).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('external AI call request timeout', () => {
+    it('should return 504 AppError when the Gemini request aborts (timeout)', async () => {
+      mockRequest.body = { wpm: 60, accuracy: 95, errors: 2, duration: 60 };
+
+      const abortError = new Error('The operation was aborted.');
+      abortError.name = 'AbortError';
+      (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
+
+      await getTypingFeedback(mockRequest, mockResponse, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.statusCode).toBe(504);
+      expect(error.message).toContain('AI service request timed out');
     });
   });
 });
