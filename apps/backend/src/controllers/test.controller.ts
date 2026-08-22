@@ -21,6 +21,12 @@ const createTestResultSchema = z.object({
   mode: z.enum(['WORDS', 'TIME', 'QUOTE']).default('WORDS'),
 });
 
+const getUserTestsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  duration: z.coerce.number().int().positive().optional(),
+});
+
 /**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
@@ -74,21 +80,19 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError(401, 'User not authenticated');
     }
 
-    const { page = '1', limit = '20', duration } = req.query;
-    const pageNum = Math.max(parseInt(page as string, 10) || 1, 1);
-    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
-    const skip = (pageNum - 1) * limitNum;
+    const { page, limit, duration } = getUserTestsQuerySchema.parse(req.query);
+    const skip = (page - 1) * limit;
 
     const where = {
       userId: req.user.userId,
-      ...(duration && { duration: parseInt(duration as string, 10) }),
+      ...(duration && { duration }),
     };
 
     const [tests, total] = await Promise.all([
       prisma.testResult.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: limitNum,
+        take: limit,
         skip,
         select: {
           id: true,
@@ -107,10 +111,10 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
     res.json({
       tests,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
+        page,
+        limit,
         total,
-        totalPages: Math.ceil(total / limitNum),
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {

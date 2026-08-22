@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getUserStats } from './test.controller';
+import { getUserStats, getUserTests } from './test.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -8,6 +8,7 @@ jest.mock('../utils/prisma', () => ({
     testResult: {
       findMany: jest.fn(),
       aggregate: jest.fn(),
+      count: jest.fn(),
     },
   },
 }));
@@ -184,5 +185,96 @@ mockRequest = {
     await getUserStats(mockRequest as any, mockResponse as any, mockNext);
 
     expect(mockNext).toHaveBeenCalledWith(error);
+  });
+});
+
+describe('TestController - getUserTests', () => {
+  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
+  let mockResponse: Partial<Response>;
+  let mockNext: NextFunction;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockNext = jest.fn();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
+      query: {},
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('should fetch user tests with default pagination parameters', async () => {
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.testResult.count as jest.Mock).mockResolvedValue(0);
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-123' },
+        take: 20,
+        skip: 0,
+      })
+    );
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tests: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+        },
+      })
+    );
+  });
+
+  it('should validate and parse custom valid query parameters', async () => {
+    mockRequest.query = { page: '2', limit: '10', duration: '60' };
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.testResult.count as jest.Mock).mockResolvedValue(15);
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-123', duration: 60 },
+        take: 10,
+        skip: 10,
+      })
+    );
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pagination: {
+          page: 2,
+          limit: 10,
+          total: 15,
+          totalPages: 2,
+        },
+      })
+    );
+  });
+
+  it('should reject invalid query parameters with a validation error', async () => {
+    mockRequest.query = { limit: '9999' }; // Exceeds max limit of 100
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
   });
 });
