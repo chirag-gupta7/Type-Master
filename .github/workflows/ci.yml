@@ -164,6 +164,8 @@ jobs:
         run: npm run build --workspace=apps/frontend
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXTAUTH_SECRET: ci-dummy-secret
+          NEXTAUTH_URL: http://localhost:3000
 
   build-backend:
     name: Build Backend
