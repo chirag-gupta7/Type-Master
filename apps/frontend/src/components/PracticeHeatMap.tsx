@@ -255,70 +255,65 @@ function getMonthLabels(weeks: Date[][]): Array<{ name: string; width: number }>
   return months;
 }
 
-// Calculate current streak
-function calculateCurrentStreak(data: PracticeDay[]): number {
-  const sortedDates = data
+// Day keys are 'YYYY-MM-DD' strings in UTC, matching the backend activity
+// keys and the heat map grid cells. All streak math stays in that UTC-day
+// space; mixing in local-time normalization (setHours(0,0,0,0)) shifts dates
+// by a day for users behind UTC.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function toUtcDayMs(dayKey: string): number {
+  return Date.parse(`${dayKey}T00:00:00Z`);
+}
+
+function getSortedActiveDayKeys(data: PracticeDay[]): string[] {
+  return data
     .filter((d) => d.count > 0)
-    .map((d) => new Date(d.date))
-    .sort((a, b) => b.getTime() - a.getTime());
+    .map((d) => d.date)
+    .sort();
+}
 
-  if (sortedDates.length === 0) return 0;
+// Calculate current streak
+export function calculateCurrentStreak(data: PracticeDay[], today: Date = new Date()): number {
+  const activeKeys = Array.from(new Set(getSortedActiveDayKeys(data)));
+  if (activeKeys.length === 0) return 0;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const mostRecent = new Date(sortedDates[0]);
-  mostRecent.setHours(0, 0, 0, 0);
-
-  const daysDiff = Math.floor((today.getTime() - mostRecent.getTime()) / (1000 * 60 * 60 * 24));
+  const todayKey = today.toISOString().split('T')[0];
+  const mostRecentKey = activeKeys[activeKeys.length - 1];
+  const daysDiff = Math.round(
+    (toUtcDayMs(todayKey) - toUtcDayMs(mostRecentKey)) / DAY_MS
+  );
 
   // If most recent activity is not today or yesterday, streak is broken
   if (daysDiff > 1) return 0;
 
+  const activeSet = new Set(activeKeys);
   let streak = 0;
-  const expectedDate = new Date(mostRecent);
+  let expectedMs = toUtcDayMs(mostRecentKey);
 
-  for (const date of sortedDates) {
-    const currentDate = new Date(date);
-    currentDate.setHours(0, 0, 0, 0);
-
-    if (currentDate.getTime() === expectedDate.getTime()) {
-      streak++;
-      expectedDate.setDate(expectedDate.getDate() - 1);
-    } else {
-      break;
-    }
+  while (activeSet.has(new Date(expectedMs).toISOString().split('T')[0])) {
+    streak++;
+    expectedMs -= DAY_MS;
   }
 
   return streak;
 }
 
 // Calculate longest streak
-function calculateLongestStreak(data: PracticeDay[]): number {
-  const sortedDates = data
-    .filter((d) => d.count > 0)
-    .map((d) => new Date(d.date))
-    .sort((a, b) => a.getTime() - b.getTime());
-
-  if (sortedDates.length === 0) return 0;
+export function calculateLongestStreak(data: PracticeDay[]): number {
+  const activeKeys = Array.from(new Set(getSortedActiveDayKeys(data)));
+  if (activeKeys.length === 0) return 0;
 
   let maxStreak = 1;
-  let currentStreak = 1;
+  let currentRun = 1;
 
-  for (let i = 1; i < sortedDates.length; i++) {
-    const prevDate = new Date(sortedDates[i - 1]);
-    const currDate = new Date(sortedDates[i]);
+  for (let i = 1; i < activeKeys.length; i++) {
+    const dayDiff = (toUtcDayMs(activeKeys[i]) - toUtcDayMs(activeKeys[i - 1])) / DAY_MS;
 
-    prevDate.setHours(0, 0, 0, 0);
-    currDate.setHours(0, 0, 0, 0);
-
-    const daysDiff = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysDiff === 1) {
-      currentStreak++;
-      maxStreak = Math.max(maxStreak, currentStreak);
+    if (dayDiff === 1) {
+      currentRun++;
+      maxStreak = Math.max(maxStreak, currentRun);
     } else {
-      currentStreak = 1;
+      currentRun = 1;
     }
   }
 
