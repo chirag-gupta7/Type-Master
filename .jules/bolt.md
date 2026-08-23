@@ -5,6 +5,9 @@
 ## 2026-08-08 - Parallelizing User Validation and Resource Fetching in startAssessment
 **Learning:** Initializing/starting flow endpoints frequently perform sequential checks: verifying the authenticated user exists first, then fetching the initial lesson or assessment template content. Combining these completely independent queries inside `Promise.all` executes them concurrently, minimizing API response latency down to the maximum single query execution time instead of their sum.
 **Action:** Inspect initialization and bootstrap handlers for sequential validation and configuration database lookups, and execute them concurrently via `Promise.all`.
+## 2026-08-11 - Memoization of Calendar Grid and Stats Calculations in PracticeHeatMap
+**Learning:** Rendering complex charting components (like a 365-day calendar heatmap) on every single render can cause unnecessary computational and memory allocation overhead if helper computations (e.g. constructing dates, calculating streaks, grouping weeks, deriving month layouts) are run inline. Wrapping these multi-step algorithms in React `useMemo` hooks prevents garbage collection spikes and CPU cycles.
+**Action:** Always memoize derived visual layouts and statistic pipelines in visual components using `useMemo` when working with large historical ranges or arrays.
 
 ## 2026-07-31 - Parallelizing weak key analysis queries
 **Learning:** Sequential await execution of multiple independent database queries (e.g., findMany, queryRaw) in controller endpoints introduces unnecessary cumulative network and DB roundtrip latencies. Using Promise.all parallelizes execution, reducing total API response time to that of the single slowest query.
