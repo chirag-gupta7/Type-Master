@@ -8,6 +8,8 @@ interface AuthRequest extends Request {
 }
 
 // Validation schemas
+const userIdParamSchema = z.string().uuid('Invalid user ID format');
+
 const logMistakeSchema = z.object({
   lessonId: z.string().uuid('Invalid lesson ID'),
   mistakes: z
@@ -106,6 +108,12 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    const userIdParsed = userIdParamSchema.safeParse(userId);
+    if (!userIdParsed.success) {
+      res.status(400).json({ error: 'Invalid user ID format' });
+      return;
+    }
+
     if (userId !== authUserId) {
       res.status(403).json({ error: 'Forbidden' });
       return;
@@ -180,6 +188,12 @@ export const generatePracticeText = async (req: AuthRequest, res: Response): Pro
 
     if (!authUserId) {
       res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const userIdParsed = userIdParamSchema.safeParse(userId);
+    if (!userIdParsed.success) {
+      res.status(400).json({ error: 'Invalid user ID format' });
       return;
     }
 
