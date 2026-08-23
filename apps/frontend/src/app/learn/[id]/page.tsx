@@ -82,7 +82,6 @@ export default function LessonPracticePage() {
   const [userInput, setUserInput] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [, setEndTime] = useState<number | null>(null);
   const [mistakes, setMistakes] = useState<TypingMistake[]>([]);
   const [wpm, setWpm] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
@@ -316,7 +315,6 @@ export default function LessonPracticePage() {
     if (!lesson || !startTime) return;
 
     const end = Date.now();
-    setEndTime(end);
 
     const timeSpent = (end - startTime) / 1000; // seconds
     const timeInMinutes = timeSpent / 60;

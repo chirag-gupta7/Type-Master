@@ -131,7 +131,7 @@ export const getTypingFeedback = async (req: Request, res: Response, next: NextF
 
     const systemPrompt =
       "You are a typing tutor AI. Analyze the user's typing test results (WPM, accuracy) and provide concise, helpful feedback (2-3 sentences max). Focus on constructive advice based on their performance (e.g., focus on accuracy if low, practice for speed if accuracy is high but WPM low). Be encouraging.";
-const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors ?? 'N/A'}\nDuration: ${duration ? `${duration} seconds` : 'N/A'}\n\nProvide helpful feedback.`;
+const userQuery = `Analyze typing test results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%\nErrors: ${errors}\nDuration: ${duration} seconds\n\nProvide helpful feedback.`;
 
     const feedback = await callGemini(systemPrompt, userQuery);
     res.json({ feedback });

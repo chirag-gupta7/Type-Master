@@ -72,7 +72,6 @@ const getFingerZone = (key: string) => {
 export function AnimatedHandOverlay({
   targetKey,
   pressedKey,
-  isCorrect: _isCorrect,
   className = '',
 }: AnimatedHandOverlayProps) {
   const targetZone = useMemo(() => (targetKey ? getFingerZone(targetKey) : null), [targetKey]);
