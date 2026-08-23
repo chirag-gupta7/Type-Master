@@ -933,7 +933,7 @@ export const gameAPI = {
           avgScore: number;
         }>;
       };
-    }>('/games/stats', { cacheKey: 'games:stats', cacheTtl: 60 });
+    }>('/games/stats', { cacheKey: 'games:stats', cacheTtl: 60 * 1000 });
   },
 
   getLeaderboard: async (gameType: 'WORD_BLITZ' | 'PROMPT_DASH' | 'STORY_CHAIN') => {
@@ -954,7 +954,7 @@ export const gameAPI = {
         }>;
         total: number;
       };
-    }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 });
+    }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 * 1000 });
   },
 };
 
