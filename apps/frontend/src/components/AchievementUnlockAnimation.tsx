@@ -235,6 +235,7 @@ export const AchievementUnlockAnimation: React.FC<AchievementUnlockAnimationProp
               {/* Close button */}
               <button
                 onClick={handleClose}
+                aria-label="Close achievement animation"
                 className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
                 <X className="w-5 h-5 text-white" />

@@ -118,6 +118,7 @@ export function AchievementUnlockModal({
               {/* Close Button */}
               <button
                 onClick={emitCloseEvent}
+                aria-label="Close achievement modal"
                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
               >
                 <X className="w-5 h-5" />

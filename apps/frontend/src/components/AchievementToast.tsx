@@ -100,6 +100,7 @@ export function AchievementToast({ achievement, onClose, duration = 5000 }: Achi
                   <h4 className="font-semibold text-sm">🎉 Achievement Unlocked!</h4>
                   <button
                     onClick={onClose}
+                    aria-label="Close notification"
                     className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                   >
                     <X className="w-4 h-4" />
