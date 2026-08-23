@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
-import { userAPI } from '@/lib/api';
+import { authAPI, userAPI } from '@/lib/api';
 
 function SettingsContent() {
   const { theme, setTheme } = useTheme();
@@ -11,25 +12,38 @@ function SettingsContent() {
   const [image, setImage] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    setIsAuthenticated(authAPI.isAuthenticated());
   }, []);
 
   useEffect(() => {
+    if (mounted && isAuthenticated === false) {
+      // Not signed in: skip the profile fetch entirely.
+      return;
+    }
+
     async function loadProfile() {
       try {
         const data = await userAPI.getProfile();
         setUsername(data.user.username || '');
         setImage(data.user.image || '');
+        setIsAuthenticated(true);
       } catch (err) {
+        // A failed profile load means the visitor can't use this page;
+        // surface it instead of rendering an empty editable form.
         console.error('Failed to load profile:', err);
+        setIsAuthenticated(false);
       }
     }
 
-    loadProfile();
-  }, []);
+    if (mounted) {
+      loadProfile();
+    }
+  }, [mounted]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +65,22 @@ function SettingsContent() {
 
   if (!mounted) {
     return null;
+  }
+
+  if (isAuthenticated === false) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <h1 className="text-3xl font-bold mb-8">Settings</h1>
+        <div className="bg-card border rounded-lg p-6 text-center">
+          <p className="text-muted-foreground mb-4">
+            Sign in to manage your profile settings.
+          </p>
+          <Link href="/login?callbackUrl=%2Fsettings" className="inline-block">
+            <Button>Sign In</Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
