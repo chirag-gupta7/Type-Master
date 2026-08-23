@@ -8,7 +8,10 @@ import { logger } from '../utils/logger';
 
 // Validation schemas
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z
+    .string()
+    .email('Invalid email address')
+    .max(255, 'Email must not exceed 255 characters'),
   username: z
     .string()
     .min(3, 'Username must be at least 3 characters')
@@ -17,14 +20,21 @@ const registerSchema = z.object({
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
+    .max(100, 'Password must not exceed 100 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z
+    .string()
+    .email('Invalid email address')
+    .max(255, 'Email must not exceed 255 characters'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .max(100, 'Password must not exceed 100 characters'),
 });
 
 const refreshTokenSchema = z.object({
@@ -32,10 +42,18 @@ const refreshTokenSchema = z.object({
 });
 
 const tokenProvisionSchema = z.object({
-  email: z.string().email('Invalid email'),
+  email: z
+    .string()
+    .email('Invalid email')
+    .max(255, 'Email must not exceed 255 characters'),
   name: z.string().min(1).max(100).nullable().optional(),
   username: z.string().min(1).max(50).nullable().optional(),
-  image: z.string().url('Invalid image URL').nullable().optional(),
+  image: z
+    .string()
+    .url('Invalid image URL')
+    .max(1000, 'Image URL must not exceed 1000 characters')
+    .nullable()
+    .optional(),
 });
 
 const MIN_USERNAME_LENGTH = 3;
