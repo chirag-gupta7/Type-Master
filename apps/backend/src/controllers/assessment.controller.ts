@@ -36,8 +36,8 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
 
     const userId = authUserId;
 
-    // PERFORMANCE OPTIMIZATION: Concurrently check if user exists and fetch the assessment lesson.
-    // This reduces latency by parallelizing the two independent database queries.
+    // Optimization: Parallelize independent user validity and baseline lesson queries using Promise.all
+    // This reduces cumulative network roundtrip times from 2 sequentially blocked database queries to 1 concurrent roundtrip.
     const [user, assessmentLesson] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
@@ -132,7 +132,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       'pinky-right': wpm * 0.8,
     });
 
-    // UNLOCK LESSONS BASED ON SKILL LEVEL
+    // UNLOCK LESSONS BASED ON SKILL LEVEL - Pre-calculate sections in-memory
     // Get all lessons up to the recommended section
     let sectionsToUnlock: number[] = [];
 
@@ -145,9 +145,9 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
     }
     // BEGINNER starts at lesson 1, no need to unlock
 
-    // Optimization: Parallelize independent queries (create assessment, fetch lessons to unlock,
-    // and fetch recommended lesson details) using Promise.all to reduce sequential blocking DB round-trips.
-    // This reduces response time from sum of individual queries to maximum of single slowest query.
+    // Optimization: Parallelize independent queries (userSkillAssessment.create, lesson.findMany for lesson unlocking,
+    // and lesson.findFirst for recommended lesson details) using Promise.all.
+    // This reduces cumulative sequential database roundtrips from 4 sequential queries to 2 concurrent phases.
     const [assessment, lessonsToUnlock, recommendedLesson] = await Promise.all([
       prisma.userSkillAssessment.create({
         data: {
@@ -185,7 +185,7 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       }),
     ]);
 
-    if (sectionsToUnlock.length > 0 && lessonsToUnlock && lessonsToUnlock.length > 0) {
+    if (sectionsToUnlock.length > 0 && lessonsToUnlock.length > 0) {
       // Create UserLessonProgress records to unlock these lessons
       // Mark them as "completed" with basic stats so they show as unlocked
       const unlockData = lessonsToUnlock.map((lesson) => ({

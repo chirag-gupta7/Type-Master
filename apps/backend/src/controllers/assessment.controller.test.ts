@@ -1,4 +1,4 @@
-import { startAssessment, completeAssessment } from './assessment.controller';
+import { startAssessment, completeAssessment, getLatestAssessment } from './assessment.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -21,11 +21,10 @@ jest.mock('../utils/prisma', () => ({
   },
 }));
 
-// Mock logger
+// Mock Logger
 jest.mock('../utils/logger', () => ({
   logger: {
     info: jest.fn(),
-    warn: jest.fn(),
     error: jest.fn(),
   },
 }));
@@ -45,33 +44,37 @@ describe('AssessmentController', () => {
     };
     mockRequest = {
       userId: 'user-123',
+      params: {},
+      query: {},
       body: {},
     };
     jest.clearAllMocks();
   });
 
   describe('startAssessment', () => {
-    it('should return 401 if unauthorized (no userId)', async () => {
+    it('should return 401 if userId is missing', async () => {
       mockRequest.userId = undefined;
-
       await startAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(401);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
-    it('should return 403 if body userId mismatch', async () => {
-      mockRequest.body = { userId: 'user-456' };
-
+    it('should return 403 if body userId does not match authenticated userId', async () => {
+      mockRequest.body = { userId: 'different-user' };
       await startAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
     });
 
-    it('should return 404 if user not found', async () => {
+    it('should return 404 if user is not found', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({ id: 'lesson-1', content: 'test text' });
+      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({
+        content: 'Baseline text',
+        targetWpm: 40,
+        minAccuracy: 95,
+      });
 
       await startAssessment(mockRequest, mockResponse);
 
@@ -79,7 +82,7 @@ describe('AssessmentController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'User not found' });
     });
 
-    it('should return 500 if assessment content not found', async () => {
+    it('should return 500 if assessment content lesson is not found', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' });
       (prisma.lesson.findFirst as jest.Mock).mockResolvedValue(null);
 
@@ -89,86 +92,171 @@ describe('AssessmentController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Assessment content not found' });
     });
 
-    it('should successfully start assessment', async () => {
+    it('should return 200 with assessment details when user and baseline lesson exist', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' });
       (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({
-        content: 'Type this content',
+        content: 'Baseline text content to type.',
         targetWpm: 40,
         minAccuracy: 95,
       });
 
       await startAssessment(mockRequest, mockResponse);
 
-      expect(jsonMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Assessment started',
-          content: 'Type this content',
-          targetWpm: 40,
-          minAccuracy: 95,
-        })
-      );
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-123' } });
+      expect(prisma.lesson.findFirst).toHaveBeenCalledWith({
+        where: { level: 1 },
+        select: { content: true, targetWpm: true, minAccuracy: true },
+      });
+
+      expect(jsonMock).toHaveBeenCalledWith({
+        message: 'Assessment started',
+        content: 'Baseline text content to type.',
+        instructions: 'Type the text below as accurately and quickly as you can.',
+        targetWpm: 40,
+        minAccuracy: 95,
+      });
+    });
+
+    it('should return 500 when database error occurs', async () => {
+      (prisma.user.findUnique as jest.Mock).mockRejectedValue(new Error('DB failure'));
+
+      await startAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to start assessment' });
     });
   });
 
   describe('completeAssessment', () => {
-    const validBody = {
-      userId: 'user-123',
-      wpm: 60,
-      accuracy: 98,
-      mistakesByKey: { a: 1, b: 2 },
-      weakFingers: ['pinky-left'],
-      timeSpent: 45,
-    };
-
     beforeEach(() => {
-      mockRequest.body = { ...validBody };
+      mockRequest.body = {
+        userId: 'user-123',
+        wpm: 60,
+        accuracy: 98,
+        mistakesByKey: { a: 1, b: 3 },
+        weakFingers: ['index-left'],
+        timeSpent: 45,
+      };
     });
 
-    it('should return 401 if unauthorized', async () => {
+    it('should return 401 if userId is missing', async () => {
       mockRequest.userId = undefined;
-
       await completeAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(401);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
-    it('should return 403 if body userId mismatch', async () => {
-      mockRequest.body.userId = 'user-456';
-
+    it('should return 403 if body userId does not match authenticated userId', async () => {
+      mockRequest.body.userId = 'different-user';
       await completeAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
     });
 
-    it('should successfully complete assessment and unlock lessons', async () => {
-      (prisma.userSkillAssessment.create as jest.Mock).mockResolvedValue({
+    it('should successfully complete assessment with BEGINNER level and no lesson unlocking', async () => {
+      mockRequest.body.wpm = 20;
+      mockRequest.body.accuracy = 90;
+
+      const mockAssessment = {
         id: 'assessment-abc',
+        userId: 'user-123',
+        overallWpm: 20,
+        overallAccuracy: 90,
+        recommendedLevel: 'BEGINNER',
+        weakFingers: ['index-left'],
+        problematicKeys: [],
+        fingerWpmScores: '{}',
+        assessmentDate: new Date(),
+      };
+
+      const mockRecommendedLesson = {
+        id: 'lesson-1',
+        level: 1,
+        title: 'Home Row Basics',
+        description: 'First steps',
+        section: 1,
+        targetWpm: 25,
+        minAccuracy: 90,
+      };
+
+      (prisma.userSkillAssessment.create as jest.Mock).mockResolvedValue(mockAssessment);
+      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue(mockRecommendedLesson);
+
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(prisma.userSkillAssessment.create).toHaveBeenCalled();
+      expect(prisma.lesson.findFirst).toHaveBeenCalledWith({
+        where: { level: 1 },
+        select: expect.any(Object),
       });
-      (prisma.lesson.findMany as jest.Mock).mockResolvedValue([
-        { id: 'l1' },
-        { id: 'l2' },
-      ]);
-      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({
-        id: 'rec-1',
-        level: 41,
-        title: 'Advanced Technique 1',
-        description: 'Practice advanced keystrokes',
-        section: 3,
-        targetWpm: 55,
-        minAccuracy: 97,
-      });
+
+      expect(prisma.lesson.findMany).not.toHaveBeenCalled();
+      expect(prisma.userLessonProgress.createMany).not.toHaveBeenCalled();
+
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Assessment completed',
+          assessment: expect.objectContaining({
+            wpm: 20,
+            accuracy: 90,
+            recommendedSkillLevel: 'BEGINNER',
+            recommendedLessonLevel: 1,
+            sectionsUnlocked: [],
+          }),
+          recommendedLesson: mockRecommendedLesson,
+        })
+      );
+    });
+
+    it('should successfully complete assessment with EXPERT level and unlock lessons in parallel', async () => {
+      mockRequest.body.wpm = 80;
+      mockRequest.body.accuracy = 99;
+
+      const mockAssessment = {
+        id: 'assessment-xyz',
+        userId: 'user-123',
+        overallWpm: 80,
+        overallAccuracy: 99,
+        recommendedLevel: 'EXPERT',
+        weakFingers: ['index-left'],
+        problematicKeys: ['b'],
+        fingerWpmScores: '{}',
+        assessmentDate: new Date(),
+      };
+
+      const mockLessonsToUnlock = [
+        { id: 'lesson-unl-1' },
+        { id: 'lesson-unl-2' },
+      ];
+
+      const mockRecommendedLesson = {
+        id: 'lesson-61',
+        level: 61,
+        title: 'Speed Booster',
+        description: 'Fast typing',
+        section: 4,
+        targetWpm: 70,
+        minAccuracy: 95,
+      };
+
+      (prisma.userSkillAssessment.create as jest.Mock).mockResolvedValue(mockAssessment);
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue(mockLessonsToUnlock);
+      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue(mockRecommendedLesson);
       (prisma.userLessonProgress.createMany as jest.Mock).mockResolvedValue({ count: 2 });
 
       await completeAssessment(mockRequest, mockResponse);
 
       expect(prisma.userSkillAssessment.create).toHaveBeenCalled();
-      expect(prisma.lesson.findMany).toHaveBeenCalled();
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith({
+        where: { section: { in: [1, 2, 3] } },
+        select: { id: true },
+      });
       expect(prisma.userLessonProgress.createMany).toHaveBeenCalledWith({
         data: [
-          { userId: 'user-123', lessonId: 'l1', completed: true, bestWpm: 0, bestAccuracy: 0, attempts: 0, stars: 0 },
-          { userId: 'user-123', lessonId: 'l2', completed: true, bestWpm: 0, bestAccuracy: 0, attempts: 0, stars: 0 },
+          { userId: 'user-123', lessonId: 'lesson-unl-1', completed: true, bestWpm: 0, bestAccuracy: 0, attempts: 0, stars: 0 },
+          { userId: 'user-123', lessonId: 'lesson-unl-2', completed: true, bestWpm: 0, bestAccuracy: 0, attempts: 0, stars: 0 },
         ],
         skipDuplicates: true,
       });
@@ -177,18 +265,96 @@ describe('AssessmentController', () => {
         expect.objectContaining({
           message: 'Assessment completed',
           assessment: expect.objectContaining({
-            id: 'assessment-abc',
-            wpm: 60,
-            accuracy: 98,
-            recommendedSkillLevel: 'ADVANCED',
-            recommendedLessonLevel: 41,
+            wpm: 80,
+            accuracy: 99,
+            recommendedSkillLevel: 'EXPERT',
+            recommendedLessonLevel: 61,
+            sectionsUnlocked: [1, 2, 3],
           }),
-          recommendedLesson: expect.objectContaining({
-            id: 'rec-1',
-            level: 41,
-          }),
+          recommendedLesson: mockRecommendedLesson,
         })
       );
+    });
+
+    it('should return 500 when database error occurs during completion', async () => {
+      (prisma.userSkillAssessment.create as jest.Mock).mockRejectedValue(new Error('Creation failed'));
+
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to complete assessment' });
+    });
+  });
+
+  describe('getLatestAssessment', () => {
+    it('should return 401 if userId is missing', async () => {
+      mockRequest.userId = undefined;
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    });
+
+    it('should return 403 if params userId does not match authenticated userId', async () => {
+      mockRequest.params = { userId: 'different-user' };
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(403);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
+    });
+
+    it('should return 404 if no assessment exists for the user', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      (prisma.userSkillAssessment.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(404);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'No assessment found for this user' });
+    });
+
+    it('should return 200 with latest assessment details', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      const mockAssessment = {
+        id: 'assessment-xyz',
+        overallWpm: 55,
+        overallAccuracy: 96,
+        recommendedLevel: 'ADVANCED',
+        weakFingers: ['ring-left'],
+        problematicKeys: ['k'],
+        assessmentDate: new Date('2023-01-01T12:00:00Z'),
+      };
+
+      (prisma.userSkillAssessment.findFirst as jest.Mock).mockResolvedValue(mockAssessment);
+
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(prisma.userSkillAssessment.findFirst).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        orderBy: { assessmentDate: 'desc' },
+      });
+
+      expect(jsonMock).toHaveBeenCalledWith({
+        assessment: {
+          id: 'assessment-xyz',
+          wpm: 55,
+          accuracy: 96,
+          recommendedLevel: 'ADVANCED',
+          weakFingers: ['ring-left'],
+          problematicKeys: ['k'],
+          completedAt: mockAssessment.assessmentDate,
+        },
+      });
+    });
+
+    it('should return 500 when database error occurs during fetching', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      (prisma.userSkillAssessment.findFirst as jest.Mock).mockRejectedValue(new Error('Retrieval failed'));
+
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to retrieve assessment' });
     });
   });
 });
