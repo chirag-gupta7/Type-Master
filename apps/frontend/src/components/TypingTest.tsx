@@ -352,9 +352,12 @@ const TypingTest: React.FC = () => {
               {[30, 60, 180].map((duration) => (
                 <button
                   key={duration}
+                  type="button"
+                  aria-label={`Select ${duration === 30 ? '30 seconds' : `${duration / 60} minutes`} test duration`}
+                  aria-pressed={activeDuration === duration}
                   onClick={() => prepareTest(duration as 30 | 60 | 180)}
                   className={cn(
-                    'px-4 py-2 md:px-6 md:py-3 rounded-md text-lg font-medium transition-all duration-300',
+                    'px-4 py-2 md:px-6 md:py-3 rounded-md text-lg font-medium transition-all duration-300 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                     activeDuration === duration
                       ? 'bg-primary text-primary-foreground shadow-lg'
                       : 'text-muted-foreground hover:bg-secondary'
@@ -365,9 +368,10 @@ const TypingTest: React.FC = () => {
               ))}
             </div>
             <button
+              type="button"
               onClick={handleStartClick}
               disabled={!textToType}
-              className="px-12 py-4 bg-yellow-400 text-background font-bold text-2xl rounded-lg shadow-lg hover:bg-yellow-300 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-12 py-4 bg-yellow-400 text-background font-bold text-2xl rounded-lg shadow-lg hover:bg-yellow-300 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               {textToType ? 'Start' : 'Loading...'}
             </button>
@@ -392,10 +396,12 @@ const TypingTest: React.FC = () => {
               </div>
               <div className="flex items-center gap-4">
                 <button
+                  type="button"
                   onClick={() =>
                     setDisplayMode(displayMode === 'horizontal' ? 'vertical' : 'horizontal')
                   }
-                  className="px-3 py-1 text-sm bg-background/50 border border-border rounded-md hover:bg-muted transition-colors"
+                  className="px-3 py-1 text-sm bg-background/50 border border-border rounded-md hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  aria-label={`Switch to ${displayMode === 'horizontal' ? 'vertical' : 'horizontal'} display mode`}
                   title="Toggle display mode"
                 >
                   {displayMode === 'horizontal' ? '↕️ Vertical' : '↔️ Horizontal'}
@@ -518,8 +524,10 @@ const TypingTest: React.FC = () => {
               autoFocus
             />
             <button
+              type="button"
               onClick={handleRestart}
-              className="mt-8 flex items-center gap-2 text-muted-foreground hover:text-primary-foreground transition-colors"
+              aria-label="Restart typing test"
+              className="mt-8 flex items-center gap-2 text-muted-foreground hover:text-primary-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <RefreshCw size={16} />
               <span>Restart</span>
