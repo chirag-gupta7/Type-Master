@@ -70,6 +70,22 @@ const isJwtExpired = (token: string, skewSeconds = 30): boolean => {
   return payload.exp - skewSeconds <= now;
 };
 
+/**
+ * Derive the cache namespace for a backend JWT. Cached responses are stored
+ * per-user so data fetched while signed in as one account can never be served
+ * to another account (or to guests) within the same browser tab/session.
+ */
+export const getCacheScopeFromToken = (token: string | null): string => {
+  if (!token) {
+    return 'guest';
+  }
+  const payload = decodeJwtPayload(token);
+  if (payload && typeof payload.userId === 'string' && payload.userId.length > 0) {
+    return `user:${payload.userId}`;
+  }
+  return 'guest';
+};
+
 const persistBackendToken = (token?: string | null) => {
   const cleaned = sanitizeToken(token);
   if (typeof window === 'undefined' || !cleaned) {
@@ -118,7 +134,7 @@ const getAuthToken = async (): Promise<string | null> => {
  */ /**
  * Generic fetch wrapper with error handling
  */
-async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+export async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { cacheKey, cacheTtl, skipCache, ...requestInit } = options;
 
   const token = await getAuthToken();
@@ -133,7 +149,9 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   const method = (requestInit.method || 'GET').toUpperCase();
-  const effectiveCacheKey = method === 'GET' && !skipCache ? (cacheKey ?? endpoint) : undefined;
+  const scope = getCacheScopeFromToken(token);
+  const effectiveCacheKey =
+    method === 'GET' && !skipCache ? `${scope}:${cacheKey ?? endpoint}` : undefined;
 
   if (effectiveCacheKey) {
     const cached = getCache<T>(effectiveCacheKey);
@@ -163,6 +181,21 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   return data;
+}
+
+/**
+ * Invalidate cached entries for the currently authenticated user's scope.
+ * Keys must be scoped identically to how fetchAPI stores them, otherwise
+ * stale data would survive a mutation.
+ */
+async function invalidateScoped(...keys: string[]): Promise<void> {
+  const scope = getCacheScopeFromToken(await getAuthToken());
+  keys.forEach((key) => invalidateCache(`${scope}:${key}`));
+}
+
+async function invalidateScopedByPrefix(prefix: string): Promise<void> {
+  const scope = getCacheScopeFromToken(await getAuthToken());
+  invalidateCacheByPrefix(`${scope}:${prefix}`);
 }
 
 /**
@@ -633,15 +666,17 @@ export const lessonAPI = {
     });
 
     // Invalidate all relevant caches so dashboard reflects new progress
-    invalidateCache('lessons:all');
-    invalidateCache('lessons:dashboard');
-    invalidateCache(`lessons:detail:${data.lessonId}`);
-    invalidateCache('lessons:stats');
-    invalidateCache('lessons:progress');
-    invalidateCache('lessons:sections:normal');
-    invalidateCache('lessons:sections:coding');
-    invalidateCache('lessons:sections:assessment');
-    invalidateCacheByPrefix('lessons:section:');
+    await invalidateScoped(
+      'lessons:all',
+      'lessons:dashboard',
+      `lessons:detail:${data.lessonId}`,
+      'lessons:stats',
+      'lessons:progress',
+      'lessons:sections:normal',
+      'lessons:sections:coding',
+      'lessons:sections:assessment'
+    );
+    await invalidateScopedByPrefix('lessons:section:');
 
     return response;
   },
@@ -791,9 +826,7 @@ export const achievementAPI = {
       method: 'POST',
     });
 
-    invalidateCache('achievements:all');
-    invalidateCache('achievements:stats');
-    invalidateCache('achievements:progress');
+    await invalidateScoped('achievements:all', 'achievements:stats', 'achievements:progress');
 
     return response;
   },
