@@ -5,6 +5,7 @@
 
 import express from 'express';
 import request from 'supertest';
+import { Prisma } from '@prisma/client';
 import authRoutes from '../routes/auth.routes';
 import userRoutes from '../routes/user.routes';
 import { errorHandler } from '../middleware/error-handler';
@@ -156,6 +157,57 @@ describe('Auth Token Integration', () => {
         .expect(400);
 
       expect(response.body.error).toBeDefined();
+    });
+
+    // Regression: when a concurrent registration for the same email/username
+    // wins the race, the DB unique constraint (P2002) used to surface as an
+    // unhandled 500 instead of a conflict.
+    it('should return 409 when the email unique constraint is violated by a concurrent registration', async () => {
+      const p2002 = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed on the fields: (`email`)',
+        { code: 'P2002', clientVersion: 'test', meta: { target: ['email'] } }
+      );
+      (prisma.user.findFirst as any) = jest.fn().mockResolvedValue(null);
+      (prisma.user.create as any) = jest.fn().mockRejectedValue(p2002);
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: 'race@example.com',
+          username: 'race_user',
+          password: 'Password1',
+        })
+        .expect(409);
+
+      expect(response.body.error).toBe('Email already registered');
+
+      (prisma.user.create as any) = jest.fn().mockImplementation((args: any) => {
+        return Promise.resolve({ id: 'new-id', ...args.data });
+      });
+    });
+
+    it('should return 409 when the username unique constraint is violated', async () => {
+      const p2002 = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed on the fields: (`username`)',
+        { code: 'P2002', clientVersion: 'test', meta: { target: ['username'] } }
+      );
+      (prisma.user.findFirst as any) = jest.fn().mockResolvedValue(null);
+      (prisma.user.create as any) = jest.fn().mockRejectedValue(p2002);
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: 'race@example.com',
+          username: 'race_user',
+          password: 'Password1',
+        })
+        .expect(409);
+
+      expect(response.body.error).toBe('Username already taken');
+
+      (prisma.user.create as any) = jest.fn().mockImplementation((args: any) => {
+        return Promise.resolve({ id: 'new-id', ...args.data });
+      });
     });
   });
 
