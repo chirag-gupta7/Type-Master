@@ -201,6 +201,8 @@ enum GameType {
   WORD_BLITZ
   ACCURACY_CHALLENGE
   SPEED_RACE
+  PROMPT_DASH
+  STORY_CHAIN
 }
 
 model GameScore {

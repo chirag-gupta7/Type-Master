@@ -484,18 +484,23 @@ function LearnPageContent() {
                       {selectedSectionPage.lessons.map((lesson) => {
                         const isSelected = lesson.id === selectedLessonId;
                         const accuracy = lesson.userProgress[0]?.bestAccuracy;
-                        return (
-                          <Link
-                            key={lesson.id}
-                            href={lesson.isUnlocked ? `/learn/${lesson.id}` : '#'}
-                            className={`rounded-lg border p-4 transition-all ${
-                              lesson.isUnlocked
-                                ? 'hover:border-primary/40'
-                                : 'cursor-not-allowed opacity-60'
-                            } ${isSelected ? 'ring-1 ring-primary border-primary' : ''}`}
-                            onMouseEnter={() => setSelectedLessonId(lesson.id)}
-                            onFocus={() => setSelectedLessonId(lesson.id)}
-                          >
+                        const cardClasses = `rounded-lg border p-4 transition-all ${
+                          lesson.isUnlocked
+                            ? 'hover:border-primary/40'
+                            : 'cursor-not-allowed opacity-60'
+                        } ${isSelected ? 'ring-1 ring-primary border-primary' : ''}`;
+                        const interactionHandlers = lesson.isUnlocked
+                          ? {}
+                          : {
+                              onMouseEnter: () => setSelectedLessonId(lesson.id),
+                              onFocus: () => setSelectedLessonId(lesson.id),
+                            };
+
+                        // Unlocked lessons are links; locked ones stay focusable
+                        // for preview but are not anchors, so activating them
+                        // never navigates (previously they linked to '#').
+                        const card = (
+                          <>
                             <div className="mb-2 flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-xs text-muted-foreground">
@@ -533,6 +538,26 @@ function LearnPageContent() {
                                 Best accuracy: {accuracy.toFixed(1)}%
                               </p>
                             )}
+                          </>
+                        );
+
+                        if (!lesson.isUnlocked) {
+                          return (
+                            <div
+                              key={lesson.id}
+                              className={cardClasses}
+                              aria-disabled="true"
+                              tabIndex={0}
+                              {...interactionHandlers}
+                            >
+                              {card}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Link key={lesson.id} href={`/learn/${lesson.id}`} className={cardClasses}>
+                            {card}
                           </Link>
                         );
                       })}

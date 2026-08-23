@@ -80,16 +80,3 @@ export const saveFallbackLessonProgress = (
 
   writeToStorage(progress);
 };
-
-export const clearFallbackProgress = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.dispatchEvent(new Event('typemaster:fallback-progress-updated'));
-  } catch (error) {
-    console.error('Failed to clear fallback progress:', error);
-  }
-};

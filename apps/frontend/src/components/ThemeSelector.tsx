@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Palette, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useThemeStore, THEME_PRESETS, type ThemeColors } from '@/store/theme';
+import { useThemeStore, THEME_PRESETS, type ThemeColors, parseStoredTheme } from '@/store/theme';
 import { cn } from '@/lib/utils';
 
 export function ThemeSelector() {
@@ -13,27 +13,10 @@ export function ThemeSelector() {
 
   // Apply theme on mount and load from localStorage
   useEffect(() => {
-    // Try to load saved theme from localStorage
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('typemaster-theme');
-      if (saved) {
-        try {
-          const theme = JSON.parse(saved);
-          if (
-            theme &&
-            typeof theme === 'object' &&
-            'name' in theme &&
-            'primary' in theme &&
-            'secondary' in theme &&
-            'accent' in theme
-          ) {
-            setTheme(theme as ThemeColors);
-          } else {
-            applyTheme();
-          }
-        } catch {
-          applyTheme();
-        }
+      const theme = parseStoredTheme(localStorage.getItem('typemaster-theme'));
+      if (theme) {
+        setTheme(theme);
       } else {
         applyTheme();
       }

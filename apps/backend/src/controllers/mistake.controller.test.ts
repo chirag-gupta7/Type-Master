@@ -1,4 +1,5 @@
 import { logMistakes, getWeakKeyAnalysis, generatePracticeText } from './mistake.controller';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -123,6 +124,50 @@ describe('MistakeController', () => {
       expect(statusMock).toHaveBeenCalledWith(500);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Failed to log mistakes' });
     });
+
+    // Regression: malformed payloads used to fall through to the generic 500
+    // handler instead of being reported as client errors.
+    it('should return 400 when the payload fails validation', async () => {
+      mockRequest.body = {
+        lessonId: 'not-a-uuid',
+        mistakes: [{ keyPressed: 'a', keyExpected: 's' }],
+      };
+
+      await logMistakes(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
+    });
+
+    it('should return 400 when the mistakes array is missing', async () => {
+      mockRequest.body = { lessonId: '6b6c7b95-ef1b-4b1d-84e0-798df673ea14' };
+
+      await logMistakes(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
+    // Regression: a nonexistent lessonId used to surface as an unhandled Prisma
+    // foreign-key error and return 500; it is a client/data error (404).
+    it('should return 404 when the lesson does not exist (foreign key violation)', async () => {
+      mockRequest.body = {
+        lessonId: '6b6c7b95-ef1b-4b1d-84e0-798df673ea14',
+        mistakes: [{ keyPressed: 'a', keyExpected: 's', fingerUsed: 'index-left' }],
+      };
+
+      const fkError = new Prisma.PrismaClientKnownRequestError(
+        'Foreign key constraint failed on the field: `lessonId`',
+        { code: 'P2003', clientVersion: 'test' }
+      );
+      (prisma.typingMistake.createMany as jest.Mock).mockRejectedValue(fkError);
+
+      await logMistakes(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(404);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Lesson not found' });
+    });
   });
 
   describe('getWeakKeyAnalysis', () => {
@@ -216,6 +261,36 @@ describe('MistakeController', () => {
           recentMistakes: [],
           analysis: 'Excellent work! No significant weak keys detected.',
         })
+      );
+    });
+
+    // Regression: the limit query param used to be passed through unbounded,
+    // so a single request could force an arbitrarily large read.
+    it('should clamp the limit query param to at most 100', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: '999999' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 100 })
+      );
+    });
+
+    it('should fall back to 10 when limit is not a number', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: 'abc' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 10 })
       );
     });
 

@@ -22,6 +22,21 @@ const createTestResultSchema = z.object({
 });
 
 /**
+ * Parse an integer query param.
+ * - undefined when the param is absent (no filter)
+ * - null when present but not a valid integer (callers reject with 400
+ *   instead of passing NaN into Prisma, which results in an unhandled 500)
+ * - the parsed number otherwise
+ */
+const parseIntQueryParam = (value: unknown): number | null | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+/**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
  * @access  Private
@@ -79,9 +94,14 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
     const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
+    const parsedDuration = parseIntQueryParam(duration);
+    if (parsedDuration === null) {
+      throw new AppError(400, 'duration must be an integer');
+    }
+
     const where = {
       userId: req.user.userId,
-      ...(duration && { duration: parseInt(duration as string, 10) }),
+      ...(parsedDuration !== undefined && { duration: parsedDuration }),
     };
 
     const [tests, total] = await Promise.all([
@@ -161,14 +181,22 @@ export const getUserStats = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const { duration, days = '30' } = req.query;
-    const daysNum = Math.max(parseInt(days as string, 10) || 30, 1);
+    const parsedDuration = parseIntQueryParam(duration);
+    if (parsedDuration === null) {
+      throw new AppError(400, 'duration must be an integer');
+    }
+    const parsedDays = parseIntQueryParam(days);
+    if (parsedDays === null) {
+      throw new AppError(400, 'days must be an integer');
+    }
+    const daysNum = Math.max(parsedDays ?? 30, 1);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
     const where = {
       userId: req.user.userId,
       createdAt: { gte: startDate },
-      ...(duration && { duration: parseInt(duration as string, 10) }),
+      ...(parsedDuration !== undefined && { duration: parsedDuration }),
     };
 
     // Optimization: Offload statistical calculations to the database using Prisma's 'aggregate'.

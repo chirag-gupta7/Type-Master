@@ -78,15 +78,7 @@ export default function KeyboardDemoPage() {
 
       // Move to next character if correct
       if (correct) {
-        setCurrentIndex((prev) => {
-          const nextIndex = prev + 1;
-          if (nextIndex >= currentPhrase.length) {
-            setTimeout(() => {
-              nextPhrase();
-            }, 800);
-          }
-          return nextIndex;
-        });
+        setCurrentIndex((prev) => prev + 1);
         setFeedback(null);
       }
       // Track mistakes when incorrect
@@ -107,6 +99,20 @@ export default function KeyboardDemoPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentPhrase, targetChar, nextPhrase, normalizeKey]);
+
+  // Advance to the next phrase shortly after the current one is finished.
+  // Scheduled in an effect (not inside the setState updater) so StrictMode's
+  // double-invoked updaters and extra keystrokes can't stack transitions.
+  useEffect(() => {
+    if (!currentPhrase || currentPhrase.length === 0) return undefined;
+    if (currentIndex >= currentPhrase.length) {
+      const timer = setTimeout(() => {
+        nextPhrase();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [currentIndex, currentPhrase, nextPhrase]);
 
   const resetDemo = useCallback(() => {
     setCurrentIndex(0);

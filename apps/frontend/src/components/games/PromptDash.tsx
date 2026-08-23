@@ -14,6 +14,13 @@ const FALLBACK_PROMPTS = [
   'A time traveler arrived, but their machine was broken.',
 ];
 
+/**
+ * Live WPM readout: (characters / 5) per minute of elapsed time.
+ * Returns 0 during the first second instead of Infinity.
+ */
+export const computeLiveWpm = (charCount: number, secondsElapsed: number): number =>
+  secondsElapsed > 0 ? Math.round(charCount / 5 / (secondsElapsed / 60)) : 0;
+
 export function PromptDash() {
   const [gameState, setGameState] = useState<'idle' | 'running' | 'finished'>('idle');
   const [prompt, setPrompt] = useState('');
@@ -203,7 +210,7 @@ export function PromptDash() {
               <span>{timer}s</span>
             </div>
             <div className="text-xl font-bold">
-              WPM: {Math.round(text.length / 5 / ((60 - timer) / 60) || 0)}
+              WPM: {computeLiveWpm(text.length, 60 - timer)}
             </div>
           </div>
           <p className="text-lg text-muted-foreground italic mb-4 p-4 bg-background/50 rounded-md w-full text-center">

@@ -185,4 +185,24 @@ mockRequest = {
 
     expect(mockNext).toHaveBeenCalledWith(error);
   });
+
+  // Regression: non-numeric duration/days used to be passed into Prisma as
+  // NaN, producing an unhandled 500 instead of a client error.
+  it('should reject a non-numeric duration with 400', async () => {
+    mockRequest.query = { duration: 'abc', days: '30' };
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('should reject a non-numeric days parameter with 400', async () => {
+    mockRequest.query = { days: 'xyz' };
+
+    await getUserStats(mockRequest as any, mockResponse as any, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.aggregate).not.toHaveBeenCalled();
+  });
 });

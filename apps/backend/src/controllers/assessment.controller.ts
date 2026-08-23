@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
@@ -66,6 +66,9 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
       minAccuracy: assessmentLesson.minAccuracy,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ error: 'Invalid input data', details: error.errors });
+    }
     logger.error('Error starting assessment:', error);
     return res.status(500).json({ error: 'Failed to start assessment' });
   }
@@ -229,6 +232,9 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
       feedback: generateFeedback(wpm, accuracy),
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ error: 'Invalid input data', details: error.errors });
+    }
     logger.error('Error completing assessment:', error);
     return res.status(500).json({ error: 'Failed to complete assessment' });
   }

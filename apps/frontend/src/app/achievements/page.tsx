@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Trophy, Award, Lock, Sparkles, TrendingUp, Target } from 'lucide-react';
 import { achievementAPI } from '@/lib/api';
@@ -27,7 +28,9 @@ const AchievementsPage: React.FC = () => {
   const [recentUnlocks, setRecentUnlocks] = useState<UnlockedAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated] = useState(() =>
+    typeof window !== 'undefined' ? authAPI.isAuthenticated() : false
+  );
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
   const [currentUnlock, setCurrentUnlock] = useState<UnlockedAchievement | null>(null);
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
@@ -35,11 +38,8 @@ const AchievementsPage: React.FC = () => {
   // Get progress tracking for locked achievements
   const { progress: achievementProgress } = useAchievementProgress();
 
-  // Check authentication status
-  useEffect(() => {
-    setIsAuthenticated(authAPI.isAuthenticated());
-  }, []);
-
+  // Check authentication status (lazy initializer avoids a state flip that
+  // would re-run the fetch effect below and double-fetch on mount)
   // Fetch achievements
   useEffect(() => {
     const fetchAchievements = async () => {
@@ -329,7 +329,9 @@ const AchievementsPage: React.FC = () => {
               Create an account or sign in to unlock achievements, earn points, and track your
               typing progress!
             </p>
-            <Button className="gap-2">Get Started</Button>
+            <Link href="/register" className="inline-block">
+              <Button className="gap-2">Get Started</Button>
+            </Link>
           </motion.div>
         )}
       </div>

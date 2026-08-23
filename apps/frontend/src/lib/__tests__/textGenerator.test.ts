@@ -76,5 +76,23 @@ describe('Text Generator', () => {
 
       expect(text).not.toContain('  ');
     });
+
+    // Regression: with a category/difficulty filter whose sentence pool holds
+    // fewer words than the target, the generator used to loop forever (the
+    // uniqueness check rejected every duplicate draw and wordCount never
+    // advanced), freezing the browser tab.
+    it('should terminate and return text when the filtered pool is smaller than the target', () => {
+      const text = generateTestText(180, 'tech', 'easy');
+
+      expect(text.length).toBeGreaterThan(0);
+      const words = text.split(' ');
+      expect(words.length).toBeGreaterThanOrEqual(440);
+      expect(words.length).toBeLessThanOrEqual(660);
+    });
+
+    it('should terminate for other small filtered pools', () => {
+      expect(generateTestText(60, 'general', 'easy').length).toBeGreaterThan(0);
+      expect(generateTestText(30, 'science', 'hard').length).toBeGreaterThan(0);
+    });
   });
 });

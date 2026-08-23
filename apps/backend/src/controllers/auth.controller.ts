@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
@@ -184,20 +185,39 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        createdAt: true,
-      },
-    });
+    // Create user. A concurrent registration for the same email/username can
+    // pass the findFirst check above and then violate the DB unique
+    // constraint (P2002); report it as a conflict instead of a 500.
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          email,
+          username,
+          password: hashedPassword,
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          createdAt: true,
+        },
+      });
+    } catch (dbError) {
+      if (
+        dbError instanceof Prisma.PrismaClientKnownRequestError &&
+        dbError.code === 'P2002'
+      ) {
+        const target = Array.isArray(dbError.meta?.target)
+          ? (dbError.meta.target as string[])
+          : [];
+        if (target.includes('username')) {
+          throw new AppError(409, 'Username already taken');
+        }
+        throw new AppError(409, 'Email already registered');
+      }
+      throw dbError;
+    }
 
     // Generate tokens
     const accessToken = generateAccessToken(user.id, user.email);

@@ -12,6 +12,12 @@ interface LessonResult {
 interface UserStats {
   lessonsCompleted?: number;
   sectionsCompleted?: number[];
+  /**
+   * Sections that became fully completed by the lesson result currently being
+   * checked. Milestones fire only for these, not merely because a section
+   * appears in sectionsCompleted.
+   */
+  newlyCompletedSections?: number[];
 }
 
 interface Achievement {
@@ -146,17 +152,17 @@ export function useAchievementChecker() {
           });
         }
 
-        // Section completion
-        const sectionsCompleted = userStats.sectionsCompleted || [];
-        if (sectionsCompleted.length > 0) {
-          const lastSection = sectionsCompleted[sectionsCompleted.length - 1];
+        // Section completion: celebrate only sections that were just finished
+        // by this result, otherwise the milestone would re-fire on every save.
+        const newlyCompletedSections = userStats.newlyCompletedSections || [];
+        newlyCompletedSections.forEach((sectionId) => {
           showMilestone({
             type: 'section_complete',
-            count: lastSection,
-            title: `Section ${lastSection} Complete!`,
-            message: `Congratulations on completing Section ${lastSection}!`,
+            count: sectionId,
+            title: `Section ${sectionId} Complete!`,
+            message: `Congratulations on completing Section ${sectionId}!`,
           });
-        }
+        });
       }
     },
     [showAchievement, showMilestone]

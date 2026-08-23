@@ -70,6 +70,22 @@ const isJwtExpired = (token: string, skewSeconds = 30): boolean => {
   return payload.exp - skewSeconds <= now;
 };
 
+/**
+ * Derive the cache namespace for a backend JWT. Cached responses are stored
+ * per-user so data fetched while signed in as one account can never be served
+ * to another account (or to guests) within the same browser tab/session.
+ */
+export const getCacheScopeFromToken = (token: string | null): string => {
+  if (!token) {
+    return 'guest';
+  }
+  const payload = decodeJwtPayload(token);
+  if (payload && typeof payload.userId === 'string' && payload.userId.length > 0) {
+    return `user:${payload.userId}`;
+  }
+  return 'guest';
+};
+
 const persistBackendToken = (token?: string | null) => {
   const cleaned = sanitizeToken(token);
   if (typeof window === 'undefined' || !cleaned) {
@@ -118,7 +134,7 @@ const getAuthToken = async (): Promise<string | null> => {
  */ /**
  * Generic fetch wrapper with error handling
  */
-async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+export async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { cacheKey, cacheTtl, skipCache, ...requestInit } = options;
 
   const token = await getAuthToken();
@@ -133,7 +149,9 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   const method = (requestInit.method || 'GET').toUpperCase();
-  const effectiveCacheKey = method === 'GET' && !skipCache ? (cacheKey ?? endpoint) : undefined;
+  const scope = getCacheScopeFromToken(token);
+  const effectiveCacheKey =
+    method === 'GET' && !skipCache ? `${scope}:${cacheKey ?? endpoint}` : undefined;
 
   if (effectiveCacheKey) {
     const cached = getCache<T>(effectiveCacheKey);
@@ -163,6 +181,21 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   return data;
+}
+
+/**
+ * Invalidate cached entries for the currently authenticated user's scope.
+ * Keys must be scoped identically to how fetchAPI stores them, otherwise
+ * stale data would survive a mutation.
+ */
+async function invalidateScoped(...keys: string[]): Promise<void> {
+  const scope = getCacheScopeFromToken(await getAuthToken());
+  keys.forEach((key) => invalidateCache(`${scope}:${key}`));
+}
+
+async function invalidateScopedByPrefix(prefix: string): Promise<void> {
+  const scope = getCacheScopeFromToken(await getAuthToken());
+  invalidateCacheByPrefix(`${scope}:${prefix}`);
 }
 
 /**
@@ -261,23 +294,6 @@ export const authAPI = {
  * Test API
  */
 export const testAPI = {
-  /**
-   * Fetch a new test paragraph
-   * Note: This endpoint doesn't exist in the backend yet
-   * For now, we'll use a client-side text generator
-   */
-  getTest: async (duration: 30 | 60 | 180): Promise<{ text: string }> => {
-    // TODO: Replace with actual API call when backend endpoint is ready
-    // For now, return sample text based on duration
-    const sampleTexts = {
-      30: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world.',
-      60: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world. Programming requires patience and practice. Every developer faces challenges daily. Learning never stops in this field. Code quality matters for maintainability.',
-      180: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world. Programming requires patience and practice. Every developer faces challenges daily. Learning never stops in this field. Code quality matters for maintainability. Software engineering combines creativity with logic. Debugging teaches valuable problem-solving skills. Collaboration makes teams stronger and more efficient. Open source projects benefit the entire community. Testing ensures reliability and prevents bugs. Documentation helps others understand your work. Version control tracks changes over time. Continuous learning keeps skills sharp and relevant.',
-    };
-
-    return Promise.resolve({ text: sampleTexts[duration] });
-  },
-
   /**
    * Save test result to backend
    */
@@ -633,15 +649,17 @@ export const lessonAPI = {
     });
 
     // Invalidate all relevant caches so dashboard reflects new progress
-    invalidateCache('lessons:all');
-    invalidateCache('lessons:dashboard');
-    invalidateCache(`lessons:detail:${data.lessonId}`);
-    invalidateCache('lessons:stats');
-    invalidateCache('lessons:progress');
-    invalidateCache('lessons:sections:normal');
-    invalidateCache('lessons:sections:coding');
-    invalidateCache('lessons:sections:assessment');
-    invalidateCacheByPrefix('lessons:section:');
+    await invalidateScoped(
+      'lessons:all',
+      'lessons:dashboard',
+      `lessons:detail:${data.lessonId}`,
+      'lessons:stats',
+      'lessons:progress',
+      'lessons:sections:normal',
+      'lessons:sections:coding',
+      'lessons:sections:assessment'
+    );
+    await invalidateScopedByPrefix('lessons:section:');
 
     return response;
   },
@@ -791,9 +809,7 @@ export const achievementAPI = {
       method: 'POST',
     });
 
-    invalidateCache('achievements:all');
-    invalidateCache('achievements:stats');
-    invalidateCache('achievements:progress');
+    await invalidateScoped('achievements:all', 'achievements:stats', 'achievements:progress');
 
     return response;
   },
@@ -900,7 +916,7 @@ export const gameAPI = {
           avgScore: number;
         }>;
       };
-    }>('/games/stats', { cacheKey: 'games:stats', cacheTtl: 60 });
+    }>('/games/stats', { cacheKey: 'games:stats', cacheTtl: 60 * 1000 });
   },
 
   getLeaderboard: async (gameType: 'WORD_BLITZ' | 'PROMPT_DASH' | 'STORY_CHAIN') => {
@@ -921,7 +937,7 @@ export const gameAPI = {
         }>;
         total: number;
       };
-    }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 });
+    }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 * 1000 });
   },
 };
 
@@ -965,6 +981,3 @@ export const aiAPI = {
     });
   },
 };
-
-// Named export for convenience
-export const getTest = testAPI.getTest;
