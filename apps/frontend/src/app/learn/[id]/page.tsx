@@ -19,6 +19,7 @@ import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
 import { achievementAPI, lessonAPI, mistakeAPI } from '@/lib/api';
+import { isSectionComplete } from '@/lib/sectionCompletion';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
 
@@ -418,7 +419,39 @@ export default function LessonPracticePage() {
         meetsRequirements: completed,
       });
 
-      // Check for achievements (client UI) and persist on backend
+      let newlyCompletedSections: number[] = [];
+
+      // Save to backend when online/authenticated; fallback mode keeps local storage only
+      if (!isFallback) {
+        await lessonAPI.saveLessonProgress({
+          lessonId: lesson.id,
+          wpm,
+          accuracy,
+          completed,
+        });
+        console.log('[Lesson] Progress saved successfully');
+
+        // Determine whether this result finished the entire section, using the
+        // freshly-invalidated lessons cache so the milestone is truthful.
+        try {
+          const { lessons } = await lessonAPI.getAllLessons();
+          if (isSectionComplete(lessons, lesson.section, lesson.id)) {
+            newlyCompletedSections = [lesson.section];
+          }
+        } catch (statsErr) {
+          console.warn('[Lesson] Could not verify section completion', statsErr);
+        }
+
+        try {
+          await achievementAPI.checkAchievements();
+        } catch (achievementErr) {
+          console.warn('[Lesson] Achievement check failed', achievementErr);
+        }
+      } else {
+        console.log('[Lesson] Fallback mode - progress saved to localStorage');
+      }
+
+      // Check for achievements (client UI) now that results are persisted
       await checkAchievements(
         {
           wpm,
@@ -427,29 +460,8 @@ export default function LessonPracticePage() {
           completed,
           stars,
         },
-        userStats
+        { ...userStats, newlyCompletedSections }
       );
-
-      if (!isFallback && userId) {
-        try {
-          await achievementAPI.checkAchievements();
-        } catch (achievementErr) {
-          console.warn('[Lesson] Achievement check failed', achievementErr);
-        }
-      }
-
-      // Save to backend when online/authenticated; fallback mode keeps local storage only
-      if (!isFallback) {
-        const response = await lessonAPI.saveLessonProgress({
-          lessonId: lesson.id,
-          wpm,
-          accuracy,
-          completed,
-        });
-        console.log('[Lesson] Progress saved successfully:', response);
-      } else {
-        console.log('[Lesson] Fallback mode - progress saved to localStorage');
-      }
 
       // Update user stats for next achievement check
       if (completed) {
