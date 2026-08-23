@@ -7,6 +7,7 @@ import { Navbar } from '@/components/Navbar';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { ThemeApplicator } from '@/components/ThemeApplicator';
 import { PageLoadingIndicator } from '@/components/PageLoadingIndicator';
+import { Toaster } from '@/components/ui/toaster';
 import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Suspense>
             <ThemeSelector />
             <main id="main-content">{children}</main>
+            <Toaster />
           </AchievementProvider>
         </Providers>
       </body>
