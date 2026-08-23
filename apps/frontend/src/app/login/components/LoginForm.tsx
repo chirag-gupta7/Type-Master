@@ -113,24 +113,12 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 font-semibold transition-colors hover:bg-muted"
-        >
-          Continue with Google
-        </button>
-      </div>
-
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{' '}
         <Link href="/register" className="text-[var(--theme-primary)] hover:underline">
           Create one
         </Link>
       </p>
-
-      <p className="mt-3 text-xs text-muted-foreground">Redirecting to: {callbackUrl}</p>
     </>
   );
 }
