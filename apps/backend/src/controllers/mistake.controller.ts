@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
+import { Prisma } from '@prisma/client';
+import { z, ZodError } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
@@ -87,6 +88,18 @@ export const logMistakes = async (req: AuthRequest, res: Response): Promise<void
       count: (mistakeRecords as { count: number }).count,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      res.status(400).json({ error: 'Invalid input data', details: error.errors });
+      return;
+    }
+    // A foreign key constraint violation means the lessonId does not exist.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2003'
+    ) {
+      res.status(404).json({ error: 'Lesson not found' });
+      return;
+    }
     logger.error('Error logging mistakes:', error);
     res.status(500).json({ error: 'Failed to log mistakes' });
   }

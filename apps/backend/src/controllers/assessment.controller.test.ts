@@ -155,6 +155,25 @@ describe('AssessmentController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Forbidden' });
     });
 
+    // Regression: invalid payloads used to fall through to the generic 500
+    // handler instead of being reported as client errors.
+    it('should return 400 when the payload fails validation', async () => {
+      mockRequest.body = { wpm: 'not-a-number' };
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
+    });
+
+    it('should return 400 when accuracy exceeds 100', async () => {
+      mockRequest.body.accuracy = 150;
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
     it('should successfully complete assessment with BEGINNER level and no lesson unlocking', async () => {
       mockRequest.body.wpm = 20;
       mockRequest.body.accuracy = 90;
