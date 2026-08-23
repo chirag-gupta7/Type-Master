@@ -8,13 +8,18 @@ const startAssessmentSchema = z.object({
   userId: z.string().optional(),
 });
 
+// SECURITY: Enforce strict bounds and size limits to prevent out-of-bounds metric injection,
+// payload exhaustion, and DoS attacks via memory/JSON overhead.
 const completeAssessmentSchema = z.object({
   userId: z.string().optional(),
-  wpm: z.number().min(0),
-  accuracy: z.number().min(0).max(100),
-  mistakesByKey: z.record(z.number()),
-  weakFingers: z.array(z.string()),
-  timeSpent: z.number().min(0),
+  wpm: z.number().min(0, 'WPM must be non-negative').max(300, 'WPM exceeds maximum limit'),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100'),
+  mistakesByKey: z.record(
+    z.string().max(10, 'Key name too long'),
+    z.number().min(0, 'Mistake count must be non-negative').max(10000, 'Mistake count too high')
+  ),
+  weakFingers: z.array(z.string().max(50, 'Finger name too long')).max(20, 'Too many weak fingers specified'),
+  timeSpent: z.number().min(0, 'Time spent must be non-negative').max(86400, 'Time spent exceeds maximum limit'),
 });
 
 /**

@@ -174,6 +174,27 @@ describe('AssessmentController', () => {
       expect(statusMock).toHaveBeenCalledWith(400);
     });
 
+    it('should return 400 when wpm exceeds maximum limit', async () => {
+      mockRequest.body.wpm = 350;
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 when timeSpent exceeds maximum limit', async () => {
+      mockRequest.body.timeSpent = 100000;
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 when weakFingers exceeds maximum array length', async () => {
+      mockRequest.body.weakFingers = Array(25).fill('finger');
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
     it('should successfully complete assessment with BEGINNER level and no lesson unlocking', async () => {
       mockRequest.body.wpm = 20;
       mockRequest.body.accuracy = 90;
