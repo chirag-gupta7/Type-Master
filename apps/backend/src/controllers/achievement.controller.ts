@@ -326,6 +326,11 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
     const metrics = await fetchUserMetrics(userId);
 
     const progress = {
+      // First achievements
+      firstSteps: Math.min((metrics.testCount / 1) * 100, 100),
+      firstLesson: Math.min((metrics.completedLessonsCount / 1) * 100, 100),
+      perfectionist: metrics.hasPerfectAccuracy ? 100 : 0,
+
       // Consistency achievements
       dedicated: Math.min((metrics.testCount / 10) * 100, 100),
       committed: Math.min((metrics.testCount / 50) * 100, 100),

@@ -186,6 +186,12 @@ describe('AchievementController', () => {
         expect.objectContaining({
           progress: expect.objectContaining({
             dedicated: 50,
+            // Regression: firstSteps/firstLesson/perfectionist used to be
+            // missing from this payload, so the achievements page always
+            // showed 0% progress for those achievements.
+            firstSteps: 100,
+            firstLesson: 100,
+            perfectionist: 0,
           }),
           stats: expect.objectContaining({
             testCount: 5,
