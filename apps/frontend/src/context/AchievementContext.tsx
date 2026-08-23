@@ -77,6 +77,15 @@ export function AchievementProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Stable callbacks: AchievementToast restarts its auto-dismiss timer when
+  // its onClose prop identity changes, so inline arrows here made the toast
+  // linger whenever the provider re-rendered.
+  const closeToast = useCallback(() => setToastAchievement(null), []);
+  const closeMilestone = useCallback(() => {
+    setShowMilestoneModal(false);
+    setCurrentMilestone(null);
+  }, []);
+
   return (
     <AchievementContext.Provider
       value={{
@@ -95,16 +104,13 @@ export function AchievementProvider({ children }: { children: ReactNode }) {
       />
 
       {/* Achievement Toast */}
-      <AchievementToast achievement={toastAchievement} onClose={() => setToastAchievement(null)} />
+      <AchievementToast achievement={toastAchievement} onClose={closeToast} />
 
       {/* Milestone Celebration */}
       <MilestoneCelebration
         isOpen={showMilestoneModal}
         milestone={currentMilestone}
-        onClose={() => {
-          setShowMilestoneModal(false);
-          setCurrentMilestone(null);
-        }}
+        onClose={closeMilestone}
       />
     </AchievementContext.Provider>
   );
