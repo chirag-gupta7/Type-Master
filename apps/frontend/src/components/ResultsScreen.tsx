@@ -114,9 +114,6 @@ export default function ResultsScreen({
   const safeDuration = Math.max(duration, 1);
   const rawWpm = Math.round(((correctChars + incorrectChars) / 5 / safeDuration) * 60);
 
-  // Determine if it's a personal best (mock for now)
-  const isPersonalBest = wpm > 100; // TODO: Compare with actual user history
-
   // State for showing detailed analysis
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
 
@@ -184,16 +181,9 @@ export default function ResultsScreen({
       transition={{ duration: 0.5, type: 'spring' }}
       className="w-full max-w-4xl mx-auto"
     >
-      {/* Personal Best Banner */}
-      {isPersonalBest && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/50 rounded-xl text-center"
-        >
-          <p className="text-xl font-bold text-yellow-400">🎉 New Personal Best!</p>
-        </motion.div>
-      )}
+      {/* Personal Best Banner: intentionally not shown yet - a real personal
+          best requires comparing against the user's saved history, and
+          claiming one based on an arbitrary WPM threshold was misleading. */}
 
       {/* Main Stats Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
