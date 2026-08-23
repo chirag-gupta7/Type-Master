@@ -30,7 +30,13 @@ describe('GameController - saveGameScore', () => {
     };
     mockRequest = {
       userId: 'user-123',
-      body: {},
+      body: {
+        gameType: GameType.WORD_BLITZ,
+        score: 250,
+        wpm: 65,
+        accuracy: 95,
+        duration: 60,
+      },
     };
     jest.clearAllMocks();
   });
@@ -44,75 +50,21 @@ describe('GameController - saveGameScore', () => {
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
   });
 
-  it('should return 400 validation error if payload is invalid (missing gameType)', async () => {
-    mockRequest.body = { score: 100 };
-
-    await saveGameScore(mockRequest as Request, mockResponse as Response);
-
-    expect(statusMock).toHaveBeenCalledWith(400);
-    expect(jsonMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: 'Validation error',
-      })
-    );
-  });
-
-  it('should return 400 validation error if score is out of bounds (negative)', async () => {
-    mockRequest.body = {
-      gameType: GameType.WORD_BLITZ,
-      score: -10,
-    };
-
-    await saveGameScore(mockRequest as Request, mockResponse as Response);
-
-    expect(statusMock).toHaveBeenCalledWith(400);
-    expect(jsonMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: 'Validation error',
-      })
-    );
-  });
-
-  it('should return 400 validation error if WPM exceeds maximum allowed limit', async () => {
-    mockRequest.body = {
-      gameType: GameType.WORD_BLITZ,
-      score: 500,
-      wpm: 500, // exceeds max 300
-    };
-
-    await saveGameScore(mockRequest as Request, mockResponse as Response);
-
-    expect(statusMock).toHaveBeenCalledWith(400);
-    expect(jsonMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: 'Validation error',
-      })
-    );
-  });
-
-  it('should successfully save game score when payload is valid', async () => {
-    mockRequest.body = {
-      gameType: GameType.WORD_BLITZ,
-      score: 450,
-      wpm: 85,
-      accuracy: 98,
-      duration: 60,
-    };
-
-    const mockSavedScore = {
+  it('should successfully save game score with valid input', async () => {
+    const mockCreatedScore = {
       id: 'score-1',
       userId: 'user-123',
       gameType: GameType.WORD_BLITZ,
-      score: 450,
-      wpm: 85,
-      accuracy: 98,
+      score: 250,
+      wpm: 65,
+      accuracy: 95,
       duration: 60,
       metadata: null,
       createdAt: new Date(),
-      user: { id: 'user-123', username: 'TestUser' },
+      user: { id: 'user-123', username: 'PlayerOne' },
     };
 
-    (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockSavedScore);
+    (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockCreatedScore);
 
     await saveGameScore(mockRequest as Request, mockResponse as Response);
 
@@ -120,9 +72,9 @@ describe('GameController - saveGameScore', () => {
       data: {
         userId: 'user-123',
         gameType: GameType.WORD_BLITZ,
-        score: 450,
-        wpm: 85,
-        accuracy: 98,
+        score: 250,
+        wpm: 65,
+        accuracy: 95,
         duration: 60,
         metadata: null,
       },
@@ -140,10 +92,68 @@ describe('GameController - saveGameScore', () => {
     expect(jsonMock).toHaveBeenCalledWith({
       success: true,
       data: {
-        ...mockSavedScore,
+        ...mockCreatedScore,
         metadata: null,
       },
     });
+  });
+
+  it('should return 400 for invalid gameType', async () => {
+    mockRequest.body = {
+      gameType: 'INVALID_GAME',
+      score: 100,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid game type' });
+  });
+
+  it('should return 400 for negative score or score exceeding maximum limit', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: -10,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid score value' });
+
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 2000000,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Score exceeds maximum limit' });
+  });
+
+  it('should return 400 for out-of-bounds WPM or accuracy', async () => {
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 100,
+      wpm: 500,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'WPM exceeds maximum limit' });
+
+    mockRequest.body = {
+      gameType: GameType.WORD_BLITZ,
+      score: 100,
+      accuracy: 150,
+    };
+
+    await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ error: 'Accuracy cannot exceed 100' });
   });
 });
 

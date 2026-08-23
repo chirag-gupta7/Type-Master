@@ -8,15 +8,17 @@ interface AuthRequest extends Request {
   userId?: string;
 }
 
-// Security enhancement: Enforce strict Zod validation schema for game score submissions.
-// Prevents score spoofing, out-of-bounds metrics (e.g., negative score or >300 WPM), and payload injection.
+// SECURITY: Strict input validation schema to prevent score spoofing, out-of-bounds metrics,
+// and payload injection/exhaustion.
 export const saveGameScoreSchema = z.object({
-  gameType: z.nativeEnum(GameType),
-  score: z.number().int().min(0).max(1000000, 'Score exceeds maximum allowed value'),
-  wpm: z.number().min(0).max(300, 'WPM exceeds upper limit').optional(),
-  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100').optional(),
-  duration: z.number().int().min(0).max(86400, 'Duration exceeds upper limit').optional(),
-  metadata: z.record(z.unknown()).optional(),
+  gameType: z.nativeEnum(GameType, {
+    errorMap: () => ({ message: 'Invalid game type' }),
+  }),
+  score: z.number({ invalid_type_error: 'Invalid score value' }).min(0, 'Invalid score value').max(1000000, 'Score exceeds maximum limit'),
+  wpm: z.number().min(0, 'WPM must be non-negative').max(300, 'WPM exceeds maximum limit').optional().nullable(),
+  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100').optional().nullable(),
+  duration: z.number().min(0, 'Duration must be non-negative').max(86400, 'Duration exceeds maximum limit').optional().nullable(),
+  metadata: z.record(z.unknown()).optional().nullable(),
 });
 
 const parseGameType = (value: unknown): GameType | null => {
@@ -73,11 +75,11 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
       data: {
         userId,
         gameType: payload.gameType,
-        score: payload.score,
-        wpm: payload.wpm ?? null,
-        accuracy: payload.accuracy ?? null,
-        duration: payload.duration ?? null,
-        metadata: serializeMetadata(payload.metadata),
+        score: Math.trunc(payload.score),
+        wpm: typeof payload.wpm === 'number' ? payload.wpm : null,
+        accuracy: typeof payload.accuracy === 'number' ? payload.accuracy : null,
+        duration: typeof payload.duration === 'number' ? Math.trunc(payload.duration) : null,
+        metadata: serializeMetadata(payload.metadata ?? undefined),
       },
       include: {
         user: withUser,
@@ -93,7 +95,7 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation error', details: error.errors });
+      res.status(400).json({ error: error.errors[0]?.message || 'Invalid input data' });
       return;
     }
     logger.error('Error saving game score:', error);
