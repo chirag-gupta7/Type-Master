@@ -121,6 +121,30 @@ describe('AI Controller Unit Tests', () => {
 
       expect(mockNext).toHaveBeenCalledWith(expect.any(ZodError));
     });
+
+    it('should fail with 504 if callGemini times out / aborts', async () => {
+      mockRequest.body = {
+        wpm: 65,
+        accuracy: 98.5,
+        errors: 3,
+        duration: 60,
+      };
+
+      // Mock fetch to reject with an AbortError immediately to simulate timeout
+      global.fetch = jest.fn().mockRejectedValue({
+        name: 'AbortError',
+        message: 'The user aborted a request.',
+      }) as unknown as typeof fetch;
+
+      await getTypingFeedback(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: 504,
+          message: 'AI service request timed out',
+        })
+      );
+    });
   });
 
   describe('getWritingFeedback', () => {

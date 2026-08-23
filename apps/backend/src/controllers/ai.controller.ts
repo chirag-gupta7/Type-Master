@@ -47,6 +47,7 @@ const extractGeminiText = (data: GeminiResponse): string | null => {
 /**
  * Generic helper to call Gemini API
  * Securely uses x-goog-api-key header instead of query parameters
+ * Includes a 10-second timeout to prevent Denial of Service (DoS) due to slow or hung responses.
  */
 const callGemini = async (
   systemPrompt: string,
@@ -64,9 +65,7 @@ const callGemini = async (
   // Security: Implement a request timeout of 10 seconds to prevent resource exhaustion / DoS
   // where slow or hung requests to the external Gemini API tie up Express thread pools.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch(GEMINI_API_URL, {
@@ -75,6 +74,7 @@ const callGemini = async (
         'Content-Type': 'application/json',
         'x-goog-api-key': apiKey,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [
           {
@@ -90,7 +90,6 @@ const callGemini = async (
           maxOutputTokens: maxTokens,
         },
       }),
-      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -107,9 +106,12 @@ const callGemini = async (
     }
 
     return text;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      logger.error('Gemini API request timed out (AbortError)');
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new AppError(504, 'AI service request timed out');
+    }
+    // Handle cases where the thrown error is a plain object (e.g. from tests)
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
       throw new AppError(504, 'AI service request timed out');
     }
     throw error;

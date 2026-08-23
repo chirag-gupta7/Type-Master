@@ -93,3 +93,7 @@
 **Vulnerability:** The backend AI routes in `apps/backend/src/controllers/ai.controller.ts` (`getTypingFeedback`, `getWritingFeedback`, and `getStoryResponse`) lacked strict input validation and length limits, exposing them to prompt injection, high-cost resource abuse, and Denial of Service (DoS) attacks via oversized payloads.
 **Learning:** AI proxy endpoints that forward user inputs directly to LLM services must be strictly bounded to prevent both prompt hijacking and high-cost API utilization.
 **Prevention:** Always implement rigorous type and length validation (e.g., using Zod schemas with `.max()` bounds on arrays and string lengths) on all inputs passed to AI/LLM handlers.
+## 2026-08-11 - Third-Party API DoS via Connection Hanging
+**Vulnerability:** External AI services (e.g., Google's Gemini API) could be slow or hang indefinitely, holding backend request sockets/connection handles open, exhausting server resources, and leading to a server-side Denial of Service (DoS) for all clients.
+**Learning:** Integrations with third-party APIs must never block or wait indefinitely. A slow responder can easily saturate the event loop or socket pool of a Node.js server.
+**Prevention:** Always enforce a reasonable request timeout (e.g., 10 seconds) on all outgoing fetch/http requests using an `AbortController` and `setTimeout`. Map abort errors cleanly to user-friendly `504` AppErrors rather than leaking internal details, and guarantee cleanup of timer references with `clearTimeout` in a `finally` block.
