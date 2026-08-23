@@ -11,6 +11,9 @@
 ## 2026-08-12 - Parallelizing skill assessment database queries in start and complete endpoints
 **Learning:** Executing independent database reads and writes sequentially inside placement test endpoints introduces cumulative network roundtrip times. Parallelizing them concurrently using Promise.all drops cumulative latency down to the single slowest query, reducing sequential blocking db calls from 2 to 1 in startAssessment and 4 to 2 in completeAssessment.
 **Action:** Audit endpoints that manage user skill assessments or startup flows for independent consecutive queries, and pack them concurrently via Promise.all.
+## 2026-08-14 - Memoizing calculations in mouse-interactive components
+**Learning:** React components that manage state for micro-interactions (like hover state or selection state) will re-render frequently (on mouse enter and mouse leave). If these components contain heavy O(N) array traversals, sorting, or grouping computations, these computations will execute on every single state update, causing micro-stutters and dropping frames. Caching them using `useMemo` with only the raw data as a dependency ensures constant-time state updates and smooth visual transitions.
+**Action:** Always wrap collection grouping, transforming, and sorting operations in `useMemo` when they occur inside highly interactive components that change state on hover, click, or other user inputs.
 
 ## 2026-07-31 - Parallelizing weak key analysis queries
 **Learning:** Sequential await execution of multiple independent database queries (e.g., findMany, queryRaw) in controller endpoints introduces unnecessary cumulative network and DB roundtrip latencies. Using Promise.all parallelizes execution, reducing total API response time to that of the single slowest query.
