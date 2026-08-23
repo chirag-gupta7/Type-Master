@@ -46,8 +46,9 @@ const extractGeminiText = (data: GeminiResponse): string | null => {
 
 /**
  * Generic helper to call Gemini API
- * Securely uses x-goog-api-key header instead of query parameters
- * Includes a 10-second timeout to prevent Denial of Service (DoS) due to slow or hung responses.
+ * Securely uses x-goog-api-key header instead of query parameters.
+ * Implements a 10-second timeout mechanism to prevent slow/hung responses
+ * from causing server resource exhaustion (Denial of Service).
  */
 const callGemini = async (
   systemPrompt: string,
