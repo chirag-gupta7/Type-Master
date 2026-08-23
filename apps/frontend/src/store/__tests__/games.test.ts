@@ -142,6 +142,10 @@ describe('Game Store', () => {
   });
 
   describe('guest access', () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
     it('should track games played count', () => {
       const { result } = renderHook(() => useGameStore());
 
@@ -156,6 +160,41 @@ describe('Game Store', () => {
       });
 
       expect(result.current.gameHistory).toHaveLength(2);
+    });
+
+    // Regression: the guest play counter lived only in memory, so a reload
+    // reset it and the advertised one-free-game limit never held.
+    it('persists guest games played across reloads', () => {
+      const first = renderHook(() => useGameStore());
+
+      act(() => {
+        first.result.current.setGuestMode(true);
+        first.result.current.incrementGamesPlayed('word-blitz');
+      });
+
+      expect(window.localStorage.getItem('typemaster-guest-games-played')).toBe('1');
+
+      // Simulate a fresh page load: hydrate from storage into a "new" store.
+      const second = renderHook(() => useGameStore());
+      act(() => {
+        second.result.current.setGuestMode(true);
+        second.result.current.hydrateGuestGamesPlayed();
+      });
+
+      expect(second.result.current.gamesPlayed).toBe(1);
+    });
+
+    it('clears persisted guest progress when leaving guest mode', () => {
+      const { result } = renderHook(() => useGameStore());
+
+      act(() => {
+        result.current.setGuestMode(true);
+        result.current.incrementGamesPlayed('story-chain');
+        result.current.setGuestMode(false);
+      });
+
+      expect(window.localStorage.getItem('typemaster-guest-games-played')).toBeNull();
+      expect(result.current.gamesPlayed).toBe(0);
     });
   });
 });

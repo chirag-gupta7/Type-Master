@@ -81,6 +81,7 @@ export default function GamesClient() {
     backendGamesPlayed,
     backendHighScores,
     setBackendStats,
+    hydrateGuestGamesPlayed,
   } = useGameStore();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const setGuestMode = useGameStore((s) => s.setGuestMode);
@@ -96,12 +97,13 @@ export default function GamesClient() {
     const determineMode = () => {
       const hasToken = Boolean(localStorage.getItem('accessToken'));
       setGuestMode(!hasToken);
+      hydrateGuestGamesPlayed();
     };
 
     determineMode();
     window.addEventListener('storage', determineMode);
     return () => window.removeEventListener('storage', determineMode);
-  }, [setGuestMode]);
+  }, [setGuestMode, hydrateGuestGamesPlayed]);
 
   // Fetch persisted game stats when authenticated
   useEffect(() => {

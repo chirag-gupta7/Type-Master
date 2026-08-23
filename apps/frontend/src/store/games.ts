@@ -33,6 +33,8 @@ interface GameState {
   resetGame: () => void;
   setHighScore: (gameId: string, score: number) => void;
   incrementGamesPlayed: (gameId?: string) => void;
+  /** Re-read the persisted guest play count (call after mount). */
+  hydrateGuestGamesPlayed: () => void;
   setWritingFeedback: (gameId: GameType, feedback: string | null) => void;
   setGuestMode: (isGuest: boolean) => void;
   setBackendStats: (payload: { totalGamesPlayed: number; highs: Record<GameType, number> }) => void;
@@ -70,6 +72,39 @@ const createHistoryId = (): string => {
   }
 
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+// Persist the guest play count so the advertised one-free-game limit survives
+// a page reload instead of resetting every time.
+const GUEST_GAMES_KEY = 'typemaster-guest-games-played';
+
+const readGuestGamesPlayed = (): number => {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = window.localStorage.getItem(GUEST_GAMES_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const persistGuestGamesPlayed = (count: number): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(GUEST_GAMES_KEY, String(count));
+  } catch {
+    // ignore storage failures
+  }
+};
+
+const clearGuestGamesPlayed = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(GUEST_GAMES_KEY);
+  } catch {
+    // ignore storage failures
+  }
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -178,8 +213,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         return {};
       }
 
-      return { gamesPlayed: state.gamesPlayed + 1 };
+      const gamesPlayed = state.gamesPlayed + 1;
+      persistGuestGamesPlayed(gamesPlayed);
+      return { gamesPlayed };
     });
+  },
+
+  hydrateGuestGamesPlayed: () => {
+    set({ gamesPlayed: readGuestGamesPlayed() });
   },
 
   setWritingFeedback: (gameId, feedback) => {
@@ -197,9 +238,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         return {};
       }
 
+      // Leaving guest mode clears the persisted guest play counter.
+      if (!isGuest) {
+        clearGuestGamesPlayed();
+      }
+
       return {
         isGuest,
-        gamesPlayed: isGuest ? 0 : state.gamesPlayed,
+        gamesPlayed: isGuest ? state.gamesPlayed : 0,
       };
     });
   },
