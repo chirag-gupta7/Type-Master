@@ -106,18 +106,5 @@ export const FALLBACK_LESSONS: Lesson[] = [
   },
 ];
 
-export const buildFallbackStats = (lessonCount: number) => ({
-  totalLessons: lessonCount,
-  completedLessons: 0,
-  completionPercentage: 0,
-  totalStars: 0,
-  maxStars: lessonCount * 3,
-  averageWpm: 0,
-  averageAccuracy: 0,
-});
-
 export const isExerciseType = (value: unknown): value is NonNullable<Lesson['exerciseType']> =>
   value === 'guided' || value === 'timed';
-
-export const getFallbackLessonById = (id: string) =>
-  FALLBACK_LESSONS.find((lesson) => lesson.id === id);

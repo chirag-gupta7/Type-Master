@@ -295,23 +295,6 @@ export const authAPI = {
  */
 export const testAPI = {
   /**
-   * Fetch a new test paragraph
-   * Note: This endpoint doesn't exist in the backend yet
-   * For now, we'll use a client-side text generator
-   */
-  getTest: async (duration: 30 | 60 | 180): Promise<{ text: string }> => {
-    // TODO: Replace with actual API call when backend endpoint is ready
-    // For now, return sample text based on duration
-    const sampleTexts = {
-      30: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world.',
-      60: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world. Programming requires patience and practice. Every developer faces challenges daily. Learning never stops in this field. Code quality matters for maintainability.',
-      180: 'The quick brown fox jumps over the lazy dog. Technology advances rapidly in our modern world. Programming requires patience and practice. Every developer faces challenges daily. Learning never stops in this field. Code quality matters for maintainability. Software engineering combines creativity with logic. Debugging teaches valuable problem-solving skills. Collaboration makes teams stronger and more efficient. Open source projects benefit the entire community. Testing ensures reliability and prevents bugs. Documentation helps others understand your work. Version control tracks changes over time. Continuous learning keeps skills sharp and relevant.',
-    };
-
-    return Promise.resolve({ text: sampleTexts[duration] });
-  },
-
-  /**
    * Save test result to backend
    */
   saveTestResult: async (payload: {
@@ -998,6 +981,3 @@ export const aiAPI = {
     });
   },
 };
-
-// Named export for convenience
-export const getTest = testAPI.getTest;
