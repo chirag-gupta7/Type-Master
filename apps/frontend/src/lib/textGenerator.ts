@@ -463,16 +463,27 @@ export function generateTestText(
   const targetWords = getTargetWordCount(duration);
   const sentences: string[] = [];
   let wordCount = 0;
+  // When a category/difficulty filter shrinks the sentence pool below the
+  // target word count, every draw eventually becomes a duplicate. After this
+  // many consecutive duplicates we stop requiring uniqueness and pad with
+  // repeated sentences so the loop is guaranteed to terminate.
+  const MAX_CONSECUTIVE_DUPLICATES = 25;
+  let consecutiveDuplicates = 0;
 
   // Keep adding unique sentences until we reach target word count
   while (wordCount < targetWords) {
     const sentence = getRandomSentence(category, difficulty);
 
-    // Avoid immediate repetition within the same test
-    if (!sentences.includes(sentence)) {
-      sentences.push(sentence);
-      wordCount += sentence.split(' ').length;
+    // Avoid immediate repetition within the same test while fresh sentences
+    // remain available in the pool.
+    if (consecutiveDuplicates < MAX_CONSECUTIVE_DUPLICATES && sentences.includes(sentence)) {
+      consecutiveDuplicates += 1;
+      continue;
     }
+
+    consecutiveDuplicates = 0;
+    sentences.push(sentence);
+    wordCount += sentence.split(' ').length;
   }
 
   const fullText = sentences.join(' ');
