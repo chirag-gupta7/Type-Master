@@ -110,6 +110,62 @@ describe('GameController - saveGameScore', () => {
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid game type' });
   });
 
+  // Regression: the frontend games PromptDash and StoryChain submit these game types.
+  // Before PROMPT_DASH/STORY_CHAIN were added to the GameType enum these saves were
+  // rejected with 400 "Invalid game type" and scores were silently dropped.
+  it.each([GameType.PROMPT_DASH, GameType.STORY_CHAIN])(
+    'should successfully save a %s score from the frontend games',
+    async (gameType) => {
+      const mockCreatedScore = {
+        id: 'score-1',
+        userId: 'user-123',
+        gameType,
+        score: 42,
+        wpm: null,
+        accuracy: null,
+        duration: null,
+        metadata: null,
+        createdAt: new Date(),
+        user: { id: 'user-123', username: 'PlayerOne' },
+      };
+
+      (prisma.gameScore.create as jest.Mock).mockResolvedValue(mockCreatedScore);
+
+      mockRequest.body = { gameType, score: 42 };
+
+      await saveGameScore(mockRequest as Request, mockResponse as Response);
+
+      expect(prisma.gameScore.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-123',
+          gameType,
+          score: 42,
+          wpm: null,
+          accuracy: null,
+          duration: null,
+          metadata: null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+      expect(statusMock).toHaveBeenCalledWith(201);
+      expect(jsonMock).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          ...mockCreatedScore,
+          metadata: null,
+        },
+      });
+    }
+  );
+
   it('should return 400 for negative score or score exceeding maximum limit', async () => {
     mockRequest.body = {
       gameType: GameType.WORD_BLITZ,
