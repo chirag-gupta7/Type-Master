@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
 import { Timer, ArrowLeft } from 'lucide-react';
@@ -114,6 +114,16 @@ type Word = {
 export function WordBlitz() {
   const [gameState, setGameState] = useState<'idle' | 'running' | 'finished'>('idle');
   const [words, setWords] = useState<Word[]>([]);
+  // Mirror of `words` used by event handlers and intervals: computing an
+  // index from a render-time snapshot and applying it inside a functional
+  // update could delete the wrong word when the fall filter ran in between.
+  const wordsRef = useRef<Word[]>([]);
+  const nextWordIdRef = useRef(0);
+  const applyWords = useCallback((fn: (prev: Word[]) => Word[]) => {
+    const next = fn(wordsRef.current);
+    wordsRef.current = next;
+    setWords(next);
+  }, []);
   const [inputValue, setInputValue] = useState('');
   const [score, setScore] = useState(0);
   const [timer, setTimer] = useState(60);
@@ -129,10 +139,10 @@ export function WordBlitz() {
     if (!gameAreaRef.current) return;
     const gameWidth = gameAreaRef.current.offsetWidth;
     const newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
-    setWords((currentWords) => [
+    applyWords((currentWords) => [
       ...currentWords,
       {
-        id: Date.now(),
+        id: nextWordIdRef.current++,
         text: newWord,
         x: Math.random() * (gameWidth - 50),
         y: 0,
@@ -141,13 +151,13 @@ export function WordBlitz() {
   };
   const startGame = () => {
     setGameState('running');
-    setWords([]);
+    applyWords(() => []);
     setInputValue('');
     setScore(0);
     setTimer(60);
     addInterval.current = setInterval(addWord, 1200);
     fallInterval.current = setInterval(() => {
-      setWords((currentWords) =>
+      applyWords((currentWords) =>
         currentWords.map((w) => ({ ...w, y: w.y + 2 })).filter((w) => w.y < 400)
       );
     }, 50);
@@ -183,9 +193,11 @@ export function WordBlitz() {
     setInputValue(value);
     if (value.endsWith(' ')) {
       const typedWord = value.trim();
-      const wordIndex = words.findIndex((w) => w.text === typedWord);
+      // Index and removal both operate on the same ref-backed snapshot, so a
+      // concurrent fall-filter update can no longer shift the index.
+      const wordIndex = wordsRef.current.findIndex((w) => w.text === typedWord);
       if (wordIndex !== -1) {
-        setWords((currentWords) => currentWords.filter((_, i) => i !== wordIndex));
+        applyWords((currentWords) => currentWords.filter((_, i) => i !== wordIndex));
         setScore((s) => s + typedWord.length);
         setInputValue('');
       }

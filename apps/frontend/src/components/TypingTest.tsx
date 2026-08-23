@@ -291,10 +291,15 @@ const TypingTest: React.FC = () => {
     setTimeout(() => inputRef.current?.focus(), 100);
   };
   const commitUserInput = useCallback(
-    (value: string) => {
+    (value: string | ((prev: string) => string)) => {
       if (status === 'finished') return;
-      if (value.length > textToType.length) return;
-      setUserInput(value);
+      // Resolve against the store's live value: two keydowns can fire before
+      // React re-renders, and computing from a render-scope snapshot would
+      // silently drop the first append.
+      const prev = useTypingStore.getState().userInput;
+      const next = typeof value === 'function' ? value(prev) : value;
+      if (next.length > textToType.length) return;
+      setUserInput(next);
     },
     [status, textToType, setUserInput]
   );
@@ -506,7 +511,7 @@ const TypingTest: React.FC = () => {
                 if (e.key === ' ' && status !== 'finished') {
                   // FIX: Manually append a space so input continues to track progression while still preventing body scroll.
                   e.preventDefault();
-                  commitUserInput(`${userInput} `);
+                  commitUserInput((prev) => `${prev} `);
                 }
               }}
               disabled={status === 'finished'}
