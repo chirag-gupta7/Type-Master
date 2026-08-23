@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType, Prisma } from '@prisma/client';
+import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
@@ -7,14 +8,16 @@ interface AuthRequest extends Request {
   userId?: string;
 }
 
-interface GameScorePayload {
-  gameType: GameType;
-  score: number;
-  wpm?: number;
-  accuracy?: number;
-  duration?: number;
-  metadata?: Record<string, unknown>;
-}
+// Security enhancement: Enforce strict Zod validation schema for game score submissions.
+// Prevents score spoofing, out-of-bounds metrics (e.g., negative score or >300 WPM), and payload injection.
+export const saveGameScoreSchema = z.object({
+  gameType: z.nativeEnum(GameType),
+  score: z.number().int().min(0).max(1000000, 'Score exceeds maximum allowed value'),
+  wpm: z.number().min(0).max(300, 'WPM exceeds upper limit').optional(),
+  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100').optional(),
+  duration: z.number().int().min(0).max(86400, 'Duration exceeds upper limit').optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
 
 const parseGameType = (value: unknown): GameType | null => {
   if (typeof value !== 'string') {
@@ -64,27 +67,16 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const payload = req.body as GameScorePayload;
-    const gameType = parseGameType(payload.gameType);
-
-    if (!gameType) {
-      res.status(400).json({ error: 'Invalid game type' });
-      return;
-    }
-
-    if (typeof payload.score !== 'number' || Number.isNaN(payload.score) || payload.score < 0) {
-      res.status(400).json({ error: 'Invalid score value' });
-      return;
-    }
+    const payload = saveGameScoreSchema.parse(req.body);
 
     const gameScore = await prisma.gameScore.create({
       data: {
         userId,
-        gameType,
-        score: Math.trunc(payload.score),
-        wpm: typeof payload.wpm === 'number' ? payload.wpm : null,
-        accuracy: typeof payload.accuracy === 'number' ? payload.accuracy : null,
-        duration: typeof payload.duration === 'number' ? Math.trunc(payload.duration) : null,
+        gameType: payload.gameType,
+        score: payload.score,
+        wpm: payload.wpm ?? null,
+        accuracy: payload.accuracy ?? null,
+        duration: payload.duration ?? null,
         metadata: serializeMetadata(payload.metadata),
       },
       include: {
@@ -100,6 +92,10 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
       },
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
     logger.error('Error saving game score:', error);
     res.status(500).json({ error: 'Failed to save game score' });
   }
