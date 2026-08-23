@@ -264,6 +264,36 @@ describe('MistakeController', () => {
       );
     });
 
+    // Regression: the limit query param used to be passed through unbounded,
+    // so a single request could force an arbitrarily large read.
+    it('should clamp the limit query param to at most 100', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: '999999' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 100 })
+      );
+    });
+
+    it('should fall back to 10 when limit is not a number', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: 'abc' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 10 })
+      );
+    });
+
     it('should handle errors gracefully and return 500 status', async () => {
       mockRequest.params = { userId: 'user-123' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Database offline'));

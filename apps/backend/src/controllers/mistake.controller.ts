@@ -124,7 +124,10 @@ export const getWeakKeyAnalysis = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    const limit = parseInt(req.query.limit as string) || 10;
+    // Cap the page size so a single request cannot force an unbounded read
+    // (consistent with the other list endpoints, which clamp to 100).
+    const parsedLimit = parseInt(req.query.limit as string) || 10;
+    const limit = Math.min(Math.max(parsedLimit, 1), 100);
 
     // Optimization: Execute three independent database queries (weak keys, finger errors, and recent
     // mistakes) concurrently using Promise.all. This reduces the endpoint's database latency from
