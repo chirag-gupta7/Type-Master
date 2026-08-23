@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Flame } from 'lucide-react';
 import type { PracticeDay } from '@/types';
@@ -43,28 +44,40 @@ function getTooltipText(count: number, date: Date): string {
 }
 
 export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
-  const days = getLast365Days();
+  // Optimization: Memoize dates, activity map, and week grouping to prevent creating ~365 Date objects and array allocations on every render
+  const days = useMemo(() => getLast365Days(), []);
 
   // Create a map for quick lookup
-  const activityMap = new Map(data.map((d) => [d.date, d.count]));
+  const activityMap = useMemo(() => new Map(data.map((d) => [d.date, d.count])), [data]);
 
   // Group days by week
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
+  const weeks = useMemo(() => {
+    const result: Date[][] = [];
+    let currentWeek: Date[] = [];
 
-  days.forEach((day, index) => {
-    currentWeek.push(day);
-    if (day.getDay() === 6 || index === days.length - 1) {
-      weeks.push([...currentWeek]);
-      currentWeek = [];
-    }
-  });
+    days.forEach((day, index) => {
+      currentWeek.push(day);
+      if (day.getDay() === 6 || index === days.length - 1) {
+        result.push([...currentWeek]);
+        currentWeek = [];
+      }
+    });
+
+    return result;
+  }, [days]);
+
+  // Pre-calculate month labels based on memoized weeks
+  const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks]);
 
   // Calculate statistics
-  const totalActivities = data.reduce((sum, d) => sum + d.count, 0);
-  const activeDays = data.filter((d) => d.count > 0).length;
-  const currentStreak = calculateCurrentStreak(data);
-  const longestStreak = calculateLongestStreak(data);
+  const { totalActivities, activeDays, currentStreak, longestStreak } = useMemo(() => {
+    return {
+      totalActivities: data.reduce((sum, d) => sum + d.count, 0),
+      activeDays: data.filter((d) => d.count > 0).length,
+      currentStreak: calculateCurrentStreak(data),
+      longestStreak: calculateLongestStreak(data),
+    };
+  }, [data]);
 
   return (
     <motion.div
@@ -131,7 +144,7 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
             {/* Month labels */}
             <div className="w-8" /> {/* Spacer for day labels */}
             <div className="flex-1 flex">
-              {getMonthLabels(weeks).map((month, index) => (
+              {monthLabels.map((month, index) => (
                 <div
                   key={index}
                   className="text-xs text-gray-400"
