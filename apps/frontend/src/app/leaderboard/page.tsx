@@ -1,20 +1,28 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Trophy, Medal, Crown, TrendingUp } from 'lucide-react';
+import { Trophy, Medal, Crown, TrendingUp, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { gameAPI } from '@/lib/api';
 
-const MOCK_LEADERBOARD = [
-  { rank: 1, name: 'SpeedDemon', wpm: 152, accuracy: 99, tests: 1247 },
-  { rank: 2, name: 'TypingNinja', wpm: 148, accuracy: 98, tests: 892 },
-  { rank: 3, name: 'KeyboardWarrior', wpm: 145, accuracy: 99, tests: 1104 },
-  { rank: 4, name: 'FastFingers', wpm: 142, accuracy: 97, tests: 756 },
-  { rank: 5, name: 'QuickType', wpm: 138, accuracy: 98, tests: 634 },
-  { rank: 6, name: 'RapidTyper', wpm: 135, accuracy: 96, tests: 523 },
-  { rank: 7, name: 'SwiftKeys', wpm: 132, accuracy: 97, tests: 478 },
-  { rank: 8, name: 'LightningHands', wpm: 130, accuracy: 95, tests: 412 },
-  { rank: 9, name: 'TypeMaster Pro', wpm: 128, accuracy: 98, tests: 389 },
-  { rank: 10, name: 'FlashTyper', wpm: 125, accuracy: 96, tests: 345 },
-];
+type LeaderboardEntry = {
+  rank: number;
+  userId: string;
+  username: string | null;
+  score: number;
+  wpm: number | null;
+  accuracy: number | null;
+  duration: number | null;
+  createdAt: string;
+};
+
+const GAME_TABS = [
+  { value: 'WORD_BLITZ', label: 'Word Blitz' },
+  { value: 'PROMPT_DASH', label: 'Prompt Dash' },
+  { value: 'STORY_CHAIN', label: 'Story Chain' },
+] as const;
+
+type GameTab = (typeof GAME_TABS)[number]['value'];
 
 function getRankIcon(rank: number) {
   switch (rank) {
@@ -30,6 +38,29 @@ function getRankIcon(rank: number) {
 }
 
 export default function LeaderboardPage() {
+  const [gameType, setGameType] = useState<GameTab>('WORD_BLITZ');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchLeaderboard = useCallback(async (type: GameTab) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await gameAPI.getLeaderboard(type);
+      setEntries(response.data?.leaderboard ?? []);
+    } catch {
+      setError('Could not load the leaderboard. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchLeaderboard(gameType);
+  }, [gameType, fetchLeaderboard]);
+
   return (
     <div className="min-h-screen pt-20 pb-12">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -54,6 +85,25 @@ export default function LeaderboardPage() {
           </p>
         </motion.div>
 
+        {/* Game type selector */}
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
+          {GAME_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setGameType(tab.value)}
+              disabled={loading}
+              aria-pressed={gameType === tab.value}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                gameType === tab.value
+                  ? 'bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white shadow-lg'
+                  : 'bg-card/40 backdrop-blur-xl border border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -64,60 +114,77 @@ export default function LeaderboardPage() {
           <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-card/60 border-b border-border text-sm font-semibold text-muted-foreground">
             <div className="col-span-1">Rank</div>
             <div className="col-span-4">Player</div>
-            <div className="col-span-2">WPM</div>
+            <div className="col-span-3">Score</div>
+            <div className="col-span-2">Best WPM</div>
             <div className="col-span-2">Accuracy</div>
-            <div className="col-span-3">Tests</div>
           </div>
 
-          {/* Leaderboard Entries */}
-          {MOCK_LEADERBOARD.map((entry, index) => (
-            <motion.div
-              key={entry.rank}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 + index * 0.05 }}
-              className={`grid grid-cols-12 gap-4 px-6 py-4 border-b border-border/50 hover:bg-[var(--theme-primary)]/5 transition-colors ${
-                entry.rank <= 3
-                  ? 'bg-gradient-to-r from-[var(--theme-primary)]/10 to-transparent'
-                  : ''
-              }`}
-            >
-              <div className="col-span-1 flex items-center">{getRankIcon(entry.rank)}</div>
+          {error && (
+            <div className="px-6 py-10 text-center text-sm text-red-400">
+              {error}
+              <button
+                onClick={() => void fetchLeaderboard(gameType)}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" /> Retry
+              </button>
+            </div>
+          )}
 
-              <div className="col-span-4 flex items-center">
-                <span className="font-semibold text-foreground">{entry.name}</span>
-              </div>
+          {!error && loading && (
+            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+              Loading leaderboard...
+            </div>
+          )}
 
-              <div className="col-span-2 flex items-center">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-[var(--theme-accent)]" />
-                  <span className="text-lg font-bold text-[var(--theme-primary)]">{entry.wpm}</span>
+          {!error && !loading && entries.length === 0 && (
+            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+              No scores yet. Be the first to set a record!
+            </div>
+          )}
+
+          {!error &&
+            !loading &&
+            entries.map((entry) => (
+              <motion.div
+                key={`${gameType}-${entry.userId}-${entry.rank}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.05 * entry.rank }}
+                className={`grid grid-cols-12 gap-4 px-6 py-4 border-b border-border/50 hover:bg-[var(--theme-primary)]/5 transition-colors ${
+                  entry.rank <= 3
+                    ? 'bg-gradient-to-r from-[var(--theme-primary)]/10 to-transparent'
+                    : ''
+                }`}
+              >
+                <div className="col-span-1 flex items-center">{getRankIcon(entry.rank)}</div>
+
+                <div className="col-span-4 flex items-center">
+                  <span className="font-semibold text-foreground truncate">
+                    {entry.username || 'Anonymous'}
+                  </span>
                 </div>
-              </div>
 
-              <div className="col-span-2 flex items-center">
-                <span className="text-foreground">{entry.accuracy}%</span>
-              </div>
+                <div className="col-span-3 flex items-center">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[var(--theme-accent)]" />
+                    <span className="text-lg font-bold text-[var(--theme-primary)]">
+                      {entry.score.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="col-span-3 flex items-center">
-                <span className="text-muted-foreground">{entry.tests.toLocaleString()}</span>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+                <div className="col-span-2 flex items-center">
+                  <span className="text-foreground">{entry.wpm ?? '-'}</span>
+                </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="mt-8 text-center"
-        >
-          <p className="text-sm text-muted-foreground mb-4">
-            Your current rank: <span className="font-semibold text-foreground">#247</span>
-          </p>
-          <button className="px-6 py-3 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white font-semibold rounded-xl hover:shadow-lg transition-shadow">
-            Take a Test to Improve Your Rank
-          </button>
+                <div className="col-span-2 flex items-center">
+                  <span className="text-foreground">
+                    {entry.accuracy != null ? `${Math.round(entry.accuracy)}%` : '-'}
+                  </span>
+                </div>
+              </motion.div>
+            ))}
         </motion.div>
       </div>
     </div>
