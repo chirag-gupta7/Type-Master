@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useThemeStore } from '@/store/theme';
+import { parseStoredTheme, useThemeStore } from '@/store/theme';
 
 export function ThemeApplicator() {
   const { currentTheme, applyTheme } = useThemeStore();
@@ -9,17 +9,11 @@ export function ThemeApplicator() {
   useEffect(() => {
     // Load saved theme from localStorage
     if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('typemaster-theme');
-      if (savedTheme) {
-        try {
-          const theme = JSON.parse(savedTheme);
-          useThemeStore.getState().setTheme(theme);
-        } catch (e) {
-          // If parsing fails, just apply the current theme
-          applyTheme();
-        }
+      const theme = parseStoredTheme(localStorage.getItem('typemaster-theme'));
+      if (theme) {
+        useThemeStore.getState().setTheme(theme);
       } else {
-        // Apply default theme
+        // No valid saved theme: apply the default
         applyTheme();
       }
     }

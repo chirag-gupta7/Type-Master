@@ -76,6 +76,30 @@ interface ThemeState {
   applyTheme: () => void;
 }
 
+const isThemeColors = (value: unknown): value is ThemeColors =>
+  typeof value === 'object' &&
+  value !== null &&
+  'name' in value &&
+  'primary' in value &&
+  'secondary' in value &&
+  'accent' in value;
+
+/**
+ * Parse and validate a stored theme string. Returns null for missing,
+ * malformed, or shape-invalid values so callers can fall back to the
+ * default theme instead of applying garbage CSS variables.
+ */
+export const parseStoredTheme = (raw: string | null): ThemeColors | null => {
+  if (!raw) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isThemeColors(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
   currentTheme: THEME_PRESETS[0], // Default to Neon Cyan
 
