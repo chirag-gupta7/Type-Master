@@ -441,7 +441,7 @@ export default function HandPositionDemo() {
                         }}
                         transition={{ duration: 1.5, repeat: Infinity }}
                       >
-                        {currentKey === 'SPACE' ? '␣' : currentKey}
+                        {currentKey === 'Space' || currentKey === ' ' ? '␣' : currentKey}
                       </motion.span>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-black/40 rounded-lg border border-white/10">
