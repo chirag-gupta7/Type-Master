@@ -10,18 +10,21 @@ const startAssessmentSchema = z.object({
 
 const completeAssessmentSchema = z.object({
   userId: z.string().optional(),
-  wpm: z.number().min(0),
-  accuracy: z.number().min(0).max(100),
-  mistakesByKey: z.record(z.number()),
-  weakFingers: z.array(z.string()),
-  timeSpent: z.number().min(0),
+  wpm: z.number().min(0).max(300, 'WPM must be between 0 and 300'),
+  accuracy: z.number().min(0).max(100, 'Accuracy must be between 0 and 100'),
+  mistakesByKey: z.record(z.string().max(10), z.number().min(0).max(1000)),
+  weakFingers: z.array(z.string().max(50)).max(20, 'Cannot exceed 20 weak fingers'),
+  timeSpent: z.number().min(0).max(86400, 'Time spent must not exceed 24 hours'),
 });
 
 /**
  * Start a new skill assessment (placement test)
  * POST /api/v1/assessment/start
  */
-export const startAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const startAssessment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const { userId: bodyUserId } = startAssessmentSchema.parse(req.body);
     const authUserId = req.userId;
@@ -78,7 +81,10 @@ export const startAssessment = async (req: Request, res: Response): Promise<Resp
  * Complete assessment and get recommended starting lesson
  * POST /api/v1/assessment/complete
  */
-export const completeAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const completeAssessment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const {
       userId: bodyUserId,
@@ -244,7 +250,10 @@ export const completeAssessment = async (req: Request, res: Response): Promise<R
  * Get user's latest assessment results
  * GET /api/v1/assessment/latest/:userId
  */
-export const getLatestAssessment = async (req: Request, res: Response): Promise<Response> => {
+export const getLatestAssessment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const { userId } = req.params;
     const authUserId = req.userId;

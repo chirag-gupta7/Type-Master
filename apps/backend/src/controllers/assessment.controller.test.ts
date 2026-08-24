@@ -1,4 +1,4 @@
-import { startAssessment, completeAssessment, getLatestAssessment } from './assessment.controller';
+﻿import { startAssessment, completeAssessment, getLatestAssessment } from './assessment.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -172,6 +172,46 @@ describe('AssessmentController', () => {
       await completeAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 when wpm exceeds 300', async () => {
+      mockRequest.body.wpm = 350;
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
+    });
+
+    it('should return 400 when timeSpent exceeds 86400 seconds', async () => {
+      mockRequest.body.timeSpent = 100000;
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
+    });
+
+    it('should return 400 when weakFingers exceeds 20 items', async () => {
+      mockRequest.body.weakFingers = Array(21).fill('finger');
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
+    });
+
+    it('should return 400 when mistakesByKey values exceed 1000', async () => {
+      mockRequest.body.mistakesByKey = { a: 1500 };
+      await completeAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Invalid input data' })
+      );
     });
 
     it('should successfully complete assessment with BEGINNER level and no lesson unlocking', async () => {
