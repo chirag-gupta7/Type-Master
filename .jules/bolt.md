@@ -185,3 +185,7 @@
 ## 2026-08-16 - Consolidating duplicate userAchievement queries in getAchievementStats
 **Learning:** The `getAchievementStats` endpoint was performing two separate `findMany` queries on `userAchievement` (one for total unlocked count / earned points and another with `take: 5` sorted descending for recent unlocks). Fetching all user achievements sorted by `unlockedAt: 'desc'` in a single query allows computing totals and deriving the top 5 recent unlocks via `.slice(0, 5)` in-memory, reducing database round-trips from 3 to 2.
 **Action:** When an endpoint fetches both a full user relation list and a recent subset of that same list, consolidate into a single sorted database fetch and slice in-memory.
+
+## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
+**Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
+**Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.

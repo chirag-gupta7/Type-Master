@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +52,8 @@ const FINGER_COLORS: Record<FingerType, FingerColor> = {
     shadowColor: 'shadow-blue-500/50',
   },
 };
+
+const FINGER_COLOR_ENTRIES = Object.entries(FINGER_COLORS);
 
 // Key-to-finger mapping for QWERTY layout
 interface KeyMapping {
@@ -152,6 +155,8 @@ const FINGER_KEY_CLUSTERS: Record<FingerType, string[]> = KEY_MAPPINGS.reduce(
   } as Record<FingerType, string[]>
 );
 
+const FINGER_KEY_CLUSTER_ENTRIES = Object.entries(FINGER_KEY_CLUSTERS) as Array<[FingerType, string[]]>;
+
 interface HandPositionGuideProps {
   targetKey?: string;
   showArrow?: boolean;
@@ -166,6 +171,11 @@ interface HandPositionGuideProps {
  *
  * Displays animated hand silhouettes with finger-to-key mapping.
  * Shows which finger should press which key with color coding and animations.
+ *
+ * Performance Optimization:
+ * - Uses static `KEY_MAPPINGS_MAP` to replace O(N) `.find()` scans with O(1) hash map lookups on every keystroke.
+ * - Sub-component `Hand` is wrapped with `React.memo` to avoid re-rendering unaffected hand elements during typing.
+ * - Static entries `FINGER_COLOR_ENTRIES` and `FINGER_KEY_CLUSTER_ENTRIES` avoid dynamic array allocations on render.
  */
 export function HandPositionGuide({
   targetKey,
@@ -242,7 +252,7 @@ export function HandPositionGuide({
       {/* Finger Legend */}
       {showFingerLabels && (
         <div className="flex flex-wrap justify-center gap-3">
-          {Object.entries(FINGER_COLORS).map(([finger, colors]) => (
+          {FINGER_COLOR_ENTRIES.map(([finger, colors]) => (
             <div
               key={finger}
               className={cn(
@@ -261,7 +271,7 @@ export function HandPositionGuide({
 
       {showKeyClusters && (
         <div className="grid gap-4 md:grid-cols-2">
-          {(Object.entries(FINGER_KEY_CLUSTERS) as Array<[FingerType, string[]]>).map(
+          {FINGER_KEY_CLUSTER_ENTRIES.map(
             ([finger, keys]) => {
               const colors = FINGER_COLORS[finger];
               const isActive = targetFinger === finger;
@@ -316,7 +326,7 @@ export function HandPositionGuide({
 }
 
 /**
- * Hand Component - Renders a single hand with finger highlights
+ * Hand Component - Renders a single hand with finger highlights (Memoized)
  */
 interface HandProps {
   hand: 'left' | 'right';
@@ -324,7 +334,7 @@ interface HandProps {
   compact?: boolean;
 }
 
-function Hand({ hand, activeFinger, compact = false }: HandProps) {
+const Hand = memo(function Hand({ hand, activeFinger, compact = false }: HandProps) {
   const fingers: FingerType[] =
     hand === 'left'
       ? ['pinky', 'ring', 'middle', 'index', 'thumb']
@@ -452,7 +462,7 @@ function Hand({ hand, activeFinger, compact = false }: HandProps) {
       </div>
     </div>
   );
-}
+});
 
 /**
  * AnimatedArrow Component - Shows arrow pointing to target key
