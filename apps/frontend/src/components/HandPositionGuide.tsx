@@ -129,6 +129,12 @@ const KEY_MAPPINGS: KeyMapping[] = [
   { key: 'Space', finger: 'thumb', hand: 'right', row: 4, position: 0 },
 ];
 
+// Optimization: Pre-compute static O(1) Map lookup table for key mappings
+// Reduces key-to-finger lookup complexity from O(N) linear array search to O(1) constant time
+const KEY_MAPPINGS_MAP: Map<string, KeyMapping> = new Map(
+  KEY_MAPPINGS.map((m) => [(m.key === ' ' ? 'Space' : m.key).toUpperCase(), m])
+);
+
 const FINGER_KEY_CLUSTERS: Record<FingerType, string[]> = KEY_MAPPINGS.reduce(
   (acc, mapping) => {
     const keyLabel = mapping.key === ' ' ? 'Space' : mapping.key;
@@ -171,14 +177,12 @@ export function HandPositionGuide({
 }: HandPositionGuideProps) {
   // Normalize target key
   const normalizedTarget = targetKey
-    ? targetKey === ' '
-      ? 'Space'
-      : targetKey.toUpperCase()
+    ? (targetKey === ' ' ? 'Space' : targetKey).toUpperCase()
     : null;
 
-  // Find the finger and hand for the target key
+  // Find the finger and hand for the target key using O(1) Map lookup
   const targetMapping = normalizedTarget
-    ? KEY_MAPPINGS.find((m) => m.key.toUpperCase() === normalizedTarget)
+    ? KEY_MAPPINGS_MAP.get(normalizedTarget) || null
     : null;
 
   const targetFinger = targetMapping?.finger;
@@ -513,8 +517,8 @@ export function getFingerForKey(key: string): {
   hand: 'left' | 'right';
   color: FingerColor;
 } | null {
-  const normalizedKey = key === ' ' ? 'Space' : key.toUpperCase();
-  const mapping = KEY_MAPPINGS.find((m) => m.key.toUpperCase() === normalizedKey);
+  const normalizedKey = (key === ' ' ? 'Space' : key).toUpperCase();
+  const mapping = KEY_MAPPINGS_MAP.get(normalizedKey);
 
   if (!mapping) return null;
 
