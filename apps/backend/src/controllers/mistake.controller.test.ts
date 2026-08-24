@@ -294,6 +294,21 @@ describe('MistakeController', () => {
       );
     });
 
+    // Regression: negative or zero limits used to reach Prisma unbounded.
+    it('should clamp the limit query param to at least 1', async () => {
+      mockRequest.params = { userId: 'user-123' };
+      mockRequest.query = { limit: '-50' };
+      (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+      (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
+
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 1 })
+      );
+    });
+
     it('should handle errors gracefully and return 500 status', async () => {
       mockRequest.params = { userId: 'user-123' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Database offline'));
