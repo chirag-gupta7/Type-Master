@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getUserStats } from './test.controller';
+import { getUserStats, getUserTests } from './test.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -8,6 +8,7 @@ jest.mock('../utils/prisma', () => ({
     testResult: {
       findMany: jest.fn(),
       aggregate: jest.fn(),
+      count: jest.fn(),
     },
   },
 }));
@@ -220,5 +221,89 @@ mockRequest = {
 
     expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
     expect(prisma.testResult.aggregate).not.toHaveBeenCalled();
+  });
+});
+
+describe('TestController - getUserTests', () => {
+  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
+  let mockResponse: Partial<Response>;
+  let mockNext: NextFunction;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockNext = jest.fn();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
+      query: {},
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('should successfully fetch tests with default pagination', async () => {
+    const mockTests = [{ id: 'test-1', wpm: 75, accuracy: 98, rawWpm: 78, errors: 2, duration: 60, mode: 'WORDS', createdAt: new Date() }];
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue(mockTests);
+    (prisma.testResult.count as jest.Mock).mockResolvedValue(1);
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(prisma.testResult.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 20,
+        skip: 0,
+        where: { userId: 'user-123' },
+      })
+    );
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      tests: mockTests,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    });
+  });
+
+  it('should reject non-numeric page with 400', async () => {
+    mockRequest.query = { page: 'invalid' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should reject limit exceeding 100 with 400', async () => {
+    mockRequest.query = { limit: '500' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should reject non-numeric duration with 400', async () => {
+    mockRequest.query = { duration: 'abc' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
   });
 });
