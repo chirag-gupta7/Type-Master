@@ -110,3 +110,9 @@
 **Vulnerability:** `registerSchema` and `loginSchema` lacked maximum length limits on passwords, emails, and image URLs.
 **Learning:** Failing to restrict input string lengths, especially on credentials passed to computationally expensive hashing algorithms like `bcrypt`, exposes the backend to Denial of Service (DoS) and CPU/memory exhaustion attacks.
 **Prevention:** Always enforce strict upper bounds (e.g., `.max(100)` for passwords, `.max(255)` for emails) in validation schemas at the entry point of the application before downstream processing or storage.
+
+## 2026-08-18 - [Missing Zod Schema Bounds on Game Score Endpoint]
+
+**Vulnerability:** The game score submission endpoint (`/api/v1/games/score`) relied on manual type assertions (`req.body as GameScorePayload`) without strict numerical bounds or schema validation on score, WPM, accuracy, duration, or metadata.
+**Learning:** Endpoints accepting game/test metrics without schema bounds allow score spoofing, out-of-bounds parameter pollution, and DoS payload injection (e.g. through unbounded JSON metadata objects or extreme numbers).
+**Prevention:** Always enforce strict Zod schema validation (`.min()`, `.max()`, and object shape restrictions) on all submission endpoints to reject malformed or out-of-bounds payloads before hitting database layer or serialization logic.
