@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, Target, AlertTriangle, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,10 +23,31 @@ export function MistakeAnalysis({
   onRetry,
   onContinue,
 }: MistakeAnalysisProps) {
-  // Group mistakes by severity
-  const criticalKeys = weakKeys.filter((k) => k.errorCount >= 5);
-  const moderateKeys = weakKeys.filter((k) => k.errorCount >= 3 && k.errorCount < 5);
-  const minorKeys = weakKeys.filter((k) => k.errorCount < 3);
+  // PERFORMANCE OPTIMIZATION:
+  // Consolidate 3 redundant array `.filter()` traversals into a single O(N) pass and memoize with `useMemo`.
+  // This avoids re-filtering array items and allocating new array instances on every render of `MistakeAnalysis`.
+  const { criticalKeys, moderateKeys, minorKeys } = useMemo(() => {
+    const critical: WeakKey[] = [];
+    const moderate: WeakKey[] = [];
+    const minor: WeakKey[] = [];
+
+    for (let i = 0; i < weakKeys.length; i++) {
+      const k = weakKeys[i];
+      if (k.errorCount >= 5) {
+        critical.push(k);
+      } else if (k.errorCount >= 3) {
+        moderate.push(k);
+      } else {
+        minor.push(k);
+      }
+    }
+
+    return {
+      criticalKeys: critical,
+      moderateKeys: moderate,
+      minorKeys: minor,
+    };
+  }, [weakKeys]);
 
   return (
     <div className="space-y-6">
