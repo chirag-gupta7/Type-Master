@@ -114,32 +114,30 @@ const TypingTest: React.FC = () => {
   // Memoize word arrays to prevent recalculation on every render
   const words = useMemo(() => textToType.split(' '), [textToType]);
 
-  // Calculate the current word index based on number of spaces typed
-  const currentWordIndex = useMemo(() => {
-    if (userInput.length === 0) return 0;
+  // Performance Optimization: Consolidate word indexing and typing state calculations into a single memoized operation.
+  // Replacing regex matches (userInput.match(/ /g)), lastIndexOf searches, and array filter allocations
+  // with a single string split reduces per-keystroke garbage collection overhead and string traversals.
+  const { currentWordIndex, currentWordTyped, completedWords } = useMemo(() => {
+    if (userInput.length === 0) {
+      return {
+        currentWordIndex: 0,
+        currentWordTyped: '',
+        completedWords: [],
+      };
+    }
+    const splitInput = userInput.split(' ');
+    const currentWordIndex = splitInput.length - 1;
+    const currentWordTyped = splitInput[currentWordIndex] || '';
+    // Preserve completed words list excluding trailing empty string if input ends with a space
+    const completedWords = splitInput.filter(
+      (word, idx, arr) => idx < arr.length - 1 || word.length > 0
+    );
 
-    // Count spaces to determine word index
-    // "hello " has 1 space = we're on word index 1 (second word)
-    // "hello world " has 2 spaces = we're on word index 2 (third word)
-    const spaceCount = (userInput.match(/ /g) || []).length;
-    return spaceCount;
-  }, [userInput]);
-
-  // Get the text typed for the current word (everything after last space)
-  const currentWordTyped = useMemo(() => {
-    const lastSpaceIndex = userInput.lastIndexOf(' ');
-    if (lastSpaceIndex === -1) return userInput; // No spaces yet, all input is current word
-    return userInput.slice(lastSpaceIndex + 1); // Everything after last space
-  }, [userInput]);
-
-  // Get array of completed words (split and filter out empty strings from trailing spaces)
-  const completedWords = useMemo(() => {
-    if (userInput.length === 0) return [];
-    const split = userInput.split(' ');
-    // Filter out the last empty string if input ends with space
-    return split.filter((word, idx, arr) => {
-      return idx < arr.length - 1 || word.length > 0;
-    });
+    return {
+      currentWordIndex,
+      currentWordTyped,
+      completedWords,
+    };
   }, [userInput]);
 
   const { correctCharsCount, incorrectCharsCount, missedCharsCount } = useMemo(() => {
