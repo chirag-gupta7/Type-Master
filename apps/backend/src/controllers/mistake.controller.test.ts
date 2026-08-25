@@ -284,7 +284,9 @@ describe('MistakeController', () => {
     // Regression: the limit query param used to be passed through unbounded,
     // so a single request could force an arbitrarily large read.
     it('should clamp the limit query param to at most 100', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       mockRequest.query = { limit: '999999' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
@@ -298,7 +300,9 @@ describe('MistakeController', () => {
     });
 
     it('should fall back to 10 when limit is not a number', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       mockRequest.query = { limit: 'abc' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
@@ -313,7 +317,9 @@ describe('MistakeController', () => {
 
     // Regression: negative or zero limits used to reach Prisma unbounded.
     it('should clamp the limit query param to at least 1', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       mockRequest.query = { limit: '-50' };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
