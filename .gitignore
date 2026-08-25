@@ -54,3 +54,7 @@ postgres-data/
 
 # Redis
 redis-data/
+
+# Knowledge graph (graphify)
+graphify-out/
+.opencode/plugins/graphify.js

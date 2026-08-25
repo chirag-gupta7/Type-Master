@@ -1,1 +1,0 @@
-{"nodes": [{"id": "$graphify-root$_apps_backend_prisma_migrations_20251111141748_add_progress_index_migration_sql", "label": "migration.sql", "file_type": "code", "source_file": "apps/backend/prisma/migrations/20251111141748_add_progress_index/migration.sql", "source_location": null}], "edges": []}
