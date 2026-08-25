@@ -724,55 +724,72 @@ export const getSectionSummaries = async (req: AuthRequest, res: Response, next:
       },
     });
 
-    const groupedBySection = lessons.reduce<
-      Record<
-        number,
-        Array<
-          Prisma.LessonGetPayload<{
-            include: {
-              userProgress: {
-                select: {
-                  completed: true;
-                  bestWpm: true;
-                  bestAccuracy: true;
-                  stars: true;
-                  attempts: true;
-                };
-              };
-            };
-          }>
-        >
-      >
-    >((acc, lesson) => {
-      if (!acc[lesson.section]) {
-        acc[lesson.section] = [];
+    // Optimization: Use Map for O(1) section grouping instead of object reduce & prototype lookups
+    type SectionLessonType = Prisma.LessonGetPayload<{
+      include: {
+        userProgress: {
+          select: {
+            completed: true;
+            bestWpm: true;
+            bestAccuracy: true;
+            stars: true;
+            attempts: true;
+          };
+        };
+      };
+    }>;
+
+    const groupedBySection = new Map<number, SectionLessonType[]>();
+    for (const lesson of lessons) {
+      let sectionList = groupedBySection.get(lesson.section);
+      if (!sectionList) {
+        sectionList = [];
+        groupedBySection.set(lesson.section, sectionList);
       }
-      acc[lesson.section].push(lesson);
-      return acc;
-    }, {});
+      sectionList.push(lesson);
+    }
 
     const sections = sectionIds
       .map((sectionId) => {
-        const sectionLessons = groupedBySection[sectionId] ?? [];
-        if (!sectionLessons.length) {
+        const sectionLessons = groupedBySection.get(sectionId);
+        if (!sectionLessons || sectionLessons.length === 0) {
           return null;
         }
 
         const lessonsWithState = buildLessonsWithUnlockState(sectionLessons, userId);
         const totalLessons = lessonsWithState.length;
-        const completedLessons = lessonsWithState.filter((lesson) => lesson.isCompleted).length;
+
+        // Optimization: Consolidate stats calculation and index lookups into a single O(N) pass
+        // instead of separate .filter() and multiple .findIndex() calls.
+        let completedLessons = 0;
+        let firstUnlockedIncompleteIndex = -1;
+        let firstUnlockedIndex = -1;
+
+        for (let i = 0; i < totalLessons; i++) {
+          const lesson = lessonsWithState[i];
+          if (lesson.isCompleted) {
+            completedLessons++;
+          }
+          if (lesson.isUnlocked) {
+            if (firstUnlockedIndex === -1) {
+              firstUnlockedIndex = i;
+            }
+            if (!lesson.isCompleted && firstUnlockedIncompleteIndex === -1) {
+              firstUnlockedIncompleteIndex = i;
+            }
+          }
+        }
+
         const completionPercentage =
           totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
         const firstLessonId = lessonsWithState[0]?.id ?? null;
-        const firstUnlockedIncompleteIndex = lessonsWithState.findIndex(
-          (lesson) => lesson.isUnlocked && !lesson.isCompleted
-        );
-        const firstUnlockedIndex =
+        const resolvedUnlockedIndex =
           firstUnlockedIncompleteIndex >= 0
             ? firstUnlockedIncompleteIndex
-            : lessonsWithState.findIndex((lesson) => lesson.isUnlocked);
-        const resolvedUnlockedIndex = firstUnlockedIndex >= 0 ? firstUnlockedIndex : 0;
+            : firstUnlockedIndex >= 0
+              ? firstUnlockedIndex
+              : 0;
         const firstUnlockedLessonId = lessonsWithState[resolvedUnlockedIndex]?.id ?? firstLessonId;
 
         return {
