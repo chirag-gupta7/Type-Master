@@ -32,12 +32,6 @@ const getUserStatsQuerySchema = z.object({
   duration: z.coerce.number().int().positive('Duration must be positive').optional(),
 });
 
-const getUserTestsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(10000).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  duration: z.coerce.number().int().positive().optional(),
-});
-
 /**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
