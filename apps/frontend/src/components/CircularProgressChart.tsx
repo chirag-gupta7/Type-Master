@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Trophy, Star } from 'lucide-react';
@@ -93,23 +94,42 @@ const CustomTooltip = ({
 };
 
 export function CircularProgressChart({ data }: CircularProgressChartProps) {
-  // Format data for Recharts
-  const chartData = data.map((level) => ({
-    name: level.name,
-    value: level.completed,
-    total: level.total,
-    percentage: level.percentage,
-    stars: level.stars,
-    maxStars: level.maxStars,
-  }));
+  // Optimization: Precompute chart data and overall stats in a single pass O(N) using useMemo,
+  // preventing 4 redundant reduce loops and array re-allocations on every render.
+  const { chartData, totalCompleted, totalLessons, totalStars, maxStars, overallPercentage } =
+    useMemo(() => {
+      let completed = 0;
+      let total = 0;
+      let stars = 0;
+      let max = 0;
 
-  // Calculate overall stats
-  const totalCompleted = data.reduce((sum, level) => sum + level.completed, 0);
-  const totalLessons = data.reduce((sum, level) => sum + level.total, 0);
-  const totalStars = data.reduce((sum, level) => sum + level.stars, 0);
-  const maxStars = data.reduce((sum, level) => sum + level.maxStars, 0);
-  const overallPercentage =
-    totalLessons > 0 ? Math.round((totalCompleted / totalLessons) * 100) : 0;
+      const formattedData = data.map((level) => {
+        completed += level.completed;
+        total += level.total;
+        stars += level.stars;
+        max += level.maxStars;
+
+        return {
+          name: level.name,
+          value: level.completed,
+          total: level.total,
+          percentage: level.percentage,
+          stars: level.stars,
+          maxStars: level.maxStars,
+        };
+      });
+
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      return {
+        chartData: formattedData,
+        totalCompleted: completed,
+        totalLessons: total,
+        totalStars: stars,
+        maxStars: max,
+        overallPercentage: percentage,
+      };
+    }, [data]);
 
   return (
     <motion.div
