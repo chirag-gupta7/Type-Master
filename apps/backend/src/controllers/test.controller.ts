@@ -21,6 +21,12 @@ const createTestResultSchema = z.object({
   mode: z.enum(['WORDS', 'TIME', 'QUOTE']).default('WORDS'),
 });
 
+const getUserTestsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'Page must be at least 1').max(10000, 'Page cannot exceed 10000').default(1),
+  limit: z.coerce.number().int().min(1, 'Limit must be at least 1').max(100, 'Limit cannot exceed 100').default(20),
+  duration: z.coerce.number().int().positive('Duration must be positive').optional(),
+});
+
 const getUserStatsQuerySchema = z.object({
   days: z.coerce.number().int().min(1, 'Days must be at least 1').max(3650, 'Days cannot exceed 3650').default(30),
   duration: z.coerce.number().int().positive('Duration must be positive').optional(),
@@ -85,12 +91,22 @@ export const getUserTests = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError(401, 'User not authenticated');
     }
 
-    const { page, limit, duration } = getUserTestsQuerySchema.parse(req.query);
+    let query: z.infer<typeof getUserTestsQuerySchema>;
+    try {
+      query = getUserTestsQuerySchema.parse(req.query);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        (error as z.ZodError & { statusCode?: number }).statusCode = 400;
+      }
+      throw error;
+    }
+
+    const { page, limit, duration } = query;
     const skip = (page - 1) * limit;
 
     const where = {
       userId: req.user.userId,
-      ...(duration && { duration }),
+      ...(duration !== undefined && { duration }),
     };
 
     const [tests, total] = await Promise.all([

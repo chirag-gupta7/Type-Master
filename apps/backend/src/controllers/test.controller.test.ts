@@ -255,8 +255,9 @@ describe('TestController - getUserTests', () => {
   });
 
   it('should fetch user tests with default pagination parameters', async () => {
-    (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.testResult.count as jest.Mock).mockResolvedValue(0);
+    const mockTests = [{ id: 'test-1', wpm: 75, accuracy: 98, rawWpm: 78, errors: 2, duration: 60, mode: 'WORDS', createdAt: new Date() }];
+    (prisma.testResult.findMany as jest.Mock).mockResolvedValue(mockTests);
+    (prisma.testResult.count as jest.Mock).mockResolvedValue(1);
 
     await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
 
@@ -269,12 +270,12 @@ describe('TestController - getUserTests', () => {
     );
     expect(jsonMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        tests: [],
+        tests: mockTests,
         pagination: {
           page: 1,
           limit: 20,
-          total: 0,
-          totalPages: 0,
+          total: 1,
+          totalPages: 1,
         },
       })
     );
@@ -306,11 +307,38 @@ describe('TestController - getUserTests', () => {
     );
   });
 
-  it('should reject invalid query parameters with a validation error', async () => {
-    mockRequest.query = { limit: '9999' }; // Exceeds max limit of 100
+  it('should reject invalid query parameters with a 400 validation error', async () => {
+    mockRequest.query = { limit: '9999' };
 
     await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
 
-    expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+  });
+
+  it('should reject non-numeric page with 400', async () => {
+    mockRequest.query = { page: 'invalid' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should reject limit exceeding 100 with 400', async () => {
+    mockRequest.query = { limit: '500' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should reject non-numeric duration with 400', async () => {
+    mockRequest.query = { duration: 'abc' };
+
+    await getUserTests(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(prisma.testResult.findMany).not.toHaveBeenCalled();
   });
 });
