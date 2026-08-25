@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, X, Star, Target, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffect, useState } from 'react';
 import Confetti from 'react-confetti';
 
@@ -108,6 +109,9 @@ export function AchievementUnlockModal({
           >
             {/* Modal */}
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="achievement-modal-title"
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               exit={{ scale: 0, rotate: 180 }}
@@ -116,13 +120,20 @@ export function AchievementUnlockModal({
               className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden relative"
             >
               {/* Close Button */}
-              <button
-                onClick={emitCloseEvent}
-                aria-label="Close achievement modal"
-                className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={emitCloseEvent}
+                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors z-10"
+                    aria-label="Close achievement modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Close achievement modal</p>
+                </TooltipContent>
+              </Tooltip>
 
               {/* Animated Background */}
               <div
@@ -172,6 +183,7 @@ export function AchievementUnlockModal({
 
                 {/* Title */}
                 <motion.h2
+                  id="achievement-modal-title"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
