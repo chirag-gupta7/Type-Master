@@ -179,8 +179,21 @@ describe('MistakeController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
+    it('should return 400 if params userId is not a valid UUID', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: 'invalid-uuid' };
+      await getWeakKeyAnalysis(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
     it('should return 403 if params userId does not match authenticated userId', async () => {
-      mockRequest.params = { userId: 'user-456' };
+      const validUuid1 = '123e4567-e89b-12d3-a456-426614174000';
+      const validUuid2 = '98765432-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid1;
+      mockRequest.params = { userId: validUuid2 };
       await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
@@ -188,7 +201,9 @@ describe('MistakeController', () => {
     });
 
     it('should successfully return analysis and data parallelized', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       mockRequest.query = { limit: '5' };
 
       const mockWeakKeys = [
@@ -212,14 +227,14 @@ describe('MistakeController', () => {
       await getWeakKeyAnalysis(mockRequest, mockResponse);
 
       expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
+        where: { userId: validUuid },
         orderBy: { errorCount: 'desc' },
         take: 5,
       });
 
       expect(prisma.$queryRaw).toHaveBeenCalled();
       expect(prisma.typingMistake.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
+        where: { userId: validUuid },
         orderBy: { timestamp: 'desc' },
         take: 20,
         select: {
@@ -247,7 +262,9 @@ describe('MistakeController', () => {
     });
 
     it('should return empty analysis and friendly message when user has no weak keys', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
       (prisma.typingMistake.findMany as jest.Mock).mockResolvedValue([]);
@@ -310,7 +327,9 @@ describe('MistakeController', () => {
     });
 
     it('should handle errors gracefully and return 500 status', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Database offline'));
 
       await getWeakKeyAnalysis(mockRequest, mockResponse);
@@ -329,8 +348,21 @@ describe('MistakeController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
+    it('should return 400 if params userId is not a valid UUID', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: 'invalid-uuid' };
+      await generatePracticeText(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
     it('should return 403 if params userId does not match authenticated userId', async () => {
-      mockRequest.params = { userId: 'user-456' };
+      const validUuid1 = '123e4567-e89b-12d3-a456-426614174000';
+      const validUuid2 = '98765432-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid1;
+      mockRequest.params = { userId: validUuid2 };
       await generatePracticeText(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
@@ -338,7 +370,9 @@ describe('MistakeController', () => {
     });
 
     it('should return no weak keys message when user has no weak keys', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       (prisma.userWeakKeys.findMany as jest.Mock).mockResolvedValue([]);
 
       await generatePracticeText(mockRequest, mockResponse);
@@ -350,7 +384,9 @@ describe('MistakeController', () => {
     });
 
     it('should successfully generate targeted practice text with weak keys', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       const mockWeakKeys = [
         { keyChar: 'e', errorCount: 10 },
         { keyChar: 't', errorCount: 8 },
@@ -360,7 +396,7 @@ describe('MistakeController', () => {
       await generatePracticeText(mockRequest, mockResponse);
 
       expect(prisma.userWeakKeys.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
+        where: { userId: validUuid },
         orderBy: { errorCount: 'desc' },
         take: 5,
       });
@@ -376,7 +412,9 @@ describe('MistakeController', () => {
     });
 
     it('should handle errors gracefully and return 500 status', async () => {
-      mockRequest.params = { userId: 'user-123' };
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockRequest.userId = validUuid;
+      mockRequest.params = { userId: validUuid };
       (prisma.userWeakKeys.findMany as jest.Mock).mockRejectedValue(new Error('Connection timed out'));
 
       await generatePracticeText(mockRequest, mockResponse);
