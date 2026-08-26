@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getUserStats, getUserTests } from './test.controller';
+import { getTestById, getUserStats, getUserTests } from './test.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -7,6 +7,7 @@ jest.mock('../utils/prisma', () => ({
   prisma: {
     testResult: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       aggregate: jest.fn(),
       count: jest.fn(),
     },
@@ -340,5 +341,82 @@ describe('TestController - getUserTests', () => {
 
     expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
     expect(prisma.testResult.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('TestController - getTestById', () => {
+  let mockRequest: Partial<Request & { user?: { userId: string; email: string } }>;
+  let mockResponse: Partial<Response>;
+  let mockNext: NextFunction;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockNext = jest.fn();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      user: { userId: 'user-123', email: 'user@example.com' },
+      params: { id: validUuid },
+    };
+    jest.clearAllMocks();
+  });
+
+  it('should return 401 if user is not authenticated', async () => {
+    mockRequest.user = undefined;
+
+    await getTestById(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('should return 400 if id is not a valid UUID', async () => {
+    mockRequest.params = { id: 'invalid-uuid' };
+
+    await getTestById(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 400, message: 'Invalid test ID format' })
+    );
+    expect(prisma.testResult.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('should return 404 if test is not found', async () => {
+    (prisma.testResult.findUnique as jest.Mock).mockResolvedValue(null);
+
+    await getTestById(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(prisma.testResult.findUnique).toHaveBeenCalledWith({ where: { id: validUuid } });
+    expect(mockNext).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 404, message: 'Test not found' })
+    );
+  });
+
+  it('should return 403 if test belongs to a different user', async () => {
+    (prisma.testResult.findUnique as jest.Mock).mockResolvedValue({
+      id: validUuid,
+      userId: 'other-user-456',
+    });
+
+    await getTestById(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(mockNext).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 403, message: 'Access denied' })
+    );
+  });
+
+  it('should return 200 and test result if test exists and belongs to user', async () => {
+    const mockTest = { id: validUuid, userId: 'user-123', wpm: 70, accuracy: 95 };
+    (prisma.testResult.findUnique as jest.Mock).mockResolvedValue(mockTest);
+
+    await getTestById(mockRequest as Request, mockResponse as Response, mockNext);
+
+    expect(jsonMock).toHaveBeenCalledWith({ test: mockTest });
   });
 });

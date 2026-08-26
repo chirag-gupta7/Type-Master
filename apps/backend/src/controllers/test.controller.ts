@@ -32,6 +32,8 @@ const getUserStatsQuerySchema = z.object({
   duration: z.coerce.number().int().positive('Duration must be positive').optional(),
 });
 
+const testIdParamSchema = z.string().uuid('Invalid test ID format');
+
 /**
  * @route   POST /api/v1/tests
  * @desc    Create a new test result
@@ -149,6 +151,10 @@ export const getTestById = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     const { id } = req.params;
+    const testIdParsed = testIdParamSchema.safeParse(id);
+    if (!testIdParsed.success) {
+      throw new AppError(400, 'Invalid test ID format');
+    }
 
     const test = await prisma.testResult.findUnique({
       where: { id },
