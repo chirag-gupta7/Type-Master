@@ -346,6 +346,14 @@ describe('AssessmentController', () => {
   });
 
   describe('getLatestAssessment', () => {
+    const validUserId = '123e4567-e89b-12d3-a456-426614174000';
+    const otherValidUserId = '987e6543-e89b-12d3-a456-426614174000';
+
+    beforeEach(() => {
+      mockRequest.userId = validUserId;
+      mockRequest.params = { userId: validUserId };
+    });
+
     it('should return 401 if userId is missing', async () => {
       mockRequest.userId = undefined;
       await getLatestAssessment(mockRequest, mockResponse);
@@ -354,8 +362,16 @@ describe('AssessmentController', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Unauthorized' });
     });
 
+    it('should return 400 if params userId format is not a valid UUID', async () => {
+      mockRequest.params = { userId: 'invalid-uuid-format' };
+      await getLatestAssessment(mockRequest, mockResponse);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
     it('should return 403 if params userId does not match authenticated userId', async () => {
-      mockRequest.params = { userId: 'different-user' };
+      mockRequest.params = { userId: otherValidUserId };
       await getLatestAssessment(mockRequest, mockResponse);
 
       expect(statusMock).toHaveBeenCalledWith(403);
@@ -363,7 +379,6 @@ describe('AssessmentController', () => {
     });
 
     it('should return 404 if no assessment exists for the user', async () => {
-      mockRequest.params = { userId: 'user-123' };
       (prisma.userSkillAssessment.findFirst as jest.Mock).mockResolvedValue(null);
 
       await getLatestAssessment(mockRequest, mockResponse);
@@ -373,7 +388,6 @@ describe('AssessmentController', () => {
     });
 
     it('should return 200 with latest assessment details', async () => {
-      mockRequest.params = { userId: 'user-123' };
       const mockAssessment = {
         id: 'assessment-xyz',
         overallWpm: 55,
@@ -389,7 +403,7 @@ describe('AssessmentController', () => {
       await getLatestAssessment(mockRequest, mockResponse);
 
       expect(prisma.userSkillAssessment.findFirst).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
+        where: { userId: validUserId },
         orderBy: { assessmentDate: 'desc' },
       });
 
@@ -407,7 +421,6 @@ describe('AssessmentController', () => {
     });
 
     it('should return 500 when database error occurs during fetching', async () => {
-      mockRequest.params = { userId: 'user-123' };
       (prisma.userSkillAssessment.findFirst as jest.Mock).mockRejectedValue(new Error('Retrieval failed'));
 
       await getLatestAssessment(mockRequest, mockResponse);

@@ -4,6 +4,8 @@ import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
 // Validation schemas
+const userIdParamSchema = z.string().uuid('Invalid user ID format');
+
 const startAssessmentSchema = z.object({
   userId: z.string().optional(),
 });
@@ -260,6 +262,11 @@ export const getLatestAssessment = async (
 
     if (!authUserId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userIdParsed = userIdParamSchema.safeParse(userId);
+    if (!userIdParsed.success) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
     if (userId !== authUserId) {
