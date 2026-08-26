@@ -1050,23 +1050,26 @@ export const getLearningDashboard = async (req: AuthRequest, res: Response, next
       },
     });
 
-    // Group lessons by section
-    const sectionsMap = lessons.reduce<Record<number, SectionWithProgress>>((acc, lesson) => {
+    // Optimization: Group lessons using a Map<number, SectionWithProgress> instead of a plain JS object reduce.
+    // Map preserves insertion order, and since lessons are pre-sorted by `section: 'asc'` from Prisma,
+    // we eliminate dynamic string key conversions, object property lookups, and the redundant `.sort()` step.
+    const sectionsMap = new Map<number, SectionWithProgress>();
+    for (const lesson of lessons) {
       const sectionId = lesson.section;
-      if (!acc[sectionId]) {
-        acc[sectionId] = {
+      let section = sectionsMap.get(sectionId);
+      if (!section) {
+        section = {
           id: sectionId,
           title: getSectionName(sectionId),
           order: sectionId,
           lessons: [],
         };
+        sectionsMap.set(sectionId, section);
       }
-      acc[sectionId].lessons.push(lesson);
-      return acc;
-    }, {});
+      section.lessons.push(lesson);
+    }
 
-    // Convert to array and sort
-    const sectionsWithProgress = Object.values(sectionsMap).sort((a, b) => a.order - b.order);
+    const sectionsWithProgress = Array.from(sectionsMap.values());
 
     logger.info(`Fetched learning dashboard for user: ${userId}`);
 
