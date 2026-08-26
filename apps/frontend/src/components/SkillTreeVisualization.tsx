@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Lock, Star, Target, Zap } from 'lucide-react';
+import { Check, Lock, Star, Target, Zap, X } from 'lucide-react';
 import type { SkillTreeNode } from '@/types';
 
 interface SkillTreeVisualizationProps {
@@ -132,9 +132,11 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
                           onClick={() => setSelectedNode(lesson)}
                           onHoverStart={() => setHoveredNode(lesson.id)}
                           onHoverEnd={() => setHoveredNode(null)}
+                          aria-label={`${lesson.title} - ${lesson.locked ? 'Locked' : lesson.completed ? 'Completed' : 'Available'}, Target ${lesson.targetWpm} WPM`}
+                          aria-expanded={isSelected}
                           className={`relative group w-32 h-32 rounded-xl bg-gradient-to-br ${getDifficultyColor(
                             lesson.difficulty
-                          )} p-0.5 transition-all ${
+                          )} p-0.5 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-400 ${
                             isSelected ? 'ring-4 ring-purple-500' : ''
                           } ${lesson.locked ? 'opacity-50' : ''}`}
                         >
@@ -262,9 +264,10 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="text-white/80 hover:text-white transition-colors"
+                  aria-label="Close lesson details"
+                  className="p-1 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
-                  ✕
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
