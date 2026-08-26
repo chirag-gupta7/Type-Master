@@ -28,6 +28,18 @@ export function ThemeSelector() {
     setIsOpen(false);
   };
 
+  // Handle Escape key to close dialog
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
     <div className="fixed top-20 right-4 z-50">
       {/* Floating Button */}
@@ -134,7 +146,8 @@ export function ThemeSelector() {
               {/* Close Button */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="mt-4 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="mt-4 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Close theme picker"
               >
                 Close
               </button>
