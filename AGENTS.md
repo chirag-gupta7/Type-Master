@@ -1,11 +1,11 @@
 # TypeMaster — Agent Instructions (Token-Optimized)
 
 > **MANDATORY FIRST STEP FOR EVERY TASK — ZERO EXCEPTIONS.**
-> Before reading any source file, running `glob`/`grep`/`read` on raw code, or asking for clarification: **read `graphify-out/GRAPH_REPORT.md:1` and run a scoped `graphify query`**. This saves ~33k tokens per task (187 files, ~108k words → full scan = 38,500 input tokens per `graphify-out/cost.json:5`; graph report = ~5.7k tokens = 85% saving).
+> Before reading any source file, running `glob`/`grep`/`read` on raw code, or asking for clarification: **read `graphify-out/GRAPH_REPORT.md:1` and run a scoped `graphify query`**. This saves ~45k+ tokens per task (206 files, ~284k words → full scan = 38,500+ input tokens per `graphify-out/cost.json:5`; graph report = 496 lines / ~6k tokens = 84% saving).
 
 ## 0. Token Gate (Do This Before Anything)
 
-1. **Read `graphify-out/GRAPH_REPORT.md:1`** — 475 lines, 1222 nodes / 1810 edges / 140 communities. Contains community hubs, god nodes, surprising connections, suggested questions.
+1. **Read `graphify-out/GRAPH_REPORT.md:1`** — 496 lines, 1288 nodes / 1828 edges / 142 communities. Contains community hubs, god nodes, surprising connections, suggested questions.
 2. **Run `graphify query "<your task>" --budget 1500`** instead of `grep "**/*"` — BFS traversal returns scoped subgraph (often 5–30 nodes) vs scanning entire monorepo.
 3. **Only after scoped query** do `read` on ≤3 files cited by `source_location` (e.g., `apps/backend/src/controllers/lesson.controller.ts:1050`).
 4. **Never** default to `glob **/*.ts` + `grep` across workspace. Graph already encodes imports, communities, and cohesion.
