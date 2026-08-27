@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Menu, X, LogOut } from 'lucide-react';
+import { Moon, Sun, Menu, X, LogOut, Keyboard, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ const navLinks = [
   { href: '/learn', label: 'Learn', shortcut: '2' },
   { href: '/dashboard', label: 'Test', shortcut: '3' },
   { href: '/games', label: 'Games', shortcut: '4' },
-  { href: '/leaderboard', label: 'Leaderboard', shortcut: '5' },
+  { href: '/leaderboard', label: 'Board', shortcut: '5' },
   { href: '/achievements', label: 'Achievements', shortcut: '6' },
   { href: '/progress', label: 'Progress', shortcut: '7' },
 ];
@@ -44,17 +44,9 @@ export function Navbar() {
     [session]
   );
 
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => setLoading(false), [pathname, setLoading]);
 
-  // Reset loading state on route change
-  useEffect(() => {
-    setLoading(false);
-  }, [pathname, setLoading]);
-
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key >= '1' && e.key <= '7') {
@@ -65,14 +57,9 @@ export function Navbar() {
         }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [router]);
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
 
   const handleSignOut = async () => {
     try {
@@ -84,30 +71,33 @@ export function Navbar() {
   };
 
   return (
-    <nav className="border-b bg-card/80 backdrop-blur-lg sticky top-0 z-50">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
+        <div className="flex h-[64px] items-center justify-between gap-4">
+          {/* Brand */}
           <Link
             href="/"
-            className="flex items-center space-x-2"
-            onClick={() => {
-              if (pathname !== '/') {
-                setLoading(true);
-              }
-            }}
+            onClick={() => pathname !== '/' && setLoading(true)}
+            className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 -ml-2 focus-ring"
+            aria-label="TypeMaster home"
           >
-            <span className="text-xl font-bold bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] bg-clip-text text-transparent">
-              TypeMaster
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--theme-primary)_40%,transparent)]">
+              <Keyboard className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="text-[17px] font-bold tracking-tight text-foreground">
+              Type<span className="text-gradient">Master</span>
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[var(--theme-primary)]/10 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-[var(--theme-primary)]">
+              <Sparkles className="h-3 w-3" /> PRO
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
+          {/* Desktop nav */}
+          <div className="hidden lg:flex items-center gap-1">
             <NavigationMenu>
-              <NavigationMenuList>
+              <NavigationMenuList className="gap-0.5">
                 {navLinks.map((link) => {
-                  const isActive = pathname === link.href;
+                  const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
                   return (
                     <NavigationMenuItem key={link.href}>
                       <Tooltip>
@@ -116,7 +106,10 @@ export function Navbar() {
                             <NavigationMenuLink
                               className={cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && 'bg-accent/50 text-accent-foreground'
+                                'h-8 rounded-full px-3.5 text-[13px] font-medium transition-all',
+                                isActive
+                                  ? 'bg-foreground text-background shadow-sm'
+                                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                               )}
                               aria-current={isActive ? 'page' : undefined}
                             >
@@ -125,9 +118,7 @@ export function Navbar() {
                           </Link>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>
-                            {link.label} (Ctrl+{link.shortcut})
-                          </p>
+                          <p>{link.label} (Ctrl+{link.shortcut})</p>
                         </TooltipContent>
                       </Tooltip>
                     </NavigationMenuItem>
@@ -135,167 +126,108 @@ export function Navbar() {
                 })}
               </NavigationMenuList>
             </NavigationMenu>
-
-            <div className="ml-4 flex items-center gap-3">
-              {status === 'loading' && (
-                <span className="text-sm text-muted-foreground">Checking session...</span>
-              )}
-              {status !== 'loading' &&
-                (isAuthenticated ? (
-                  <>
-                    <span className="text-sm text-muted-foreground">Hi, {displayName}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSignOut}
-                      className="flex items-center gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign out
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => router.push('/login')}>
-                      Sign in
-                    </Button>
-                    <Button size="sm" onClick={() => router.push('/register')}>
-                      Sign up
-                    </Button>
-                  </>
-                ))}
-            </div>
-
-            {/* Theme Toggle */}
-            {mounted && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleTheme}
-                    className="ml-2"
-                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                  >
-                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center gap-2">
+          {/* Actions */}
+          <div className="flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-2 mr-1">
+              {status === 'loading' ? (
+                <span className="text-xs text-muted-foreground px-2">Checking session…</span>
+              ) : isAuthenticated ? (
+                <>
+                  <span className="hidden xl:inline text-sm text-muted-foreground">Hi, <span className="text-foreground font-medium">{displayName}</span></span>
+                  <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-full gap-1.5 h-8">
+                    <LogOut className="h-3.5 w-3.5" /> Sign out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => router.push('/login')} className="rounded-full h-8">
+                    Sign in
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={() => router.push('/register')} className="rounded-full h-8 shadow-md">
+                    Sign up
+                  </Button>
+                </>
+              )}
+            </div>
+
             {mounted && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={toggleTheme}
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    className="rounded-full"
                   >
-                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                    {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Switch to {theme === 'dark' ? 'light' : 'dark'} mode</p>
-                </TooltipContent>
+                <TooltipContent><p>Toggle theme</p></TooltipContent>
               </Tooltip>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  aria-label="Toggle menu"
-                >
-                  {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{mobileMenuOpen ? 'Close menu' : 'Open menu'}</TooltipContent>
-            </Tooltip>
+
+            {/* Mobile toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden rounded-full"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile sheet */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t animate-in slide-in-from-top-2">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => {
-                    if (pathname !== link.href) {
-                      setLoading(true);
-                    }
-                    setMobileMenuOpen(false);
-                  }}
-                  className={cn(
-                    'block px-4 py-3 rounded-md text-base font-medium transition-colors touch-manipulation',
-                    isActive
-                      ? 'bg-[var(--theme-primary)]/10 text-foreground border-l-4 border-[var(--theme-primary)]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <div className="flex items-center justify-between">
-                    {link.label}
-                    <span className="text-xs text-muted-foreground">Ctrl+{link.shortcut}</span>
-                  </div>
-                </Link>
-              );
-            })}
-
-            <div className="mt-4 flex flex-col gap-2 px-4">
-              {status === 'loading' && (
-                <span className="text-sm text-muted-foreground">Checking session...</span>
-              )}
-              {status !== 'loading' &&
-                (isAuthenticated ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
+          <div className="lg:hidden border-t border-border/40 py-4 animate-in fade-in slide-in-from-top-1 duration-200">
+            <nav className="grid gap-1" aria-label="Mobile">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
                     onClick={() => {
+                      if (pathname !== link.href) setLoading(true);
                       setMobileMenuOpen(false);
-                      handleSignOut();
                     }}
+                    className={cn(
+                      'flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-foreground text-background'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    )}
+                    aria-current={isActive ? 'page' : undefined}
                   >
+                    {link.label}
+                    <span className="text-xs opacity-60">⌃{link.shortcut}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="mt-4 grid gap-2 px-1">
+              {status !== 'loading' && (
+                isAuthenticated ? (
+                  <Button variant="outline" onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="w-full rounded-xl">
                     Sign out
                   </Button>
                 ) : (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        router.push('/login');
-                      }}
-                    >
-                      Sign in
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        router.push('/register');
-                      }}
-                    >
-                      Create account
-                    </Button>
-                  </>
-                ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={() => { setMobileMenuOpen(false); router.push('/login'); }} className="rounded-xl">Sign in</Button>
+                    <Button variant="primary" onClick={() => { setMobileMenuOpen(false); router.push('/register'); }} className="rounded-xl">Create account</Button>
+                  </div>
+                )
+              )}
             </div>
           </div>
         )}
       </div>
-    </nav>
+    </header>
   );
 }

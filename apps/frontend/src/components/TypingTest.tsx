@@ -3,12 +3,11 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useTypingStore } from '@/store';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Clock, Target, Zap, ArrowRight } from 'lucide-react';
+import { RefreshCw, Clock, Target, Zap, ArrowRight, Keyboard, Sparkles } from 'lucide-react';
 import { generateTestText } from '@/lib/textGenerator';
 import ResultsScreen from '@/components/ResultsScreen';
 import { aiAPI } from '@/lib/api';
-// Word Component: Renders each word and handles its state (correct, incorrect, active).
-// It's memoized to prevent re-rendering of words that haven't changed.
+
 const Word = React.memo(
   ({
     targetWord,
@@ -21,60 +20,45 @@ const Word = React.memo(
     isActive: boolean;
     isUpcoming: boolean;
   }) => {
-    // Upcoming words (not yet reached)
     if (isUpcoming) {
       return (
         <>
-          {targetWord}
+          <span className="text-muted-foreground/60">{targetWord}</span>
           <span className="mr-2"> </span>
         </>
       );
     }
-
-    // Completed words (already typed)
     if (!isActive) {
       const isCorrect = typedWord === targetWord;
       return (
         <>
-          <span className={isCorrect ? 'text-green-400' : 'text-red-500'}>{targetWord}</span>
+          <span className={isCorrect ? 'text-emerald-500' : 'text-red-500 decoration-red-500/50 underline decoration-2 underline-offset-2'}>
+            {targetWord}
+          </span>
           <span className="mr-2"> </span>
         </>
       );
     }
-
-    // Active word (currently being typed)
     return (
       <>
         {targetWord.split('').map((char, index) => {
           const isTyped = index < typedWord.length;
           const isCorrect = isTyped && typedWord[index] === char;
           const isCursor = index === typedWord.length;
-
           return (
             <span key={index} className="relative inline-block">
               {isCursor && (
-                <span
-                  className={cn(
-                    'absolute top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full',
-                    'left-0 -translate-x-full'
-                  )}
-                />
+                <span className="absolute inset-y-0 -left-px w-[2px] rounded-full bg-[var(--theme-primary)] animate-blink" aria-hidden />
               )}
-              <span
-                className={cn(
-                  isTyped && (isCorrect ? 'text-green-400' : 'text-red-500 underline'),
-                  !isTyped && 'text-muted-foreground'
-                )}
-              >
+              <span className={cn('transition-colors', isTyped ? (isCorrect ? 'text-emerald-500' : 'text-red-500 underline decoration-red-500/50 decoration-2 underline-offset-2') : 'text-muted-foreground/70')}>
                 {char}
               </span>
             </span>
           );
         })}
-        {/* Cursor after the word when it's complete */}
         {typedWord.length === targetWord.length && (
-          <span className="relative inline-block ml-0">
-            <span className="absolute left-full top-0 bottom-0 w-[2px] bg-yellow-400 animate-blink rounded-full" />
+          <span className="relative inline-block">
+            <span className="absolute left-full inset-y-0 w-[2px] rounded-full bg-[var(--theme-primary)] animate-blink" />
           </span>
         )}
         <span className="mr-2"> </span>
@@ -83,87 +67,42 @@ const Word = React.memo(
   }
 );
 Word.displayName = 'Word';
+
 const TypingTest: React.FC = () => {
-  const {
-    status,
-    textToType,
-    userInput,
-    wpm,
-    accuracy,
-    errors,
-    mistakes,
-    startTest,
-    setUserInput,
-    endTest,
-    resetTest,
-    startTime,
-    endTime,
-  } = useTypingStore();
+  const { status, textToType, userInput, wpm, accuracy, errors, mistakes, startTest, setUserInput, endTest, resetTest, startTime, endTime } =
+    useTypingStore();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [activeDuration, setActiveDuration] = useState<30 | 60 | 180>(60);
   const [resultDuration, setResultDuration] = useState<number>(activeDuration);
   const [view, setView] = useState<'initial' | 'typing' | 'results'>('initial');
-  const [displayMode, setDisplayMode] = useState<'vertical' | 'horizontal'>('horizontal');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // FIX: Add ref for the hidden input to programmatically focus it
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackRequestedRef = useRef(false);
-  // Memoize word arrays to prevent recalculation on every render
+
   const words = useMemo(() => textToType.split(' '), [textToType]);
 
-  // Performance Optimization: Consolidate word indexing and typing state calculations into a single memoized operation.
-  // Replacing regex matches (userInput.match(/ /g)), lastIndexOf searches, and array filter allocations
-  // with a single string split reduces per-keystroke garbage collection overhead and string traversals.
   const { currentWordIndex, currentWordTyped, completedWords } = useMemo(() => {
-    if (userInput.length === 0) {
-      return {
-        currentWordIndex: 0,
-        currentWordTyped: '',
-        completedWords: [],
-      };
-    }
+    if (userInput.length === 0) return { currentWordIndex: 0, currentWordTyped: '', completedWords: [] as string[] };
     const splitInput = userInput.split(' ');
     const currentWordIndex = splitInput.length - 1;
     const currentWordTyped = splitInput[currentWordIndex] || '';
-    // Preserve completed words list excluding trailing empty string if input ends with a space
-    const completedWords = splitInput.filter(
-      (word, idx, arr) => idx < arr.length - 1 || word.length > 0
-    );
-
-    return {
-      currentWordIndex,
-      currentWordTyped,
-      completedWords,
-    };
+    const completedWords = splitInput.filter((word, idx, arr) => idx < arr.length - 1 || word.length > 0);
+    return { currentWordIndex, currentWordTyped, completedWords };
   }, [userInput]);
 
   const { correctCharsCount, incorrectCharsCount, missedCharsCount } = useMemo(() => {
     let correct = 0;
     const typedLength = userInput.length;
-
-    for (let i = 0; i < typedLength; i++) {
-      if (userInput[i] === textToType[i]) {
-        correct++;
-      }
-    }
-
-    const incorrect = typedLength - correct;
-    const missed = Math.max(textToType.length - typedLength, 0);
-
-    return {
-      correctCharsCount: correct,
-      incorrectCharsCount: incorrect,
-      missedCharsCount: missed,
-    };
+    for (let i = 0; i < typedLength; i++) if (userInput[i] === textToType[i]) correct++;
+    return { correctCharsCount: correct, incorrectCharsCount: typedLength - correct, missedCharsCount: Math.max(textToType.length - typedLength, 0) };
   }, [userInput, textToType]);
+
   const prepareTest = useCallback(
     (duration: 30 | 60 | 180, existingText?: string) => {
-      // If we have existing text (replay scenario), preserve it during reset
       const shouldPreserveText = !!existingText;
-
       resetTest(shouldPreserveText);
       setActiveDuration(duration);
       setResultDuration(duration);
@@ -171,46 +110,27 @@ const TypingTest: React.FC = () => {
       setAiFeedback(null);
       setIsFeedbackLoading(false);
       feedbackRequestedRef.current = false;
-
-      // Generate new text only if not replaying
       const newText = existingText ?? generateTestText(duration);
       startTest(newText);
       setView('initial');
     },
     [resetTest, startTest]
   );
-  useEffect(() => {
-    prepareTest(activeDuration);
-  }, []); // Run only on initial mount
 
-  // FIX: Ensure input stays focused during typing view
+  useEffect(() => { prepareTest(activeDuration); }, []); // mount only
+
   useEffect(() => {
-    if (view === 'typing' && status !== 'finished') {
-      inputRef.current?.focus();
-    }
+    if (view === 'typing' && status !== 'finished') inputRef.current?.focus();
   }, [view, status]);
 
-  // AI Feedback Function
   const getAiTypingFeedback = useCallback(
     async (summaryDuration: number) => {
       setIsFeedbackLoading(true);
       setAiFeedback(null);
-
       try {
-        const data = await aiAPI.getTypingFeedback({
-          wpm,
-          accuracy,
-          errors,
-          duration: summaryDuration,
-        });
-
-        if (data.feedback) {
-          setAiFeedback(data.feedback);
-        } else {
-          setAiFeedback('Could not load AI feedback at this time.');
-        }
-      } catch (error) {
-        console.error('Error getting AI feedback:', error);
+        const data = await aiAPI.getTypingFeedback({ wpm, accuracy, errors, duration: summaryDuration });
+        setAiFeedback(data.feedback ?? 'Could not load AI feedback at this time.');
+      } catch {
         setAiFeedback('Could not load AI feedback. Please try again later.');
       } finally {
         setIsFeedbackLoading(false);
@@ -219,20 +139,13 @@ const TypingTest: React.FC = () => {
     [wpm, accuracy, errors]
   );
 
-  // Main timer logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (view === 'typing' && status === 'in-progress' && startTime) {
       timer = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         const remaining = activeDuration - elapsed;
-        if (remaining <= 0) {
-          setTimeLeft(0);
-          endTest();
-          clearInterval(timer);
-        } else {
-          setTimeLeft(remaining);
-        }
+        if (remaining <= 0) { setTimeLeft(0); endTest(); clearInterval(timer); } else setTimeLeft(remaining);
       }, 1000);
     }
     return () => clearInterval(timer);
@@ -241,329 +154,232 @@ const TypingTest: React.FC = () => {
   useEffect(() => {
     if (status === 'finished') {
       let effectiveDuration = Math.max(activeDuration, 1);
-
       if (startTime) {
         const finishedAt = endTime ?? Date.now();
         effectiveDuration = Math.max(1, Math.round((finishedAt - startTime) / 1000));
       }
-
       setResultDuration(effectiveDuration);
       setTimeLeft(0);
-      if (view !== 'results') {
-        setView('results');
-      }
-
-      if (!feedbackRequestedRef.current) {
-        feedbackRequestedRef.current = true;
-        void getAiTypingFeedback(effectiveDuration);
-      }
-    } else {
-      feedbackRequestedRef.current = false;
-    }
+      if (view !== 'results') setView('results');
+      if (!feedbackRequestedRef.current) { feedbackRequestedRef.current = true; void getAiTypingFeedback(effectiveDuration); }
+    } else feedbackRequestedRef.current = false;
   }, [status, startTime, endTime, activeDuration, view, getAiTypingFeedback]);
-  // This crucial effect handles scrolling the active word into the center of the viewbox.
-  useEffect(() => {
-    if (activeWordRef.current && containerRef.current) {
-      const activeWord = activeWordRef.current;
-      const container = containerRef.current;
-      const wordRect = activeWord.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
 
-      if (displayMode === 'horizontal') {
-        // Horizontal: center the word horizontally
-        const wordCenter = wordRect.left + wordRect.width / 2;
-        const containerCenter = containerRect.left + containerRect.width / 2;
-        const scrollOffset = wordCenter - containerCenter;
-        container.scrollBy({ left: scrollOffset, behavior: 'smooth' });
-      } else {
-        // Vertical: center the word vertically (original logic)
-        if (wordRect.bottom > containerRect.bottom || wordRect.top < containerRect.top) {
-          activeWord.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
-      }
+  useEffect(() => {
+    if (!activeWordRef.current || !containerRef.current) return;
+    const el = activeWordRef.current;
+    const container = containerRef.current;
+    // Smoothly keep active word centered vertically within container
+    const cRect = container.getBoundingClientRect();
+    const wRect = el.getBoundingClientRect();
+    if (wRect.bottom > cRect.bottom - 24 || wRect.top < cRect.top + 24) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [currentWordIndex, displayMode]);
-  const handleStartClick = () => {
-    setView('typing');
-    // FIX: Focus the input immediately when test starts
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
+  }, [currentWordIndex]);
+
+  const handleStartClick = () => { setView('typing'); setTimeout(() => inputRef.current?.focus(), 80); };
+
   const commitUserInput = useCallback(
     (value: string | ((prev: string) => string)) => {
       if (status === 'finished') return;
-      // Resolve against the store's live value: two keydowns can fire before
-      // React re-renders, and computing from a render-scope snapshot would
-      // silently drop the first append.
       const prev = useTypingStore.getState().userInput;
-      const next = typeof value === 'function' ? value(prev) : value;
+      const next = typeof value === 'function' ? (value as (p: string) => string)(prev) : value;
       if (next.length > textToType.length) return;
       setUserInput(next);
     },
     [status, textToType, setUserInput]
   );
 
-  const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // FIX: Delegate to commitUserInput so all pathways (change & space key) share the same logic.
-    commitUserInput(e.target.value);
-  };
-  // FIX: Add handler to refocus input when clicking the text container
-  const handleContainerClick = () => {
-    if (view === 'typing' && status !== 'finished') {
-      inputRef.current?.focus();
-    }
-  };
   const handleRestart = useCallback(() => {
-    // Preserve the current text for replay
     const currentText = textToType;
-    if (currentText) {
-      // Reset to initial view with same text
-      prepareTest(activeDuration, currentText);
-    } else {
-      prepareTest(activeDuration);
-    }
+    if (currentText) prepareTest(activeDuration, currentText);
+    else prepareTest(activeDuration);
   }, [prepareTest, activeDuration, textToType]);
 
-  const handleNewTest = useCallback(() => {
-    // Generate completely new text
-    prepareTest(activeDuration);
-  }, [prepareTest, activeDuration]);
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  const handleNewTest = useCallback(() => prepareTest(activeDuration), [prepareTest, activeDuration]);
+  const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const progress = useMemo(() => {
+    if (!textToType) return 0;
+    return Math.min(100, (userInput.length / textToType.length) * 100);
+  }, [userInput.length, textToType.length]);
+
   return (
-    <div className="flex flex-col items-center justify-center w-full p-4 text-foreground font-sans">
+    <div className="flex w-full flex-col items-center">
       <AnimatePresence mode="wait">
         {view === 'initial' && (
           <motion.div
             key="initial"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            className="flex flex-col items-center text-center"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35 }}
+            className="flex w-full max-w-3xl flex-col items-center text-center"
           >
-            <h1 className="text-6xl font-bold mb-2 animate-tracking-in-expand">TypeMaster</h1>
-            <p className="text-xl text-muted-foreground mb-10">Test your typing skills.</p>
-            <div className="mb-10 flex items-center justify-center gap-2 md:gap-4 p-2 bg-secondary/50 rounded-lg">
-              {[30, 60, 180].map((duration) => (
+            <div className="inline-flex items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs font-medium backdrop-blur">
+              <Keyboard className="h-3.5 w-3.5 text-[var(--theme-primary)]" /> Real-time engine • 60fps • WCAG AA
+            </div>
+            <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
+              Test your <span className="text-gradient">typing</span>
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground md:text-[15px]">
+              Choose a duration and start instantly. Your progress is tracked live — WPM, accuracy, and character-level feedback.
+            </p>
+
+            <div className="mt-6 flex items-center gap-2 rounded-full border bg-card/60 p-1 backdrop-blur">
+              {[30, 60, 180].map((d) => (
                 <button
-                  key={duration}
+                  key={d}
                   type="button"
-                  aria-label={`Select ${duration === 30 ? '30 seconds' : `${duration / 60} minutes`} test duration`}
-                  aria-pressed={activeDuration === duration}
-                  onClick={() => prepareTest(duration as 30 | 60 | 180)}
+                  aria-pressed={activeDuration === d}
+                  aria-label={`Select ${d === 30 ? '30 seconds' : `${d / 60} minutes`} test duration`}
+                  onClick={() => prepareTest(d as 30 | 60 | 180)}
                   className={cn(
-                    'px-4 py-2 md:px-6 md:py-3 rounded-md text-lg font-medium transition-all duration-300 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                    activeDuration === duration
-                      ? 'bg-primary text-primary-foreground shadow-lg'
-                      : 'text-muted-foreground hover:bg-secondary'
+                    'rounded-full px-5 py-2 text-sm font-semibold transition-all focus-ring',
+                    activeDuration === d ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  {duration === 30 ? '30s' : `${duration / 60}m`}
+                  {d === 30 ? '30s' : `${d / 60}m`}
                 </button>
               ))}
             </div>
+
             <button
               type="button"
               onClick={handleStartClick}
               disabled={!textToType}
-              className="px-12 py-4 bg-yellow-400 text-background font-bold text-2xl rounded-lg shadow-lg hover:bg-yellow-300 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-secondary)] px-8 py-3 text-base font-semibold text-white shadow-[0_8px_24px_color-mix(in_srgb,var(--theme-primary)_40%,transparent)] transition hover:brightness-[1.05] disabled:opacity-50 focus-ring"
             >
-              {textToType ? 'Start' : 'Loading...'}
+              {textToType ? 'Start test' : 'Loading…'} <ArrowRight className="h-4 w-4" />
             </button>
+
+            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5" /> Tip: Press any key to focus — click the text to re-focus anytime.
+            </div>
           </motion.div>
         )}
+
         {view === 'typing' && (
-          <motion.div
-            key="typing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full max-w-4xl flex flex-col items-center"
-          >
-            <div className="w-full flex justify-between items-center mb-8 px-4 py-3 bg-secondary/50 rounded-lg">
-              <div className="flex items-center gap-6 text-xl">
-                <div className="flex items-center gap-2">
-                  <Zap className="text-yellow-400" /> <span>{wpm} WPM</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Target className="text-yellow-400" /> <span>{accuracy}%</span>
-                </div>
+          <motion.div key="typing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-4xl">
+            {/* Top bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/60 p-3 backdrop-blur">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-semibold text-background">
+                  <Clock className="h-3.5 w-3.5" /> {formatTime(timeLeft)}
+                </span>
+                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium">
+                  <Zap className="h-3.5 w-3.5 text-amber-500" /> {wpm} WPM
+                </span>
+                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium">
+                  <Target className="h-3.5 w-3.5 text-emerald-500" /> {accuracy}%
+                </span>
               </div>
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDisplayMode(displayMode === 'horizontal' ? 'vertical' : 'horizontal')
-                  }
-                  className="px-3 py-1 text-sm bg-background/50 border border-border rounded-md hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  aria-label={`Switch to ${displayMode === 'horizontal' ? 'vertical' : 'horizontal'} display mode`}
-                  title="Toggle display mode"
-                >
-                  {displayMode === 'horizontal' ? '↕️ Vertical' : '↔️ Horizontal'}
-                </button>
-                <div className="flex items-center gap-2 text-2xl font-semibold">
-                  <Clock className="text-yellow-400" /> <span>{formatTime(timeLeft)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground hidden md:inline">Progress</span>
+                <div className="h-2 w-28 overflow-hidden rounded-full bg-muted md:w-40">
+                  <motion.div className="h-full bg-foreground" animate={{ width: `${progress}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
                 </div>
+                <span className="text-xs font-medium tabular-nums">{Math.round(progress)}%</span>
               </div>
             </div>
 
-            {/* Horizontal Mode (TypeRacer-style) */}
-            {displayMode === 'horizontal' && (
-              <div
-                ref={containerRef}
-                onClick={handleContainerClick}
-                className="text-3xl font-mono leading-relaxed tracking-wider h-24 overflow-x-auto overflow-y-hidden relative w-full scroll-smooth cursor-text"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                <style jsx>{`
-                  div::-webkit-scrollbar {
-                    display: none;
-                  }
-                `}</style>
-                <div className="whitespace-nowrap text-muted-foreground flex items-center h-full">
-                  <span className="inline-block w-[50%]"></span> {/* Left padding for centering */}
-                  {words.map((word, index) => {
-                    const isActive = index === currentWordIndex;
-                    const isCompleted = index < currentWordIndex;
-                    const isUpcoming = index > currentWordIndex;
+            {/* Mobile stats */}
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:hidden">
+              <div className="rounded-xl border bg-card p-2 text-center"><div className="text-xs text-muted-foreground">WPM</div><div className="font-semibold">{wpm}</div></div>
+              <div className="rounded-xl border bg-card p-2 text-center"><div className="text-xs text-muted-foreground">Accuracy</div><div className="font-semibold">{accuracy}%</div></div>
+              <div className="rounded-xl border bg-card p-2 text-center"><div className="text-xs text-muted-foreground">Errors</div><div className="font-semibold">{errors}</div></div>
+            </div>
 
-                    let typedWord = '';
-                    if (isActive) {
-                      typedWord = currentWordTyped;
-                    } else if (isCompleted) {
-                      typedWord = completedWords[index] || '';
-                    }
-
-                    return (
-                      <React.Fragment key={index}>
-                        <span
-                          ref={isActive ? activeWordRef : null}
-                          className={cn(
-                            'inline-block px-2 py-1 rounded-md transition-all duration-200',
-                            isActive && 'bg-yellow-400/10 border border-yellow-400/50 scale-110'
-                          )}
-                        >
-                          <Word
-                            targetWord={word}
-                            typedWord={typedWord}
-                            isActive={isActive}
-                            isUpcoming={isUpcoming}
-                          />
-                        </span>
-                      </React.Fragment>
-                    );
-                  })}
-                  <span className="inline-block w-[50%]"></span> {/* Right padding for centering */}
-                </div>
+            {/* Text viewport */}
+            <div
+              ref={containerRef}
+              onClick={() => inputRef.current?.focus()}
+              className="relative mt-4 max-h-[220px] cursor-text overflow-y-auto rounded-2xl border bg-card/70 p-6 backdrop-blur"
+              role="textbox"
+              aria-label="Typing test text"
+              aria-multiline="true"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key.length === 1 || e.key === 'Backspace' || e.key === ' ') inputRef.current?.focus(); }}
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-card/70 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card/70 to-transparent" />
+              <div className="whitespace-normal font-mono text-[20px] leading-8 tracking-wide md:text-[22px] md:leading-9">
+                {words.map((word, index) => {
+                  const isActive = index === currentWordIndex;
+                  const isCompleted = index < currentWordIndex;
+                  const isUpcoming = index > currentWordIndex;
+                  let typedWord = '';
+                  if (isActive) typedWord = currentWordTyped;
+                  else if (isCompleted) typedWord = completedWords[index] || '';
+                  return (
+                    <span
+                      key={index}
+                      ref={isActive ? activeWordRef : undefined}
+                      className={cn('inline-block rounded-lg px-1 py-0.5 transition', isActive && 'bg-[var(--theme-primary)]/10 ring-1 ring-[var(--theme-primary)]/20')}
+                    >
+                      <Word targetWord={word} typedWord={typedWord} isActive={isActive} isUpcoming={isUpcoming} />
+                    </span>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
-            {/* Vertical Mode (Original) */}
-            {displayMode === 'vertical' && (
-              <div
-                ref={containerRef}
-                onClick={handleContainerClick}
-                className="text-3xl font-mono leading-relaxed tracking-wider text-left h-40 overflow-y-auto overflow-x-hidden relative w-full scroll-smooth cursor-text"
-              >
-                <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
-                <div className="whitespace-normal text-muted-foreground">
-                  {words.map((word, index) => {
-                    const isActive = index === currentWordIndex;
-                    const isCompleted = index < currentWordIndex;
-                    const isUpcoming = index > currentWordIndex;
-
-                    let typedWord = '';
-                    if (isActive) {
-                      typedWord = currentWordTyped;
-                    } else if (isCompleted) {
-                      typedWord = completedWords[index] || '';
-                    }
-
-                    return (
-                      <React.Fragment key={index}>
-                        <span ref={isActive ? activeWordRef : null}>
-                          <Word
-                            targetWord={word}
-                            typedWord={typedWord}
-                            isActive={isActive}
-                            isUpcoming={isUpcoming}
-                          />
-                        </span>
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
-              </div>
-            )}
-
-            {/* This is a hidden input field that captures all keyboard events, keeping the UI clean. */}
             <input
               ref={inputRef}
               type="text"
-              className="absolute top-[-9999px] left-[-9999px] opacity-0"
+              className="sr-only"
               value={userInput}
-              onChange={handleUserInput}
+              onChange={(e) => commitUserInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Backspace') {
-                  e.preventDefault();
-                  return; // Do not process backspace
-                }
-                if (e.key === ' ' && status !== 'finished') {
-                  // FIX: Manually append a space so input continues to track progression while still preventing body scroll.
-                  e.preventDefault();
-                  commitUserInput((prev) => `${prev} `);
-                }
+                if (e.key === 'Backspace') { e.preventDefault(); return; }
+                if (e.key === ' ' && status !== 'finished') { e.preventDefault(); commitUserInput((prev) => `${prev} `); }
               }}
               disabled={status === 'finished'}
               autoFocus
+              aria-label="Typing input"
             />
-            <button
-              type="button"
-              onClick={handleRestart}
-              aria-label="Restart typing test"
-              className="mt-8 flex items-center gap-2 text-muted-foreground hover:text-primary-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <RefreshCw size={16} />
-              <span>Restart</span>
-            </button>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleRestart}
+                className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm font-medium hover:bg-accent focus-ring"
+                aria-label="Restart typing test"
+              >
+                <RefreshCw className="h-4 w-4" /> Restart
+              </button>
+              <span className="text-xs text-muted-foreground">Press <kbd className="rounded border bg-muted px-1 py-0.5 text-[11px]">Space</kbd> to advance • Backspace is disabled for accuracy tracking</span>
+            </div>
           </motion.div>
         )}
+
         {view === 'results' && (
-          <ResultsScreen
-            wpm={wpm}
-            accuracy={accuracy}
-            errors={errors}
-            duration={resultDuration}
-            correctChars={correctCharsCount}
-            incorrectChars={incorrectCharsCount}
-            missedChars={missedCharsCount}
-            mistakes={mistakes}
-            aiFeedback={aiFeedback}
-            isFeedbackLoading={isFeedbackLoading}
-            onRetry={handleRestart}
-            onContinue={handleNewTest}
-            footer={
-              <>
-                <button
-                  onClick={handleRestart}
-                  className="px-8 py-4 bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] text-white font-semibold rounded-xl hover:shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
-                >
-                  Retry Same Text
-                </button>
-                <button
-                  onClick={handleNewTest}
-                  className="px-8 py-4 bg-card/40 backdrop-blur-sm border-2 border-[var(--theme-primary)]/50 text-foreground font-semibold rounded-xl hover:bg-[var(--theme-primary)]/10 transition-all flex items-center justify-center gap-2"
-                >
-                  New Test
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </>
-            }
-          />
+          <div className="w-full max-w-4xl">
+            <ResultsScreen
+              wpm={wpm}
+              accuracy={accuracy}
+              errors={errors}
+              duration={resultDuration}
+              correctChars={correctCharsCount}
+              incorrectChars={incorrectCharsCount}
+              missedChars={missedCharsCount}
+              mistakes={mistakes}
+              aiFeedback={aiFeedback}
+              isFeedbackLoading={isFeedbackLoading}
+              onRetry={handleRestart}
+              onContinue={handleNewTest}
+              footer={
+                <>
+                  <button onClick={handleRestart} className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-semibold text-background hover:opacity-90 focus-ring">
+                    Retry same text
+                  </button>
+                  <button onClick={handleNewTest} className="inline-flex items-center justify-center gap-2 rounded-full border bg-card px-6 py-3 text-sm font-semibold hover:bg-accent focus-ring">
+                    New test <ArrowRight className="h-4 w-4" />
+                  </button>
+                </>
+              }
+            />
+          </div>
         )}
       </AnimatePresence>
     </div>

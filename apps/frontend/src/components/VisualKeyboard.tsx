@@ -3,82 +3,76 @@
 import { useEffect, useState, memo } from 'react';
 import { cn } from '@/lib/utils';
 
-// Keyboard layout definition
 const KEYBOARD_LAYOUT = [
-  // Row 1 (Numbers)
   [
-    { key: '`', code: 'Backquote', width: 'w-12' },
-    { key: '1', code: 'Digit1', width: 'w-12' },
-    { key: '2', code: 'Digit2', width: 'w-12' },
-    { key: '3', code: 'Digit3', width: 'w-12' },
-    { key: '4', code: 'Digit4', width: 'w-12' },
-    { key: '5', code: 'Digit5', width: 'w-12' },
-    { key: '6', code: 'Digit6', width: 'w-12' },
-    { key: '7', code: 'Digit7', width: 'w-12' },
-    { key: '8', code: 'Digit8', width: 'w-12' },
-    { key: '9', code: 'Digit9', width: 'w-12' },
-    { key: '0', code: 'Digit0', width: 'w-12' },
-    { key: '-', code: 'Minus', width: 'w-12' },
-    { key: '=', code: 'Equal', width: 'w-12' },
-    { key: 'Backspace', code: 'Backspace', width: 'w-20' },
+    { key: '`', code: 'Backquote', width: 'w-11' },
+    { key: '1', code: 'Digit1', width: 'w-11' },
+    { key: '2', code: 'Digit2', width: 'w-11' },
+    { key: '3', code: 'Digit3', width: 'w-11' },
+    { key: '4', code: 'Digit4', width: 'w-11' },
+    { key: '5', code: 'Digit5', width: 'w-11' },
+    { key: '6', code: 'Digit6', width: 'w-11' },
+    { key: '7', code: 'Digit7', width: 'w-11' },
+    { key: '8', code: 'Digit8', width: 'w-11' },
+    { key: '9', code: 'Digit9', width: 'w-11' },
+    { key: '0', code: 'Digit0', width: 'w-11' },
+    { key: '-', code: 'Minus', width: 'w-11' },
+    { key: '=', code: 'Equal', width: 'w-11' },
+    { key: '⌫', code: 'Backspace', width: 'w-[72px]' },
   ],
-  // Row 2 (Top letter row)
   [
-    { key: 'Tab', code: 'Tab', width: 'w-16' },
-    { key: 'Q', code: 'KeyQ', width: 'w-12' },
-    { key: 'W', code: 'KeyW', width: 'w-12' },
-    { key: 'E', code: 'KeyE', width: 'w-12' },
-    { key: 'R', code: 'KeyR', width: 'w-12' },
-    { key: 'T', code: 'KeyT', width: 'w-12' },
-    { key: 'Y', code: 'KeyY', width: 'w-12' },
-    { key: 'U', code: 'KeyU', width: 'w-12' },
-    { key: 'I', code: 'KeyI', width: 'w-12' },
-    { key: 'O', code: 'KeyO', width: 'w-12' },
-    { key: 'P', code: 'KeyP', width: 'w-12' },
-    { key: '[', code: 'BracketLeft', width: 'w-12' },
-    { key: ']', code: 'BracketRight', width: 'w-12' },
-    { key: '\\', code: 'Backslash', width: 'w-16' },
+    { key: 'Tab', code: 'Tab', width: 'w-[64px]' },
+    { key: 'Q', code: 'KeyQ', width: 'w-11' },
+    { key: 'W', code: 'KeyW', width: 'w-11' },
+    { key: 'E', code: 'KeyE', width: 'w-11' },
+    { key: 'R', code: 'KeyR', width: 'w-11' },
+    { key: 'T', code: 'KeyT', width: 'w-11' },
+    { key: 'Y', code: 'KeyY', width: 'w-11' },
+    { key: 'U', code: 'KeyU', width: 'w-11' },
+    { key: 'I', code: 'KeyI', width: 'w-11' },
+    { key: 'O', code: 'KeyO', width: 'w-11' },
+    { key: 'P', code: 'KeyP', width: 'w-11' },
+    { key: '[', code: 'BracketLeft', width: 'w-11' },
+    { key: ']', code: 'BracketRight', width: 'w-11' },
+    { key: '\\', code: 'Backslash', width: 'w-[60px]' },
   ],
-  // Row 3 (Home row)
   [
-    { key: 'Caps', code: 'CapsLock', width: 'w-20' },
-    { key: 'A', code: 'KeyA', width: 'w-12' },
-    { key: 'S', code: 'KeyS', width: 'w-12' },
-    { key: 'D', code: 'KeyD', width: 'w-12' },
-    { key: 'F', code: 'KeyF', width: 'w-12', homeRow: true },
-    { key: 'G', code: 'KeyG', width: 'w-12' },
-    { key: 'H', code: 'KeyH', width: 'w-12' },
-    { key: 'J', code: 'KeyJ', width: 'w-12', homeRow: true },
-    { key: 'K', code: 'KeyK', width: 'w-12' },
-    { key: 'L', code: 'KeyL', width: 'w-12' },
-    { key: ';', code: 'Semicolon', width: 'w-12' },
-    { key: "'", code: 'Quote', width: 'w-12' },
-    { key: 'Enter', code: 'Enter', width: 'w-24' },
+    { key: 'Caps', code: 'CapsLock', width: 'w-[76px]' },
+    { key: 'A', code: 'KeyA', width: 'w-11' },
+    { key: 'S', code: 'KeyS', width: 'w-11' },
+    { key: 'D', code: 'KeyD', width: 'w-11' },
+    { key: 'F', code: 'KeyF', width: 'w-11', homeRow: true },
+    { key: 'G', code: 'KeyG', width: 'w-11' },
+    { key: 'H', code: 'KeyH', width: 'w-11' },
+    { key: 'J', code: 'KeyJ', width: 'w-11', homeRow: true },
+    { key: 'K', code: 'KeyK', width: 'w-11' },
+    { key: 'L', code: 'KeyL', width: 'w-11' },
+    { key: ';', code: 'Semicolon', width: 'w-11' },
+    { key: "'", code: 'Quote', width: 'w-11' },
+    { key: 'Enter', code: 'Enter', width: 'w-[92px]' },
   ],
-  // Row 4 (Bottom letter row)
   [
-    { key: 'Shift', code: 'ShiftLeft', width: 'w-24' },
-    { key: 'Z', code: 'KeyZ', width: 'w-12' },
-    { key: 'X', code: 'KeyX', width: 'w-12' },
-    { key: 'C', code: 'KeyC', width: 'w-12' },
-    { key: 'V', code: 'KeyV', width: 'w-12' },
-    { key: 'B', code: 'KeyB', width: 'w-12' },
-    { key: 'N', code: 'KeyN', width: 'w-12' },
-    { key: 'M', code: 'KeyM', width: 'w-12' },
-    { key: ',', code: 'Comma', width: 'w-12' },
-    { key: '.', code: 'Period', width: 'w-12' },
-    { key: '/', code: 'Slash', width: 'w-12' },
-    { key: 'Shift', code: 'ShiftRight', width: 'w-28' },
+    { key: 'Shift', code: 'ShiftLeft', width: 'w-[92px]' },
+    { key: 'Z', code: 'KeyZ', width: 'w-11' },
+    { key: 'X', code: 'KeyX', width: 'w-11' },
+    { key: 'C', code: 'KeyC', width: 'w-11' },
+    { key: 'V', code: 'KeyV', width: 'w-11' },
+    { key: 'B', code: 'KeyB', width: 'w-11' },
+    { key: 'N', code: 'KeyN', width: 'w-11' },
+    { key: 'M', code: 'KeyM', width: 'w-11' },
+    { key: ',', code: 'Comma', width: 'w-11' },
+    { key: '.', code: 'Period', width: 'w-11' },
+    { key: '/', code: 'Slash', width: 'w-11' },
+    { key: 'Shift', code: 'ShiftRight', width: 'w-[108px]' },
   ],
-  // Row 5 (Space bar row)
   [
-    { key: 'Ctrl', code: 'ControlLeft', width: 'w-16' },
-    { key: 'Win', code: 'MetaLeft', width: 'w-12' },
-    { key: 'Alt', code: 'AltLeft', width: 'w-12' },
-    { key: 'Space', code: 'Space', width: 'flex-1' },
-    { key: 'Alt', code: 'AltRight', width: 'w-12' },
-    { key: 'Win', code: 'MetaRight', width: 'w-12' },
-    { key: 'Ctrl', code: 'ControlRight', width: 'w-16' },
+    { key: 'Ctrl', code: 'ControlLeft', width: 'w-[60px]' },
+    { key: 'Win', code: 'MetaLeft', width: 'w-11' },
+    { key: 'Alt', code: 'AltLeft', width: 'w-11' },
+    { key: 'Space', code: 'Space', width: 'flex-1 min-w-[180px]' },
+    { key: 'Alt', code: 'AltRight', width: 'w-11' },
+    { key: 'Win', code: 'MetaRight', width: 'w-11' },
+    { key: 'Ctrl', code: 'ControlRight', width: 'w-[60px]' },
   ],
 ];
 
@@ -93,10 +87,6 @@ interface KeyboardKeyProps {
   showHomeRowMarkers: boolean;
 }
 
-/**
- * KeyboardKey Component (Memoized)
- * Refactored to reduce render workload from O(Keys) to O(1) on single key presses.
- */
 const KeyboardKey = memo(function KeyboardKey({
   keyCode,
   keyLabel,
@@ -107,90 +97,51 @@ const KeyboardKey = memo(function KeyboardKey({
   compact,
   showHomeRowMarkers,
 }: KeyboardKeyProps) {
-  const keyClassName = cn(
-    'h-12 rounded-md font-medium transition-all duration-150 flex items-center justify-center relative',
-    'border-2 select-none',
-    compact ? 'text-xs' : 'text-sm',
-    width,
-
-    // State-based colors
-    {
-      // Target key (yellow)
-      'bg-yellow-400/20 border-yellow-500 text-yellow-700 dark:text-yellow-300':
-        state === 'target',
-
-      // Correct key (green)
-      'bg-green-500/20 border-green-600 text-green-700 dark:text-green-300 shadow-lg shadow-green-500/20':
-        state === 'correct',
-
-      // Incorrect key (red)
-      'bg-red-500/20 border-red-600 text-red-700 dark:text-red-300 shadow-lg shadow-red-500/20':
-        state === 'incorrect',
-
-      // Neutral key
-      'bg-card border-border hover:bg-muted hover:border-primary/50': state === 'neutral',
-    },
-
-    // Animation
-    {
-      'scale-95': isAnimating,
-      'scale-100': !isAnimating,
-    },
-
-    // Pulse animation for target key
-    {
-      'animate-pulse': state === 'target',
-    }
-  );
-
   return (
     <div
-      className={keyClassName}
-      role="button"
-      aria-label={keyLabel}
+      className={cn(
+        'relative flex h-11 select-none items-center justify-center rounded-xl border text-[12px] font-semibold tracking-wide transition-all duration-150',
+        compact ? 'h-9 text-[11px]' : 'h-11',
+        width,
+        state === 'target' &&
+          'bg-[var(--theme-primary)] text-white border-transparent shadow-[0_6px_16px_color-mix(in_srgb,var(--theme-primary)_45%,transparent)] scale-[1.02]',
+        state === 'correct' &&
+          'bg-emerald-500 text-white border-emerald-600 shadow-[0_6px_16px_rgba(16,185,129,0.35)]',
+        state === 'incorrect' &&
+          'bg-red-500 text-white border-red-600 shadow-[0_6px_16px_rgba(239,68,68,0.35)]',
+        state === 'neutral' &&
+          'bg-card border-border text-foreground/80 hover:border-foreground/20 hover:bg-accent',
+        isAnimating && 'scale-[0.97]'
+      )}
+      role="img"
+      aria-label={keyLabel === 'Space' ? 'Space' : keyLabel}
       data-keycode={keyCode}
     >
-      {/* Key label */}
-      <span className="relative z-10">{keyLabel === 'Space' ? '' : keyLabel}</span>
-
-      {/* Home row markers (bumps on F and J) */}
+      <span className="relative z-10">{keyLabel === 'Space' ? '—' : keyLabel}</span>
       {showHomeRowMarkers && homeRow && (
-        <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2">
-          <div className="w-2 h-1 bg-current opacity-30 rounded-full" />
-        </div>
+        <span className="absolute bottom-1 left-1/2 h-1 w-3 -translate-x-1/2 rounded-full bg-current opacity-20" />
       )}
-
-      {/* Target key indicator (pulsing dot) */}
       {state === 'target' && (
-        <div className="absolute -top-1 -right-1">
-          <span className="flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-          </span>
-        </div>
+        <span className="pointer-events-none absolute -right-1 -top-1 flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-60" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+        </span>
       )}
     </div>
   );
 });
 
 interface VisualKeyboardProps {
-  /** The target key that should be pressed (will be highlighted in yellow) */
   targetKey?: string;
-  /** The last key that was pressed */
   pressedKey?: string;
-  /** Whether the last key press was correct */
   isCorrect?: boolean;
-  /** Show home row markers on F and J keys */
   showHomeRowMarkers?: boolean;
-  /** Compact mode for smaller displays */
   compact?: boolean;
-  /** Custom className for the container */
   className?: string;
 }
 
-// Normalize keys for comparison (handle special cases)
 const normalizeKey = (key: string): string => {
-  const keyMap: Record<string, string> = {
+  const map: Record<string, string> = {
     ' ': 'Space',
     Enter: 'Enter',
     Backspace: 'Backspace',
@@ -200,37 +151,9 @@ const normalizeKey = (key: string): string => {
     Alt: 'AltLeft',
     Meta: 'MetaLeft',
   };
-  return keyMap[key] || key.toUpperCase();
+  return map[key] ?? key.toUpperCase();
 };
 
-/**
- * VisualKeyboard Component
- *
- * Displays an interactive QWERTY keyboard layout with visual feedback.
- * - Green: Correct key press
- * - Red: Incorrect key press
- * - Yellow: Target key to press
- * - Home row markers on F and J keys
- * - Responsive animations
- *
- * Optimized version:
- * - Employs a memoized `KeyboardKey` component.
- * - Pre-normalizes the target and pressed keys at parent level to avoid O(Keys) calculations during render.
- * - Drastically improves rendering performance per keystroke to maintain smooth 60fps typing interface.
- *
- * Optimized with memoized key rendering to ensure butter-smooth typing without
- * any visual stuttering or lagging.
- *
- * @example
- * ```tsx
- * <VisualKeyboard
- *   targetKey="a"
- *   pressedKey="a"
- *   isCorrect={true}
- *   showHomeRowMarkers={true}
- * />
- * ```
- */
 export function VisualKeyboard({
   targetKey,
   pressedKey,
@@ -240,92 +163,60 @@ export function VisualKeyboard({
   className,
 }: VisualKeyboardProps) {
   const [animatingKey, setAnimatingKey] = useState<string | null>(null);
-
-  // Pre-normalize target and pressed key values to prevent O(N) calculations in keys
   const normalizedTarget = targetKey ? normalizeKey(targetKey) : null;
   const normalizedPressed = pressedKey ? normalizeKey(pressedKey) : null;
 
-  // Handle key press animation
   useEffect(() => {
-    if (pressedKey) {
-      const normalized = normalizeKey(pressedKey);
-      setAnimatingKey(normalized);
-      const timer = setTimeout(() => setAnimatingKey(null), 200);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
+    if (!pressedKey) return;
+    const n = normalizeKey(pressedKey);
+    setAnimatingKey(n);
+    const t = setTimeout(() => setAnimatingKey(null), 160);
+    return () => clearTimeout(t);
   }, [pressedKey]);
 
-// --- OPTIMIZATION (Before vs. After) ---
-  // Before:
-  //   - Normalization helpers were executed repeatedly inside individual key lookups.
-  //   - Every key was a plain element, forcing all ~60+ keys to completely re-render on *every* single keystroke.
-  //   - Time Complexity: O(Keys) per keystroke due to complete Virtual DOM recreation and DOM tree checks.
-  // After:
-  //   - Pre-normalize comparison values once at the parent component using useMemo.
-  //   - Individual keys extracted into `KeyboardKey` wrapped in `React.memo`.
-  //   - Time Complexity: O(1) rendering overhead per keystroke, since only the active key and target key undergo state transition.
-
   return (
-    <div className={cn('w-full max-w-5xl mx-auto', className)}>
-      <div className="space-y-2">
-        {KEYBOARD_LAYOUT.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-2 justify-center">
-            {row.map((keyData) => {
-const keyCharUpper = keyData.key.toUpperCase();
-
-              // Get key state (target, correct, incorrect, neutral)
-              let state: 'target' | 'correct' | 'incorrect' | 'neutral' = 'neutral';
-
-              const isTarget =
-                normalizedTarget === keyData.code ||
-                normalizedTarget === keyCharUpper ||
-                (normalizedTarget === 'SPACE' && keyData.code === 'Space');
-
-              const wasPressed =
-                normalizedPressed === keyData.code ||
-                normalizedPressed === keyCharUpper ||
-                (normalizedPressed === 'SPACE' && keyData.code === 'Space');
-
-              if (isTarget) {
-                state = 'target';
-              } else if (wasPressed) {
-                state = isCorrect ? 'correct' : 'incorrect';
-              }
-
-              const isAnimating = animatingKey === keyData.code || animatingKey === keyCharUpper;
-
-              return (
-                <KeyboardKey
-                  key={keyData.code}
-                  keyCode={keyData.code}
-                  keyLabel={keyData.key}
-                  width={keyData.width}
-                  homeRow={keyData.homeRow}
-                  state={state}
-                  isAnimating={isAnimating}
-                  compact={compact}
-                  showHomeRowMarkers={showHomeRowMarkers}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="mt-6 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-yellow-400/20 border-2 border-yellow-500" />
-          <span>Target Key</span>
+    <div className={cn('w-full max-w-5xl mx-auto', className)} role="region" aria-label="Visual keyboard">
+      <div className="rounded-[20px] border bg-card/60 p-3 backdrop-blur-xl md:p-4">
+        <div className="space-y-1.5">
+          {KEYBOARD_LAYOUT.map((row, rowIdx) => (
+            <div key={rowIdx} className="flex gap-1.5 justify-center">
+              {row.map((k) => {
+                const upper = k.key.toUpperCase();
+                let state: 'target' | 'correct' | 'incorrect' | 'neutral' = 'neutral';
+                const isTarget =
+                  normalizedTarget === k.code ||
+                  normalizedTarget === upper ||
+                  (normalizedTarget === 'SPACE' && k.code === 'Space');
+                const wasPressed =
+                  normalizedPressed === k.code ||
+                  normalizedPressed === upper ||
+                  (normalizedPressed === 'SPACE' && k.code === 'Space');
+                if (isTarget) state = 'target';
+                else if (wasPressed) state = isCorrect ? 'correct' : 'incorrect';
+                const isAnimating = animatingKey === k.code || animatingKey === upper;
+                return (
+                  <KeyboardKey
+                    key={k.code}
+                    keyCode={k.code}
+                    keyLabel={k.key}
+                    width={k.width}
+                    homeRow={k.homeRow}
+                    state={state}
+                    isAnimating={isAnimating}
+                    compact={compact}
+                    showHomeRowMarkers={showHomeRowMarkers}
+                  />
+                );
+              })}
+            </div>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-green-500/20 border-2 border-green-600" />
-          <span>Correct</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-red-500/20 border-2 border-red-600" />
-          <span>Incorrect</span>
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-md bg-[var(--theme-primary)] border" /> Target</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-md bg-emerald-500 border border-emerald-600" /> Correct</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-md bg-red-500 border border-red-600" /> Miss</span>
+          <span className="hidden sm:inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-md bg-card border" /> Idle</span>
         </div>
       </div>
     </div>

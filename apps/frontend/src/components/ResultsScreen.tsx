@@ -3,21 +3,17 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Loader2, Sparkles, BarChart3 } from 'lucide-react';
+import { Loader2, Sparkles, BarChart3, Clock, Target, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MistakeAnalysis } from '@/components/MistakeAnalysis';
 import { useSession } from 'next-auth/react';
 import { lessonAPI } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-interface MistakeDetail {
-  key: string;
-  expected: string;
-  position: number;
-}
+interface MistakeDetail { key: string; expected: string; position: number; }
 
 interface ResultsScreenProps {
-  lessonId?: string; // Add lessonId prop for auto-save
+  lessonId?: string;
   wpm: number;
   accuracy: number;
   errors: number;
@@ -25,7 +21,7 @@ interface ResultsScreenProps {
   correctChars: number;
   incorrectChars: number;
   missedChars: number;
-  mistakes?: MistakeDetail[]; // Add mistakes array
+  mistakes?: MistakeDetail[];
   footer?: ReactNode;
   aiFeedback?: string | null;
   isFeedbackLoading?: boolean;
@@ -34,140 +30,55 @@ interface ResultsScreenProps {
 }
 
 export default function ResultsScreen({
-  lessonId,
-  wpm,
-  accuracy,
-  errors,
-  duration,
-  correctChars,
-  incorrectChars,
-  missedChars,
-  mistakes = [],
-  footer,
-  aiFeedback,
-  isFeedbackLoading,
-  onRetry,
-  onContinue,
+  lessonId, wpm, accuracy, errors, duration, correctChars, incorrectChars, missedChars, mistakes = [], footer, aiFeedback, isFeedbackLoading, onRetry, onContinue,
 }: ResultsScreenProps) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const savingRef = useRef(false);
   const lastSavedAttemptRef = useRef<string | null>(null);
 
-  // Auto-save progress when component mounts
   useEffect(() => {
-    if (!session?.accessToken || !lessonId || wpm <= 0 || savingRef.current) {
-      return;
-    }
-
+    if (!session?.accessToken || !lessonId || wpm <= 0 || savingRef.current) return;
     const attemptKey = `${lessonId}-${wpm}-${accuracy}-${errors}-${duration}`;
-    if (lastSavedAttemptRef.current === attemptKey) {
-      return;
-    }
-
-    let isActive = true;
-    savingRef.current = true;
-
-    const persistProgress = async () => {
+    if (lastSavedAttemptRef.current === attemptKey) return;
+    let isActive = true; savingRef.current = true;
+    const persist = async () => {
       try {
-        const completed = accuracy >= 90; // Adjust threshold as needed
-        await lessonAPI.saveLessonProgress({
-          lessonId,
-          wpm,
-          accuracy,
-          completed,
-        });
-
+        await lessonAPI.saveLessonProgress({ lessonId, wpm, accuracy, completed: accuracy >= 90 });
         if (!isActive) return;
         lastSavedAttemptRef.current = attemptKey;
-
-        toast({
-          title: 'Progress Saved!',
-          description: 'Your score for this lesson has been recorded.',
-        });
-      } catch (err) {
-        console.error('Failed to save progress:', err);
-        if (isActive) {
-          lastSavedAttemptRef.current = null;
-          toast({
-            title: 'Error',
-            description: 'Could not save your progress. Please try again.',
-          });
-        }
-      } finally {
-        if (isActive) {
-          savingRef.current = false;
-        }
-      }
+        toast({ title: 'Progress saved', description: 'Your lesson score has been recorded.' });
+      } catch {
+        if (isActive) { lastSavedAttemptRef.current = null; toast({ title: 'Could not save progress', description: 'Please try again.' }); }
+      } finally { if (isActive) savingRef.current = false; }
     };
-
-    void persistProgress();
-
-    return () => {
-      isActive = false;
-      savingRef.current = false;
-    };
+    void persist();
+    return () => { isActive = false; savingRef.current = false; };
   }, [session?.accessToken, lessonId, wpm, accuracy, errors, duration, toast]);
-  // Calculate additional stats
+
   const totalChars = correctChars + incorrectChars + missedChars;
-  const safeTotalChars = Math.max(totalChars, 1);
+  const safeTotal = Math.max(totalChars, 1);
   const safeDuration = Math.max(duration, 1);
   const rawWpm = Math.round(((correctChars + incorrectChars) / 5 / safeDuration) * 60);
-
-  // State for showing detailed analysis
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
 
-  // Process mistakes to create weak keys data for MistakeAnalysis
-  const weakKeys =
-    mistakes.length > 0
-      ? Object.values(
-          mistakes.reduce(
-            (acc, mistake) => {
-              const key = mistake.key === ' ' ? '␣' : mistake.key;
-              if (!acc[key]) {
-                acc[key] = { key, errorCount: 0 };
-              }
-              acc[key].errorCount++;
-              return acc;
-            },
-            {} as Record<string, { key: string; errorCount: number }>
-          )
-        ).sort((a, b) => b.errorCount - a.errorCount)
-      : [];
+  const weakKeys = mistakes.length > 0
+    ? Object.values(mistakes.reduce((acc, m) => {
+        const key = m.key === ' ' ? '␣' : m.key;
+        if (!acc[key]) acc[key] = { key, errorCount: 0 };
+        acc[key].errorCount++; return acc;
+      }, {} as Record<string, { key: string; errorCount: number }>)).sort((a, b) => b.errorCount - a.errorCount)
+    : [];
 
-  // Generate practice text from weak keys
-  const practiceText =
-    weakKeys.length > 0
-      ? weakKeys
-          .slice(0, 10)
-          .map((wk) => wk.key)
-          .join(' ')
-          .repeat(10)
-          .substring(0, 200)
-      : '';
+  const practiceText = weakKeys.length > 0 ? weakKeys.slice(0, 10).map((wk) => wk.key).join(' ').repeat(10).slice(0, 200) : '';
 
-  // If showing detailed analysis, render MistakeAnalysis component
   if (showDetailedAnalysis) {
     return (
       <AnimatePresence mode="wait">
-        <motion.div
-          key="detailed-analysis"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.3 }}
-          className="w-full max-w-4xl mx-auto"
-        >
-          <MistakeAnalysis
-            weakKeys={weakKeys}
-            practiceText={practiceText}
-            onRetry={onRetry}
-            onContinue={onContinue}
-          />
-          <div className="flex justify-center mt-6">
-            <Button variant="outline" onClick={() => setShowDetailedAnalysis(false)}>
-              ← Back to Results
-            </Button>
+        <motion.div key="detailed" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }} className="w-full">
+          <MistakeAnalysis weakKeys={weakKeys} practiceText={practiceText} onRetry={onRetry} onContinue={onContinue} />
+          <div className="mt-4 flex justify-center">
+            <Button variant="outline" onClick={() => setShowDetailedAnalysis(false)} className="rounded-full">← Back to results</Button>
           </div>
         </motion.div>
       </AnimatePresence>
@@ -175,221 +86,104 @@ export default function ResultsScreen({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5, type: 'spring' }}
-      className="w-full max-w-4xl mx-auto"
-    >
-      {/* Personal Best Banner: intentionally not shown yet - a real personal
-          best requires comparing against the user's saved history, and
-          claiming one based on an arbitrary WPM threshold was misleading. */}
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="w-full space-y-4">
+      {/* Hero stats */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="relative overflow-hidden rounded-[20px] border bg-card p-6">
+          <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-to-br from-[var(--theme-primary)]/25 to-transparent blur-2xl" />
+          <div className="text-xs font-medium tracking-widest text-muted-foreground">WORDS PER MINUTE</div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-5xl font-bold tracking-tight">{wpm}</span>
+            <span className="text-sm font-medium text-muted-foreground">WPM</span>
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600"><Zap className="h-3.5 w-3.5" /> Net</span>
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" /> {duration}s • Raw {rawWpm} WPM • {errors} errors
+          </div>
+        </div>
 
-      {/* Main Stats Display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        {/* WPM - Large display */}
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', duration: 0.8, delay: 0.2 }}
-          className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-8 text-center"
-        >
-          <div className="text-sm text-muted-foreground mb-2">Words Per Minute</div>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 0.4 }}
-            className="text-7xl font-bold bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-secondary)] bg-clip-text text-transparent"
-          >
-            {wpm}
-          </motion.div>
-          <div className="text-sm text-muted-foreground mt-2">WPM</div>
-        </motion.div>
-
-        {/* Accuracy - Circular ring */}
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', duration: 0.8, delay: 0.3 }}
-          className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-8 flex flex-col items-center justify-center"
-        >
-          <div className="text-sm text-muted-foreground mb-4">Accuracy</div>
-          <div className="relative w-32 h-32">
-            {/* Background circle */}
-            <svg className="w-full h-full transform -rotate-90">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="8"
-                className="text-muted/20"
-              />
-              {/* Progress circle */}
+        <div className="rounded-[20px] border bg-card p-6 flex flex-col items-center justify-center">
+          <div className="text-xs font-medium tracking-widest text-muted-foreground">ACCURACY</div>
+          <div className="relative mt-3 h-32 w-32">
+            <svg className="h-full w-full -rotate-90" viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="54" fill="none" stroke="currentColor" strokeWidth="10" className="text-muted/30" />
               <motion.circle
-                cx="64"
-                cy="64"
-                r="56"
-                fill="none"
-                stroke="url(#gradient)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 56}`}
-                initial={{ strokeDashoffset: 2 * Math.PI * 56 }}
-                animate={{ strokeDashoffset: 2 * Math.PI * 56 * (1 - accuracy / 100) }}
-                transition={{ duration: 1.5, delay: 0.5, ease: 'easeOut' }}
+                cx="64" cy="64" r="54" fill="none" stroke="url(#grad)" strokeWidth="10" strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 54}`} initial={{ strokeDashoffset: 2 * Math.PI * 54 }}
+                animate={{ strokeDashoffset: 2 * Math.PI * 54 * (1 - accuracy / 100) }} transition={{ duration: 1.1, ease: 'easeOut' }}
               />
               <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="var(--theme-primary)" />
                   <stop offset="100%" stopColor="var(--theme-secondary)" />
                 </linearGradient>
               </defs>
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-3xl font-bold">{accuracy}%</span>
+            <div className="absolute inset-0 grid place-items-center">
+              <span className="text-3xl font-bold tracking-tight">{accuracy}<span className="text-lg text-muted-foreground">%</span></span>
             </div>
           </div>
-        </motion.div>
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"><Target className="h-3.5 w-3.5 text-emerald-500" /> {accuracy >= 95 ? 'Excellent' : accuracy >= 90 ? 'Great' : accuracy >= 80 ? 'Good' : 'Keep practicing'}</div>
+        </div>
       </div>
 
-      {/* Detailed Stats Grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-        className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6 mb-8"
-      >
-        <h3 className="text-lg font-semibold mb-4">Detailed Statistics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Stat grid */}
+      <div className="rounded-[20px] border bg-card p-4">
+        <h3 className="px-1 text-sm font-semibold">Detailed stats</h3>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
           <StatBox label="Raw WPM" value={rawWpm} />
           <StatBox label="Net WPM" value={wpm} />
           <StatBox label="Accuracy" value={`${accuracy}%`} />
           <StatBox label="Errors" value={errors} />
-          <StatBox label="Correct Chars" value={correctChars} highlight="green" />
+          <StatBox label="Correct" value={correctChars} highlight="green" />
           <StatBox label="Duration" value={`${duration}s`} />
         </div>
-      </motion.div>
+      </div>
 
-      {/* Character Breakdown */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.7 }}
-        className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6 mb-8"
-      >
-        <h3 className="text-lg font-semibold mb-4">Character Breakdown</h3>
-        <div className="flex items-center gap-4 mb-2">
-          <div className="flex-1 h-6 bg-muted rounded-full overflow-hidden flex">
-            <div
-              className="bg-green-500 h-full transition-all duration-1000"
-              style={{ width: `${(correctChars / safeTotalChars) * 100}%` }}
-            />
-            <div
-              className="bg-red-500 h-full transition-all duration-1000"
-              style={{ width: `${(incorrectChars / safeTotalChars) * 100}%` }}
-            />
-            <div
-              className="bg-gray-600 h-full transition-all duration-1000"
-              style={{ width: `${(missedChars / safeTotalChars) * 100}%` }}
-            />
-          </div>
+      {/* Character breakdown */}
+      <div className="rounded-[20px] border bg-card p-4">
+        <h3 className="text-sm font-semibold">Character breakdown</h3>
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted flex">
+          <div className="bg-emerald-500 transition-all duration-700" style={{ width: `${(correctChars / safeTotal) * 100}%` }} />
+          <div className="bg-red-500 transition-all duration-700" style={{ width: `${(incorrectChars / safeTotal) * 100}%` }} />
+          <div className="bg-zinc-400 transition-all duration-700" style={{ width: `${(missedChars / safeTotal) * 100}%` }} />
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full" />
-            <span>Correct: {correctChars}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full" />
-            <span>Incorrect: {incorrectChars}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-gray-600 rounded-full" />
-            <span>Missed: {missedChars}</span>
-          </div>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs">
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Correct {correctChars}</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Incorrect {incorrectChars}</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-zinc-400" /> Missed {missedChars}</span>
         </div>
-      </motion.div>
+      </div>
 
-      {/* AI Feedback Section */}
       {(isFeedbackLoading || aiFeedback) && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.75 }}
-          className="bg-card/40 backdrop-blur-xl border border-border rounded-2xl p-6 mb-8"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-[var(--theme-primary)]" />
-            <h3 className="text-lg font-semibold">AI Feedback</h3>
-          </div>
+        <div className="rounded-[20px] border bg-card p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-[var(--theme-primary)]" /> AI Feedback</div>
           {isFeedbackLoading ? (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Analyzing your performance...</span>
-            </div>
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing your performance…</div>
           ) : aiFeedback ? (
-            <p className="text-foreground leading-relaxed">{aiFeedback}</p>
+            <p className="mt-2 text-sm leading-6 text-foreground/90">{aiFeedback}</p>
           ) : null}
-        </motion.div>
+        </div>
       )}
 
-      {/* Detailed Analysis Button */}
       {mistakes.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.75 }}
-          className="flex justify-center mb-6"
-        >
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => setShowDetailedAnalysis(true)}
-            className="gap-2"
-          >
-            <BarChart3 className="w-5 h-5" />
-            View Detailed Analysis
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={() => setShowDetailedAnalysis(true)} className="gap-2 rounded-full">
+            <BarChart3 className="h-4 w-4" /> View detailed analysis
           </Button>
-        </motion.div>
+        </div>
       )}
 
-      {footer && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          {footer}
-        </motion.div>
-      )}
+      {footer && <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">{footer}</div>}
     </motion.div>
   );
 }
 
-function StatBox({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string | number;
-  highlight?: 'green' | 'red';
-}) {
+function StatBox({ label, value, highlight }: { label: string; value: string | number; highlight?: 'green' | 'red' }) {
   return (
-    <div className="bg-background/50 rounded-lg p-3 text-center">
-      <div className="text-xs text-muted-foreground mb-1">{label}</div>
-      <div
-        className={cn(
-          'text-2xl font-bold',
-          highlight === 'green' && 'text-green-400',
-          highlight === 'red' && 'text-red-400'
-        )}
-      >
-        {value}
-      </div>
+    <div className="rounded-2xl border bg-background/60 p-3 text-center">
+      <div className="text-[11px] tracking-widest text-muted-foreground">{label.toUpperCase()}</div>
+      <div className={cn('mt-1 text-xl font-bold tabular-nums', highlight === 'green' && 'text-emerald-500', highlight === 'red' && 'text-red-500')}>{value}</div>
     </div>
   );
 }
