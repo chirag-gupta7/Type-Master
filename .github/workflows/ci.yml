@@ -68,9 +68,11 @@ jobs:
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
+        continue-on-error: true
         with:
           files: ./apps/frontend/coverage/lcov.info
           flags: frontend
+          fail_ci_if_error: false
 
   test-backend:
     name: Test Backend
