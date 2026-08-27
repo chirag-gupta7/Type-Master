@@ -64,18 +64,7 @@ jobs:
         run: npm run typecheck --workspace=apps/frontend
 
       - name: Run tests
-        run: npm run test:ci --workspace=apps/frontend 2>&1 | tee test-output.log; exit ${PIPESTATUS[0]}
-
-      - name: Debug failure (push log)
-        if: always()
-        continue-on-error: true
-        run: |
-          { echo "# Frontend test log"; cat test-output.log; } > debug-log.txt
-          git config user.email "ci@ci.local"
-          git config user.name "ci-debug"
-          git add -f debug-log.txt
-          git commit -m "ci debug log" || true
-          git push -f origin HEAD:ci-debug
+        run: npm run test:ci --workspace=apps/frontend
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
