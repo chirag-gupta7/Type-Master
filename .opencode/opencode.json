@@ -1,6 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    ".opencode/plugins/graphify.js"
-  ]
+  "instructions": [
+    "AGENTS.md",
+    "instructions/token-policy.md",
+    "instructions/project-map.md",
+    "instructions/workflows.md"
+  ],
+  "skills": {
+    "paths": [".opencode/skills"]
+  },
+  "plugin": [".opencode/plugins/graphify.js", ".opencode/plugins/auto-graphify.js"]
 }
