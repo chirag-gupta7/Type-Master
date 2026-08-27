@@ -4,16 +4,21 @@ import { TooltipProvider } from '../ui/tooltip';
 
 // Mock framer-motion to execute animations synchronously in test environment
 jest.mock('framer-motion', () => {
-  const React = require('react');
+  const React = jest.requireActual('react');
+  const MotionButton = React.forwardRef(
+    ({ children, whileHover, whileTap, ...props }: any, ref: any) => (
+      <button ref={ref} {...props}>{children}</button>
+    )
+  );
+  MotionButton.displayName = 'MotionButton';
+  const MotionDiv = React.forwardRef(
+    ({ children, initial, animate, exit, transition, ...props }: any, ref: any) => (
+      <div ref={ref} {...props}>{children}</div>
+    )
+  );
+  MotionDiv.displayName = 'MotionDiv';
   return {
-    motion: {
-      button: React.forwardRef(({ children, whileHover, whileTap, ...props }: any, ref: any) => (
-        <button ref={ref} {...props}>{children}</button>
-      )),
-      div: React.forwardRef(({ children, initial, animate, exit, transition, ...props }: any, ref: any) => (
-        <div ref={ref} {...props}>{children}</div>
-      )),
-    },
+    motion: { button: MotionButton, div: MotionDiv },
     AnimatePresence: ({ children }: any) => <>{children}</>,
   };
 });
