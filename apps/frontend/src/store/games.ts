@@ -29,7 +29,7 @@ interface GameState {
   setGame: (game: GameType | null) => void;
   updateScore: (score: number) => void;
   startGame: () => void;
-  endGame: () => void;
+  endGame: (result?: { score?: number; wpm?: number; accuracy?: number; duration?: number }) => void;
   resetGame: () => void;
   setHighScore: (gameId: string, score: number) => void;
   incrementGamesPlayed: (gameId?: string) => void;
@@ -138,8 +138,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  endGame: () => {
+  endGame: (result) => {
     const { currentGame, score, gameHistory, isGuest } = get();
+    const finalScore = result?.score ?? score;
 
     if (!currentGame) {
       set({ isPlaying: false });
@@ -149,7 +150,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const entry: GameHistoryEntry = {
       id: createHistoryId(),
       gameType: currentGame,
-      score,
+      score: finalScore,
       playedAt: new Date(),
     };
 
@@ -170,14 +171,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       void gameAPI
         .saveScore({
           gameType: mappedType,
-          score,
+          score: finalScore,
+          wpm: result?.wpm,
+          accuracy: result?.accuracy,
+          duration: result?.duration,
         })
         .then(() => {
           set((state) => ({
             backendGamesPlayed: state.backendGamesPlayed + 1,
             backendHighScores: {
               ...state.backendHighScores,
-              [currentGame]: Math.max(state.backendHighScores[currentGame] || 0, score),
+              [currentGame]: Math.max(state.backendHighScores[currentGame] || 0, finalScore),
             },
           }));
         })

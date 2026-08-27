@@ -27,10 +27,14 @@ export function WordBlitz() {
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const addInterval = useRef<NodeJS.Timeout | null>(null);
   const fallInterval = useRef<NodeJS.Timeout | null>(null);
+  const scoreRef = useRef(0);
   const setHighScore = useGameStore((s) => s.setHighScore);
   const incrementGamesPlayed = useGameStore((s) => s.incrementGamesPlayed);
   const setCurrentGame = useGameStore((s) => s.setCurrentGame);
+  const endGame = useGameStore((s) => s.endGame);
   const highScore = useGameStore((s) => s.highScores['word-blitz'] || 0);
+
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   const addWord = () => {
     if (!gameAreaRef.current) return;
@@ -57,8 +61,10 @@ export function WordBlitz() {
     if (timerInterval.current) clearInterval(timerInterval.current);
     if (addInterval.current) clearInterval(addInterval.current);
     if (fallInterval.current) clearInterval(fallInterval.current);
-    if (score > highScore) setHighScore('word-blitz', score);
+    const finalScore = scoreRef.current;
+    if (finalScore > highScore) setHighScore('word-blitz', finalScore);
     incrementGamesPlayed('word-blitz');
+    endGame({ score: finalScore });
   };
 
   useEffect(() => () => {

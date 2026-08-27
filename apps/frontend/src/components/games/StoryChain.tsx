@@ -6,19 +6,6 @@ import { Timer, CornerDownLeft, ArrowLeft, Loader2, Sparkles, Trophy, BookOpen, 
 import { aiAPI } from '@/lib/api';
 import { motion } from 'framer-motion';
 
-const FALLBACK_STARTERS = [
-  'The dusty old book fell from the shelf, opening to a strange map.',
-  'A single red light blinked on the abandoned console.',
-  'The alley was empty, except for a cat with unusual green eyes.',
-];
-const FALLBACK_RESPONSES = [
-  'Suddenly, a loud noise echoed from the floor above.',
-  'But they had a strange feeling they were being watched.',
-  'It was unlike anything they had ever seen before.',
-  'A hidden door creaked open in the shadows.',
-  'They knew at that moment, nothing would be the same.',
-];
-
 export function StoryChain() {
   const [gameState, setGameState] = useState<'idle' | 'running' | 'finished'>('idle');
   const [story, setStory] = useState<string[]>([]);
@@ -29,15 +16,22 @@ export function StoryChain() {
   const [isStarting, setIsStarting] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const scoreRef = useRef(0);
+  const storyRef = useRef<string[]>([]);
   const setHighScore = useGameStore((s) => s.setHighScore);
   const incrementGamesPlayed = useGameStore((s) => s.incrementGamesPlayed);
   const setCurrentGame = useGameStore((s) => s.setCurrentGame);
+  const endGame = useGameStore((s) => s.endGame);
   const previousFeedback = useGameStore((s) => s.lastWritingFeedback['story-chain'] || null);
   const setWritingFeedback = useGameStore((s) => s.setWritingFeedback);
   const highScore = useGameStore((s) => s.highScores['story-chain'] || 0);
   const inputRef = useRef<HTMLInputElement>(null);
   const storyEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { storyRef.current = story; }, [story]);
 
   const generateWritingFeedback = useCallback(async (storySentences: string[], priorFeedback: string | null) => {
     const userSentences = storySentences.filter((_, i) => i % 2 === 1);
@@ -52,30 +46,33 @@ export function StoryChain() {
     finally { setIsFeedbackLoading(false); }
   }, [setWritingFeedback]);
 
-  const getAiResponse = async (currentStory: string[]): Promise<string> => {
+  const getAiResponse = async (currentStory: string[]): Promise<string | null> => {
     try {
       const data = await aiAPI.getStoryResponse(currentStory);
       if (data.response) return data.response;
-      if (currentStory.length === 0) return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
-      return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
+      setAiError('The AI story service returned no response. Please try again later.');
+      return null;
     } catch {
-      if (currentStory.length === 0) return FALLBACK_STARTERS[Math.floor(Math.random() * FALLBACK_STARTERS.length)];
-      return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
+      setAiError('Could not reach the AI story service. Please try again later.');
+      return null;
     }
   };
 
   const startGame = async () => {
     setIsStarting(true);
     const first = await getAiResponse([]);
-    setStory([first]); setUserInput(''); setTimer(180); setScore(0); setGameState('running'); setAiFeedback(null); setIsFeedbackLoading(false);
     setIsStarting(false);
+    if (!first) { setGameState('idle'); return; }
+    setStory([first]); setUserInput(''); setTimer(180); setScore(0); setGameState('running'); setAiFeedback(null); setIsFeedbackLoading(false);
   };
 
   const stopGame = () => {
     setGameState('finished');
-    if (score > highScore) setHighScore('story-chain', score);
+    const finalScore = scoreRef.current;
+    if (finalScore > highScore) setHighScore('story-chain', finalScore);
     incrementGamesPlayed('story-chain');
-    generateWritingFeedback(story, previousFeedback);
+    endGame({ score: finalScore, duration: 180 });
+    generateWritingFeedback(storyRef.current, previousFeedback);
   };
 
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -84,6 +81,7 @@ export function StoryChain() {
     const next = userInput.trim();
     setUserInput(''); setIsAiThinking(true);
     const aiResponse = await getAiResponse([...story, next]);
+    if (!aiResponse) { setIsAiThinking(false); return; }
     setStory([...story, next, aiResponse]); setScore((s) => s + 1); setIsAiThinking(false);
     inputRef.current?.focus();
   };
@@ -135,9 +133,10 @@ export function StoryChain() {
             <div className="flex items-center gap-2 rounded-xl border bg-background/60 px-3 py-2"><Wand2 className="h-4 w-4 text-emerald-500" /> AI starts, you continue</div>
             <div className="flex items-center gap-2 rounded-xl border bg-background/60 px-3 py-2"><Timer className="h-4 w-4 text-muted-foreground" /> 3 minutes • alternating sentences</div>
           </div>
-          <Button onClick={startGame} variant="primary" size="lg" className="mt-6 rounded-full px-8" disabled={isStarting}>
-            {isStarting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is starting the story…</> : 'Start game'}
-          </Button>
+           <Button onClick={startGame} variant="primary" size="lg" className="mt-6 rounded-full px-8" disabled={isStarting}>
+             {isStarting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is starting the story…</> : 'Start game'}
+           </Button>
+           {aiError && <p className="mt-3 text-xs text-red-500">{aiError}</p>}
         </>
       ) : (
         <>

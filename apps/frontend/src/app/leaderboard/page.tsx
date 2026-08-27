@@ -25,12 +25,17 @@ function getRankIcon(rank: number) {
 export default function LeaderboardPage() {
   const [gameType, setGameType] = useState<GameTab>('WORD_BLITZ');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [globalAvg, setGlobalAvg] = useState<{ wpm: number; accuracy: number; totalTests: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchLeaderboard = useCallback(async (type: GameTab) => {
     setLoading(true); setError(null);
-    try { const res = await gameAPI.getLeaderboard(type); setEntries(res.data?.leaderboard ?? []); }
+    try {
+      const res = await gameAPI.getLeaderboard(type);
+      setEntries(res.data?.leaderboard ?? []);
+      setGlobalAvg(res.data?.globalAvg ?? null);
+    }
     catch { setError('Could not load the leaderboard. Please try again later.'); }
     finally { setLoading(false); }
   }, []);
@@ -61,6 +66,26 @@ export default function LeaderboardPage() {
             </button>
           ))}
         </div>
+
+        {globalAvg && (
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-2xl border bg-card/60 p-4 text-center">
+              <div className="text-xs tracking-widest text-muted-foreground">GLOBAL AVG WPM</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums">{globalAvg.wpm}</div>
+            </div>
+            <div className="rounded-2xl border bg-card/60 p-4 text-center">
+              <div className="text-xs tracking-widest text-muted-foreground">GLOBAL AVG ACCURACY</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums">{globalAvg.accuracy}%</div>
+            </div>
+            <div className="rounded-2xl border bg-card/60 p-4 text-center">
+              <div className="text-xs tracking-widest text-muted-foreground">TYPING TESTS</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums">{globalAvg.totalTests.toLocaleString()}</div>
+            </div>
+          </div>
+        )}
+        {globalAvg && (
+          <p className="mt-3 text-center text-xs text-muted-foreground">Beat the global average to join the top typists. Every test counts.</p>
+        )}
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, delay: 0.1 }} className="mt-6 overflow-hidden rounded-[20px] border bg-card/60 backdrop-blur-xl shadow-sm">
           <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-xs font-semibold tracking-widest text-muted-foreground border-b bg-muted/30">

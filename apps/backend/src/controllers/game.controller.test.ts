@@ -12,6 +12,12 @@ jest.mock('../utils/prisma', () => ({
       findFirst: jest.fn(),
       groupBy: jest.fn(),
     },
+    testResult: {
+      aggregate: jest.fn().mockResolvedValue({
+        _avg: { wpm: 50, accuracy: 95 },
+        _count: { _all: 100 },
+      }),
+    },
   },
 }));
 
@@ -604,6 +610,7 @@ describe('GameController - getLeaderboard', () => {
         gameType: GameType.WORD_BLITZ,
         leaderboard: [],
         total: 0,
+        globalAvg: { wpm: 50, accuracy: 95, totalTests: 100 },
       },
     });
   });
@@ -693,6 +700,7 @@ describe('GameController - getLeaderboard', () => {
           },
         ],
         total: 2,
+        globalAvg: { wpm: 50, accuracy: 95, totalTests: 100 },
       },
     });
   });
@@ -748,6 +756,7 @@ describe('GameController - getLeaderboard', () => {
         gameType: GameType.WORD_BLITZ,
         leaderboard: [],
         total: 0,
+        globalAvg: { wpm: 50, accuracy: 95, totalTests: 100 },
       },
     });
   });
@@ -841,6 +850,7 @@ describe('GameController - getLeaderboard', () => {
           },
         ],
         total: 2,
+        globalAvg: { wpm: 50, accuracy: 95, totalTests: 100 },
       },
     });
   });

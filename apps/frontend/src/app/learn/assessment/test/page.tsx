@@ -143,31 +143,6 @@ export default function AssessmentPage() {
     initializePage();
   }, [session, sessionStatus]);
 
-  // Fetch assessment content on mount (keep original logic as backup)
-  useEffect(() => {
-    const fetchAssessmentContent = async () => {
-      try {
-        // For now, use demo user ID - replace with actual auth later
-        const userId = 'demo-user-id';
-
-        const response = await fetch(`${getApiBaseUrl()}/api/${API_VERSION}/assessment/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
-        });
-
-        const data = await response.json();
-        setTestContent(data.content);
-      } catch (error) {
-        console.error('Failed to fetch assessment content:', error);
-        // Fallback content
-        setTestContent('the quick brown fox jumps over the lazy dog');
-      }
-    };
-
-    fetchAssessmentContent();
-  }, []);
-
   const startAssessment = useCallback(() => {
     setStage('testing');
     setStartTime(Date.now());

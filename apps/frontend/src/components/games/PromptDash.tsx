@@ -6,15 +6,6 @@ import { Timer, ArrowLeft, Loader2, Sparkles, Trophy, Feather, Wand2 } from 'luc
 import { aiAPI } from '@/lib/api';
 import { motion } from 'framer-motion';
 
-const FALLBACK_PROMPTS = [
-  'Describe a city hidden in the clouds.',
-  'The ancient artifact began to glow...',
-  'My pet suddenly started talking. It said...',
-  'Write about a world where music is illegal.',
-  'The last dragon on Earth was just a rumor, until today.',
-  'A time traveler arrived, but their machine was broken.',
-];
-
 export const computeLiveWpm = (charCount: number, secondsElapsed: number): number =>
   secondsElapsed > 0 ? Math.round(charCount / 5 / (secondsElapsed / 60)) : 0;
 
@@ -27,14 +18,19 @@ export function PromptDash() {
   const [isLoading, setIsLoading] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const textRef = useRef('');
   const setHighScore = useGameStore((s) => s.setHighScore);
   const incrementGamesPlayed = useGameStore((s) => s.incrementGamesPlayed);
   const setCurrentGame = useGameStore((s) => s.setCurrentGame);
+  const endGame = useGameStore((s) => s.endGame);
   const previousFeedback = useGameStore((s) => s.lastWritingFeedback['prompt-dash'] || null);
   const setWritingFeedback = useGameStore((s) => s.setWritingFeedback);
   const highScore = useGameStore((s) => s.highScores['prompt-dash'] || 0);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { textRef.current = text; }, [text]);
 
   const generateWritingFeedback = useCallback(
     async (writtenText: string, priorFeedback: string | null) => {
@@ -50,28 +46,35 @@ export function PromptDash() {
     }, [setWritingFeedback]
   );
 
-  const generateNewPrompt = async () => {
+  const generateNewPrompt = async (): Promise<boolean> => {
     setIsLoading(true);
+    setAiError(null);
     try {
       const data = await aiAPI.generateWritingPrompt();
-      setPrompt(data.prompt ?? FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]);
-    } catch { setPrompt(FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)]); }
-    finally { setIsLoading(false); }
+      if (data.prompt) { setPrompt(data.prompt); return true; }
+      setAiError('The AI prompt service returned no prompt. Please try again later.');
+      return false;
+    } catch {
+      setAiError('Could not reach the AI prompt service. Please try again later.');
+      return false;
+    } finally { setIsLoading(false); }
   };
 
   const startGame = async () => {
-    await generateNewPrompt();
+    const ok = await generateNewPrompt();
+    if (!ok) { setGameState('idle'); return; }
     setText(''); setTimer(60); setScore(0); setGameState('running'); setAiFeedback(null); setIsFeedbackLoading(false);
     setTimeout(() => textAreaRef.current?.focus(), 50);
   };
 
   const stopGame = () => {
     setGameState('finished');
-    const wpm = Math.round(text.length / 5);
+    const wpm = Math.round(textRef.current.length / 5);
     setScore(wpm);
     if (wpm > highScore) setHighScore('prompt-dash', wpm);
     incrementGamesPlayed('prompt-dash');
-    generateWritingFeedback(text, previousFeedback);
+    endGame({ score: wpm, duration: 60 });
+    generateWritingFeedback(textRef.current, previousFeedback);
   };
 
   useEffect(() => {
@@ -121,9 +124,10 @@ export function PromptDash() {
             <div className="flex items-center gap-2 rounded-xl border bg-background/60 px-3 py-2"><Wand2 className="h-4 w-4 text-violet-500" /> AI-generated prompt each run</div>
             <div className="flex items-center gap-2 rounded-xl border bg-background/60 px-3 py-2"><Timer className="h-4 w-4 text-muted-foreground" /> 60 seconds • keep the flow going</div>
           </div>
-          <Button onClick={startGame} variant="primary" size="lg" className="mt-6 rounded-full px-8" disabled={isLoading}>
-            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating prompt…</> : 'Start game'}
-          </Button>
+           <Button onClick={startGame} variant="primary" size="lg" className="mt-6 rounded-full px-8" disabled={isLoading}>
+             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating prompt…</> : 'Start game'}
+           </Button>
+           {aiError && <p className="mt-3 text-xs text-red-500">{aiError}</p>}
         </>
       ) : (
         <>

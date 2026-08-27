@@ -936,6 +936,11 @@ export const gameAPI = {
           createdAt: string;
         }>;
         total: number;
+        globalAvg?: {
+          wpm: number;
+          accuracy: number;
+          totalTests: number;
+        };
       };
     }>(`/games/leaderboard?${params.toString()}`, { cacheTtl: 30 * 1000 });
   },

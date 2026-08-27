@@ -3,6 +3,36 @@ import { z, ZodError } from 'zod';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 
+// Short, self-contained sentences a typist can practice writing.
+// The assessment is a placement/practice exercise, not a full lesson.
+const PRACTICE_SENTENCES: string[] = [
+  'The quick brown fox jumps over the lazy dog while the sun sets slowly.',
+  'She packed her bag, locked the door, and walked to the train station.',
+  'Every great developer started by writing small programs that barely worked.',
+  'Reading widely is the fastest way to grow both vocabulary and imagination.',
+  'The old library smelled of paper, dust, and the quiet thrill of discovery.',
+  'He typed the email carefully, then reread it twice before pressing send.',
+  'A calm mind and a clear plan beat raw speed when the deadline is near.',
+  'We watched the tide pull back, leaving shells and broken bits of glass.',
+  'Learning to touch type well is a skill that pays off every single day.',
+  'The coffee was warm, the room was silent, and the idea finally arrived.',
+  'Mountains teach patience; the trail is long, but the view is worth the climb.',
+  'She counted the stars, named a few, and forgot the rest as she fell asleep.',
+  'Good code reads like good prose: clear, concise, and free of needless noise.',
+  'The mechanic lifted the hood and listened to the engine hum with a smile.',
+  'Practice is not about perfection; it is about showing up and trying again.',
+  'They built the boat from scrap wood and sailed it across the quiet lake.',
+  'A single thoughtful question often reveals more than a dozen quick answers.',
+  'The market buzzed with voices, the smell of bread, and the chill of morning.',
+  'Write the first sentence badly; the second one will be easier to begin.',
+  'He folded the letter, sealed it, and set it on the windowsill to dry.',
+  'Small daily habits, repeated for years, quietly shape who we become.',
+  'The cat watched the cursor blink, judging every word before it appeared.',
+  'Kindness is a language that the deaf can hear and the blind can see.',
+  'We mapped the route, checked the weather, and left before the city woke.',
+  'Typing without looking at the keys feels strange until suddenly it feels free.',
+];
+
 // Validation schemas
 const userIdParamSchema = z.string().uuid('Invalid user ID format');
 
@@ -41,41 +71,28 @@ export const startAssessment = async (
 
     const userId = authUserId;
 
-    // Pick a RANDOM level-1 lesson so each placement test uses a different passage
-    // (instead of the same fixed lesson content every time).
-    const lessons = await prisma.lesson.findMany({
-      where: { level: 1 },
-      select: { content: true, targetWpm: true, minAccuracy: true },
-      take: 8,
+    // Validate the user (independent of sentence selection below).
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
     });
-    const assessmentLesson =
-      Array.isArray(lessons) && lessons.length
-        ? lessons[Math.floor(Math.random() * lessons.length)]
-        : null;
-
-    // Validate the user (independent of lesson selection above).
-    const [user] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-      }),
-    ]);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!assessmentLesson) {
-      return res.status(500).json({ error: 'Assessment content not found' });
-    }
+    // Serve a short practice sentence (not a full lesson) so the assessment is a
+    // quick, repeatable typing exercise.
+    const content =
+      PRACTICE_SENTENCES[Math.floor(Math.random() * PRACTICE_SENTENCES.length)];
 
     logger.info(`Started skill assessment for user: ${userId}`);
 
     return res.json({
       message: 'Assessment started',
-      content: assessmentLesson.content,
-      instructions: 'Type the text below as accurately and quickly as you can.',
-      targetWpm: assessmentLesson.targetWpm,
-      minAccuracy: assessmentLesson.minAccuracy,
+      content,
+      instructions: 'Type the sentence below as accurately and quickly as you can.',
+      targetWpm: 30,
+      minAccuracy: 90,
     });
   } catch (error) {
     if (error instanceof ZodError) {

@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { section1Lessons, section2Lessons, section3Lessons } from './comprehensive-seed';
 import { section4Lessons, section5Lessons, section6Lessons } from './seed-sections-4-6';
 import { codingLessons } from './seed-coding-lessons';
+import { advancedPunctuationLessons, codeSyntaxLessons, speedDrillLessons } from './seed-new-lessons';
 
 const prisma = new PrismaClient();
 
@@ -15,6 +16,9 @@ const allLessons = [
   ...section5Lessons, // Lessons 81-95: Mastery
   ...section6Lessons, // Lessons 96-100: Programming
   ...codingLessons, // Lessons 101-200: Python, Java, C++, C
+  ...advancedPunctuationLessons, // Section 11: Advanced Punctuation
+  ...codeSyntaxLessons, // Section 12: Code Syntax
+  ...speedDrillLessons, // Section 13: Speed Drills
 ];
 
 const achievements = [

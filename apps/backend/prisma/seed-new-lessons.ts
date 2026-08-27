@@ -19,7 +19,7 @@ const commonFingers = [
   'pinky-right',
 ];
 
-const advancedPunctuationLessons = [
+export const advancedPunctuationLessons = [
   {
     level: 201,
     order: 201,
@@ -183,7 +183,7 @@ const advancedPunctuationLessons = [
   },
 ];
 
-const codeSyntaxLessons = [
+export const codeSyntaxLessons = [
   {
     level: 211,
     order: 211,
@@ -347,7 +347,7 @@ const codeSyntaxLessons = [
   },
 ];
 
-const speedDrillLessons = [
+export const speedDrillLessons = [
   {
     level: 221,
     order: 221,
@@ -540,11 +540,15 @@ async function main() {
   console.log(`✅ Created ${created} lessons across sections 11-13`);
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error during new lesson seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only run standalone when this file is the entry script (e.g. `ts-node seed-new-lessons.ts`).
+// When imported by seed.ts, the arrays above are concatenated into the main seed instead.
+if (process.argv[1] && process.argv[1].includes('seed-new-lessons')) {
+  main()
+    .catch((e) => {
+      console.error('❌ Error during new lesson seeding:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

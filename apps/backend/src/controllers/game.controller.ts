@@ -130,21 +130,34 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
     //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
     //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
     //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
-    const topGrouped = await prisma.gameScore.groupBy({
-      by: ['userId'],
-      where: {
-        gameType: rawType,
-      },
-      _max: {
-        score: true,
-      },
-      orderBy: {
-        _max: {
-          score: 'desc',
+    const [topGrouped, globalAgg] = await Promise.all([
+      prisma.gameScore.groupBy({
+        by: ['userId'],
+        where: {
+          gameType: rawType,
         },
-      },
-      take: limit,
-    });
+        _max: {
+          score: true,
+        },
+        orderBy: {
+          _max: {
+            score: 'desc',
+          },
+        },
+        take: limit,
+      }),
+      // Global motivational baseline: mean WPM / accuracy across ALL typing tests.
+      prisma.testResult.aggregate({
+        _avg: { wpm: true, accuracy: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const globalAvg = {
+      wpm: Math.round(globalAgg._avg.wpm ?? 0),
+      accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
+      totalTests: globalAgg._count._all,
+    };
 
     if (topGrouped.length === 0) {
       res.json({
@@ -153,6 +166,7 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
           gameType: rawType,
           leaderboard: [],
           total: 0,
+          globalAvg,
         },
       });
       return;
@@ -205,6 +219,7 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
         gameType: rawType,
         leaderboard,
         total: leaderboard.length,
+        globalAvg,
       },
     });
   } catch (error) {
