@@ -70,11 +70,9 @@ describe('AssessmentController', () => {
 
     it('should return 404 if user is not found', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({
-        content: 'Baseline text',
-        targetWpm: 40,
-        minAccuracy: 95,
-      });
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue([
+        { content: 'Baseline text', targetWpm: 40, minAccuracy: 95 },
+      ]);
 
       await startAssessment(mockRequest, mockResponse);
 
@@ -84,7 +82,7 @@ describe('AssessmentController', () => {
 
     it('should return 500 if assessment content lesson is not found', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' });
-      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue([]);
 
       await startAssessment(mockRequest, mockResponse);
 
@@ -94,18 +92,21 @@ describe('AssessmentController', () => {
 
     it('should return 200 with assessment details when user and baseline lesson exist', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user-123' });
-      (prisma.lesson.findFirst as jest.Mock).mockResolvedValue({
-        content: 'Baseline text content to type.',
-        targetWpm: 40,
-        minAccuracy: 95,
-      });
+      (prisma.lesson.findMany as jest.Mock).mockResolvedValue([
+        {
+          content: 'Baseline text content to type.',
+          targetWpm: 40,
+          minAccuracy: 95,
+        },
+      ]);
 
       await startAssessment(mockRequest, mockResponse);
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-123' } });
-      expect(prisma.lesson.findFirst).toHaveBeenCalledWith({
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith({
         where: { level: 1 },
         select: { content: true, targetWpm: true, minAccuracy: true },
+        take: 8,
       });
 
       expect(jsonMock).toHaveBeenCalledWith({

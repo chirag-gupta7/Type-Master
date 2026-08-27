@@ -38,7 +38,10 @@ if (trustProxyEnv === undefined) {
 // Middleware
 app.use(helmet());
 
-const rawOrigins = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000';
+const rawOrigins =
+  process.env.CORS_ORIGINS ||
+  process.env.CORS_ORIGIN ||
+  'http://localhost:3000,https://typemaster-chirag.vercel.app';
 const allowedOrigins = rawOrigins
   .split(',')
   .map((origin) => origin.trim())

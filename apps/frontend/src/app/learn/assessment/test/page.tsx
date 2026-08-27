@@ -533,7 +533,7 @@ export default function AssessmentPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 mb-6 font-mono text-2xl leading-relaxed">
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 mb-6 font-mono text-2xl leading-relaxed break-words whitespace-pre-wrap max-h-72 overflow-y-auto">
                   {testContent.split('').map((char, index) => {
                     const status = getCharStatus(index);
                     return (

@@ -227,9 +227,7 @@ function LearnPageContent() {
                         return <Link key={lesson.id} href={`/learn/${lesson.id}`} className={cardBase}>{content}</Link>;
                       })}
                     </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">Open a section to load lessons.</div>
-                  )}
+                  ) : null}
 
                   {selectedLesson && <div className="mt-4 rounded-2xl border bg-background/60 p-3 text-sm"><p className="font-medium">Selected: {selectedLesson.title}</p><p className="text-muted-foreground">{selectedLesson.description}</p></div>}
                 </div>

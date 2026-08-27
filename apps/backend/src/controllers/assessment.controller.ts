@@ -41,15 +41,22 @@ export const startAssessment = async (
 
     const userId = authUserId;
 
-    // Optimization: Parallelize independent user validity and baseline lesson queries using Promise.all
-    // This reduces cumulative network roundtrip times from 2 sequentially blocked database queries to 1 concurrent roundtrip.
-    const [user, assessmentLesson] = await Promise.all([
+    // Pick a RANDOM level-1 lesson so each placement test uses a different passage
+    // (instead of the same fixed lesson content every time).
+    const lessons = await prisma.lesson.findMany({
+      where: { level: 1 },
+      select: { content: true, targetWpm: true, minAccuracy: true },
+      take: 8,
+    });
+    const assessmentLesson =
+      Array.isArray(lessons) && lessons.length
+        ? lessons[Math.floor(Math.random() * lessons.length)]
+        : null;
+
+    // Validate the user (independent of lesson selection above).
+    const [user] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-      }),
-      prisma.lesson.findFirst({
-        where: { level: 1 },
-        select: { content: true, targetWpm: true, minAccuracy: true },
       }),
     ]);
 
