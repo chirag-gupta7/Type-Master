@@ -22,6 +22,48 @@ import { Button } from '@/components/ui/button';
 import { Achievement, AchievementStats, UnlockedAchievement } from '@/types';
 import { useAchievementProgress } from '@/lib/useAchievements';
 
+const TYPE_TO_CATEGORY: Record<string, string> = {
+  firstSteps: 'Intro',
+  firstLesson: 'Intro',
+  earlyBird: 'Intro',
+  speedDemon: 'Speed',
+  lightningFast: 'Speed',
+  typingMaster: 'Speed',
+  velocity120: 'Speed',
+  perfectionist: 'Accuracy',
+  sharpshooter: 'Accuracy',
+  accuracyAce: 'Accuracy',
+  dedicated: 'Consistency',
+  centuryClub: 'Consistency',
+  committed: 'Consistency',
+  unstoppable: 'Consistency',
+  student: 'Learning',
+  scholar: 'Learning',
+  codeCrafter: 'Learning',
+  graduateTypist: 'Learning',
+  hotStreak: 'Streak',
+  weekWarrior: 'Streak',
+};
+
+const groupBy = <T,>(arr: T[], key: (t: T) => string): Record<string, T[]> =>
+  arr.reduce(
+    (m, x) => {
+      const k = key(x);
+      (m[k] ||= [] as T[]).push(x);
+      return m;
+    },
+    {} as Record<string, T[]>
+  );
+
+const getAchievementCategory = (a: Achievement): string => {
+  try {
+    const t = JSON.parse(a.requirement).type as string;
+    return TYPE_TO_CATEGORY[t] ?? 'Other';
+  } catch {
+    return 'Other';
+  }
+};
+
 const AchievementsPage: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [stats, setStats] = useState<AchievementStats | null>(null);
@@ -105,6 +147,8 @@ const AchievementsPage: React.FC = () => {
     if (filter === 'locked') return !achievement.unlocked;
     return true;
   });
+
+  const groupedAchievements = groupBy(filteredAchievements, getAchievementCategory);
 
   // Calculate progress for locked achievements
   const getProgress = (achievement: Achievement): number => {
@@ -295,22 +339,31 @@ const AchievementsPage: React.FC = () => {
               </p>
             </div>
           ) : (
-            <AchievementGrid>
-              {filteredAchievements.map((achievement) => (
-                <AchievementCard
-                  key={achievement.id}
-                  id={achievement.id}
-                  title={achievement.title}
-                  description={achievement.description}
-                  icon={achievement.icon as AchievementIcon}
-                  points={achievement.points}
-                  unlocked={achievement.unlocked}
-                  unlockedAt={achievement.unlockedAt || undefined}
-                  progress={getProgress(achievement)}
-                  requirement={!achievement.unlocked ? achievement.requirement : undefined}
-                />
+            <div className="space-y-8">
+              {Object.entries(groupedAchievements).map(([category, list]) => (
+                <div key={category}>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                    {category} <span className="text-sm font-normal text-gray-500">({list.length})</span>
+                  </h3>
+                  <AchievementGrid>
+                    {list.map((achievement) => (
+                      <AchievementCard
+                        key={achievement.id}
+                        id={achievement.id}
+                        title={achievement.title}
+                        description={achievement.description}
+                        icon={achievement.icon as AchievementIcon}
+                        points={achievement.points}
+                        unlocked={achievement.unlocked}
+                        unlockedAt={achievement.unlockedAt || undefined}
+                        progress={getProgress(achievement)}
+                        requirement={!achievement.unlocked ? achievement.requirement : undefined}
+                      />
+                    ))}
+                  </AchievementGrid>
+                </div>
               ))}
-            </AchievementGrid>
+            </div>
           )}
         </motion.div>
 

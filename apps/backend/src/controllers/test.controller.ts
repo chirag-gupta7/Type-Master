@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+import { awardAchievementsForUser } from './achievement.controller';
 
 interface AuthRequest extends Request {
   user?: {
@@ -66,6 +67,14 @@ export const createTestResult = async (req: AuthRequest, res: Response, next: Ne
       testId: testResult.id,
       wpm: testResult.wpm,
     });
+
+    // Auto-award achievements (fire-and-forget, idempotent via skipDuplicates)
+    // Do not block or fail the test save if awarding fails
+    try {
+      await awardAchievementsForUser(req.user.userId);
+    } catch (awardErr) {
+      logger.warn('Auto-award achievements after test save failed', awardErr);
+    }
 
     res.status(201).json({
       message: 'Test result saved successfully',

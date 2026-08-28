@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+import { awardAchievementsForUser } from './achievement.controller';
 
 interface AuthRequest extends Request {
   user?: {
@@ -58,6 +59,10 @@ export const PRACTICE_SECTION_IDS: Record<z.infer<typeof PRACTICE_TYPE_SCHEMA>, 
   coding: [6, 7, 8, 9, 10, 12],
   assessment: [],
 };
+
+const CODING_SECTION_IDS = new Set<number>([6, 7, 8, 9, 10, 12]);
+export const getSectionCategory = (sectionId: number): 'Coding' | 'Typing' =>
+  CODING_SECTION_IDS.has(sectionId) ? 'Coding' : 'Typing';
 
 type PracticeType = z.infer<typeof PRACTICE_TYPE_SCHEMA>;
 
@@ -349,6 +354,13 @@ export const saveLessonProgress = async (
         bestAccuracy: existingProgress.bestAccuracy,
       });
 
+      // Auto-award achievements even when not a new best (e.g., completing lesson)
+      try {
+        await awardAchievementsForUser(userId);
+      } catch (awardErr) {
+        logger.warn('Auto-award achievements after lesson save (not new best) failed', awardErr);
+      }
+
       res.json({
         message: 'Progress saved. Previous best score maintained.',
         progress: updatedProgress,
@@ -401,6 +413,13 @@ export const saveLessonProgress = async (
       meetsRequirements,
       wpm,
     });
+
+    // Auto-award achievements on lesson progress save (idempotent)
+    try {
+      await awardAchievementsForUser(userId);
+    } catch (awardErr) {
+      logger.warn('Auto-award achievements after lesson save failed', awardErr);
+    }
 
     res.json({
       message: actuallyCompleted
@@ -508,7 +527,7 @@ export const getProgressVisualization = async (
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const [lessonsWithProgress, testActivity] = await Promise.all([
+    const [lessonsWithProgress, testResults] = await Promise.all([
       prisma.lesson.findMany({
         orderBy: [{ level: 'asc' }, { order: 'asc' }],
         include: {
@@ -532,7 +551,10 @@ export const getProgressVisualization = async (
         },
         select: {
           createdAt: true,
+          wpm: true,
+          accuracy: true,
         },
+        orderBy: { createdAt: 'asc' },
       }),
     ]);
 
@@ -598,7 +620,7 @@ export const getProgressVisualization = async (
     }));
 
     // Merge test activity into activityByDate
-    for (const test of testActivity) {
+    for (const test of testResults) {
       const date = test.createdAt.toISOString().split('T')[0];
       activityByDate[date] = (activityByDate[date] || 0) + 1;
     }
@@ -607,6 +629,27 @@ export const getProgressVisualization = async (
       date,
       count,
     }));
+
+    // Build wpmHistory (90d) from TestResult — grouped by UTC YYYY-MM-DD, avg per day
+    const wpmHistoryGrouped = new Map<string, { totalWpm: number; totalAcc: number; count: number }>();
+    for (const t of testResults) {
+      if (t.createdAt < ninetyDaysAgo) continue;
+      const date = t.createdAt.toISOString().split('T')[0];
+      const g = wpmHistoryGrouped.get(date);
+      if (!g) wpmHistoryGrouped.set(date, { totalWpm: t.wpm, totalAcc: t.accuracy, count: 1 });
+      else {
+        g.totalWpm += t.wpm;
+        g.totalAcc += t.accuracy;
+        g.count += 1;
+      }
+    }
+    const wpmHistory = Array.from(wpmHistoryGrouped.entries())
+      .map(([date, g]) => ({
+        date,
+        wpm: Math.round(g.totalWpm / g.count),
+        accuracy: Math.round((g.totalAcc / g.count) * 10) / 10,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     // PERFORMANCE OPTIMIZATION:
     // Before: O(N^2) complexity due to nested .filter() and .find() on lessonsWithProgress array inside the .map loop.
@@ -676,6 +719,7 @@ export const getProgressVisualization = async (
       wpmByLesson: Object.values(wpmByLessonMap),
       practiceFrequency,
       skillTree,
+      wpmHistory,
     });
   } catch (error) {
     next(error);
@@ -796,6 +840,7 @@ export const getSectionSummaries = async (req: AuthRequest, res: Response, next:
           sectionId,
           title: getSectionName(sectionId),
           description: getSectionDescription(sectionId),
+          category: getSectionCategory(sectionId),
           totalLessons,
           completedLessons,
           completionPercentage,

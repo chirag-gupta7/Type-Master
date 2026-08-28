@@ -331,7 +331,13 @@ const TypingTest: React.FC = () => {
               value={userInput}
               onChange={(e) => commitUserInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Backspace') { e.preventDefault(); return; }
+                if (e.key === 'Backspace') {
+                  e.preventDefault();
+                  // word-commit: only allow backspace within current word, not across committed Space
+                  if (currentWordTyped.length === 0 || userInput.length === 0) return;
+                  commitUserInput((prev) => prev.slice(0, -1));
+                  return;
+                }
                 if (e.key === ' ' && status !== 'finished') { e.preventDefault(); commitUserInput((prev) => `${prev} `); }
               }}
               disabled={status === 'finished'}
@@ -348,7 +354,7 @@ const TypingTest: React.FC = () => {
               >
                 <RefreshCw className="h-4 w-4" /> Restart
               </button>
-              <span className="text-xs text-muted-foreground">Press <kbd className="rounded border bg-muted px-1 py-0.5 text-[11px]">Space</kbd> to advance • Backspace is disabled for accuracy tracking</span>
+              <span className="text-xs text-muted-foreground">Press <kbd className="rounded border bg-muted px-1 py-0.5 text-[11px]">Space</kbd> to advance • Backspace corrects within current word (locks on Space)</span>
             </div>
           </motion.div>
         )}

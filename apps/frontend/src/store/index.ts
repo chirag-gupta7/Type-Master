@@ -116,7 +116,11 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     let wpm = 0;
     let accuracy = 100;
     let errors = 0;
-    const updatedMistakes = [...mistakes];
+    let updatedMistakes = [...mistakes];
+    // Backspace correction: prune mistakes beyond new length so word-commit within-word fix is counted
+    if (sanitizedInput.length < state.userInput.length) {
+      updatedMistakes = updatedMistakes.filter((m) => m.position < sanitizedInput.length);
+    }
 
     // Calculate real-time metrics if test has started
     if (nextStartTime && sanitizedInput.length > 0) {

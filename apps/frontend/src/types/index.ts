@@ -73,9 +73,17 @@ export interface SkillTreeNode {
   prerequisites: string[];
 }
 
+export interface WpmHistoryPoint {
+  date: string; // YYYY-MM-DD UTC
+  wpm: number;
+  accuracy: number;
+  lessonId?: string;
+}
+
 export interface ProgressVisualizationData {
   completionByLevel: LevelCompletion[];
   wpmByLesson: LessonWPMData[];
   practiceFrequency: PracticeDay[];
   skillTree: SkillTreeNode[];
+  wpmHistory: WpmHistoryPoint[];
 }

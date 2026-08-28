@@ -19,6 +19,7 @@ import { HandPositionGuide } from '@/components/HandPositionGuide';
 import { AnimatedHandOverlay } from '@/components/AnimatedHandOverlay';
 import { useAchievementChecker } from '@/hooks/useAchievementChecker';
 import { achievementAPI, lessonAPI, mistakeAPI } from '@/lib/api';
+import { useLessonsStore } from '@/store/lessons.store';
 import { isSectionComplete } from '@/lib/sectionCompletion';
 import { FALLBACK_LESSONS, Lesson as FallbackLesson, isExerciseType } from '@/lib/fallback-lessons';
 import { getFallbackProgress, type FallbackProgress } from '@/lib/fallbackProgress';
@@ -87,6 +88,7 @@ export default function LessonPracticePage() {
   const [accuracy, setAccuracy] = useState(100);
   const [lastPressedKey, setLastPressedKey] = useState('');
   const [isCorrectKey, setIsCorrectKey] = useState(false);
+  const [committedIndex, setCommittedIndex] = useState(0); // word-commit boundary: backspace blocked at or before this index
 
   // Analysis state
   const [weakKeyAnalysis, setWeakKeyAnalysis] = useState<WeakKeyAnalysis[]>([]);
@@ -118,8 +120,35 @@ export default function LessonPracticePage() {
       setLoading(true);
       setError(null);
       try {
-        // First, try to fetch from the API
-        const data = await lessonAPI.getLessonById(lessonId, { skipCache: true });
+        // Check client cache first (ponytail: avoids refetch)
+        const cached = useLessonsStore.getState().getLesson(lessonId);
+        if (cached) {
+          if (isMounted) {
+            const exerciseType = isExerciseType((cached as unknown as { exerciseType?: string }).exerciseType)
+              ? (cached as unknown as { exerciseType: FallbackLesson['exerciseType'] }).exerciseType ?? undefined
+              : undefined;
+            const normalizedLesson: Lesson = {
+              id: cached.id,
+              level: cached.level,
+              title: cached.title,
+              description: cached.description,
+              difficulty: cached.difficulty,
+              targetWpm: cached.targetWpm,
+              minAccuracy: cached.minAccuracy,
+              content: cached.content,
+              section: cached.section,
+              isCheckpoint: Boolean(cached.isCheckpoint),
+              targetFingers: (cached as unknown as { targetFingers?: string[] }).targetFingers ?? cached.keys,
+              exerciseType,
+            };
+            setLesson(normalizedLesson);
+            if (cached.level === 1 && (cached as unknown as { order?: number }).order === 1) setShowOnboarding(true);
+          }
+          return;
+        }
+
+        // Fallback to API (uses cache, no skipCache)
+        const data = await lessonAPI.getLessonById(lessonId);
         if (!data || !data.lesson) {
           throw new Error('Lesson not found from API');
         }
@@ -244,6 +273,7 @@ export default function LessonPracticePage() {
     setMistakes([]);
     setWpm(0);
     setAccuracy(100);
+    setCommittedIndex(0);
     // focus the hidden input to start capturing keystrokes immediately
     requestAnimationFrame(() => hiddenInputRef.current?.focus());
   }, []);
@@ -261,8 +291,46 @@ export default function LessonPracticePage() {
       if (key.length > 1 && key !== 'Backspace') return;
 
       if (key === 'Backspace') {
-        e.preventDefault(); // Prevent default browser action
-        return; // Stop further execution
+        // word-commit: only allow backspace within current word (not past last committed space)
+        if (currentIndex <= committedIndex || currentIndex === 0) return;
+        const prevIndex = currentIndex - 1;
+        const wasMistake = userInput[prevIndex] !== lesson.content[prevIndex];
+
+        if (wasMistake) {
+          setMistakes((prev) => {
+            const expected = lesson.content[prevIndex];
+            const pressed = userInput[prevIndex];
+            let removeIdx = -1;
+            for (let i = prev.length - 1; i >= 0; i--) {
+              if (prev[i].keyExpected === expected && prev[i].keyPressed === pressed) {
+                removeIdx = i;
+                break;
+              }
+            }
+            if (removeIdx === -1) {
+              if (prev.length > 0 && prev[prev.length - 1].keyExpected === expected) {
+                return prev.slice(0, -1);
+              }
+              return prev;
+            }
+            const next = [...prev];
+            next.splice(removeIdx, 1);
+            return next;
+          });
+        }
+
+        setUserInput((prev) => prev.slice(0, -1));
+        setCurrentIndex((prev) => prev - 1);
+
+        // Recompute WPM/accuracy after deletion — preserve formulas, guard Math.max(0.01, elapsed)
+        const elapsed = Math.max(0.01, (Date.now() - startTime) / 1000 / 60);
+        const newChars = currentIndex - 1;
+        const newErrors = wasMistake ? mistakes.length - 1 : mistakes.length;
+        const newWpm = newChars > 0 ? Math.round(newChars / 5 / elapsed) : 0;
+        const newAccuracy = newChars > 0 ? Math.max(0, ((newChars - newErrors) / newChars) * 100) : 100;
+        setWpm(newWpm);
+        setAccuracy(newAccuracy);
+        return;
       }
 
       const expectedChar = lesson.content[currentIndex];
@@ -287,16 +355,17 @@ export default function LessonPracticePage() {
       setUserInput((prev) => prev + typedChar);
       setCurrentIndex((prev) => prev + 1);
 
-      // Calculate real-time WPM and accuracy
-      const timeElapsed = (Date.now() - startTime) / 1000 / 60; // minutes
+      // On Space, commit word — lock previous word so backspace cannot cross word boundary
+      if (typedChar === ' ') {
+        setCommittedIndex(currentIndex + 1);
+      }
+
+      // Calculate real-time WPM and accuracy — preserve formulas, guard Math.max(0.01, elapsed)
+      const elapsed = Math.max(0.01, (Date.now() - startTime) / 1000 / 60);
       const charsTyped = currentIndex + 1;
       const errorCount = mistakes.length + (typedChar !== expectedChar ? 1 : 0);
 
-      // WPM = (total characters typed / 5) / time in minutes
-      // Standard WPM formula: characters per minute divided by 5 (average word length)
-      const currentWpm = timeElapsed > 0 ? Math.round(charsTyped / 5 / timeElapsed) : 0;
-
-      // Accuracy = (correct characters / total characters typed) * 100
+      const currentWpm = Math.round(charsTyped / 5 / elapsed);
       const correctChars = charsTyped - errorCount;
       const currentAccuracy = charsTyped > 0 ? (correctChars / charsTyped) * 100 : 100;
 
@@ -308,7 +377,7 @@ export default function LessonPracticePage() {
         completeLesson(typedChar === expectedChar);
       }
     },
-    [lesson, startTime, currentIndex, mistakes.length]
+    [lesson, startTime, currentIndex, mistakes.length, committedIndex, userInput]
   );
 
   const completeLesson = async (lastCharCorrect: boolean) => {
@@ -932,6 +1001,7 @@ export default function LessonPracticePage() {
                   setUserInput('');
                   setCurrentIndex(0);
                   setMistakes([]);
+                  setCommittedIndex(0);
                 }}
                 disabled={isSaving}
               >
@@ -1024,6 +1094,7 @@ export default function LessonPracticePage() {
                   setUserInput('');
                   setCurrentIndex(0);
                   setMistakes([]);
+                  setCommittedIndex(0);
                 }}
               >
                 Practice This Lesson Again

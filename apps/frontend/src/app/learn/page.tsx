@@ -4,13 +4,23 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { lessonAPI } from '@/lib/api';
+import { useLessonsStore } from '@/store/lessons.store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, CheckCircle, ChevronRight, Clock, Lock, Target, Trophy, Sparkles, BookOpen } from 'lucide-react';
 
 type PracticeType = 'normal' | 'coding' | 'assessment';
-type SectionSummary = { sectionId: number; title: string; description: string; totalLessons: number; completedLessons: number; completionPercentage: number; firstLessonId: string | null; firstUnlockedLessonId: string | null; firstUnlockedPage: number; totalPages: number; };
+type SectionSummary = { sectionId: number; title: string; description: string; category: 'Coding' | 'Typing'; totalLessons: number; completedLessons: number; completionPercentage: number; firstLessonId: string | null; firstUnlockedLessonId: string | null; firstUnlockedPage: number; totalPages: number; };
+const groupBy = <T, K extends string>(arr: T[], key: (t: T) => K): Record<K, T[]> =>
+  arr.reduce(
+    (m, x) => {
+      const k = key(x);
+      (m[k] ||= [] as T[]).push(x);
+      return m;
+    },
+    {} as Record<K, T[]>
+  );
 type LessonProgress = { completed: boolean; bestWpm: number; bestAccuracy: number; stars: number; attempts: number; };
 type SectionLesson = { id: string; level: number; order: number; title: string; description: string; keys: string[]; difficulty: string; targetWpm: number; minAccuracy: number; exerciseType: string; content: string; section: number; isCheckpoint: boolean; userProgress: LessonProgress[]; isUnlocked: boolean; isCompleted: boolean; };
 type SectionPageResponse = { section: { id: number; name: string; description: string; totalLessons: number; completedLessons: number; completionPercentage: number; }; pagination: { page: number; pageCount: number; totalPages: number; totalLessons: number; startIndex: number; endIndex: number; hasPreviousPage: boolean; hasNextPage: boolean; }; lessons: SectionLesson[]; };
@@ -74,6 +84,11 @@ function LearnPageContent() {
     finally { setPageLoading(false); }
   }, [practice, selectLessonForPage, updateLearnQuery]);
 
+  // Preload all lessons into client cache (ponytail: reuses zustand)
+  useEffect(() => {
+    void useLessonsStore.getState().preload();
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     const fetchSections = async () => {
@@ -106,6 +121,10 @@ function LearnPageContent() {
   const selectedSectionSummary = useMemo(() => sections.find((s) => s.sectionId === selectedSectionId) ?? null, [sections, selectedSectionId]);
   const selectedSectionPage = useMemo(() => selectedSectionId === null ? null : sectionPages[getSectionPageKey(selectedSectionId, currentPage)] ?? null, [sectionPages, selectedSectionId, currentPage]);
   const selectedLesson = useMemo(() => !selectedSectionPage || !selectedLessonId ? null : selectedSectionPage.lessons.find((l) => l.id === selectedLessonId) ?? null, [selectedSectionPage, selectedLessonId]);
+  const groupedSections = useMemo(() => {
+    if (!sections.length) return null;
+    return groupBy(sections as SectionSummary[], (s) => s.category);
+  }, [sections]);
 
   const handlePracticeTabClick = (next: PracticeType) => {
     if (next === practice) return;
@@ -153,32 +172,40 @@ function LearnPageContent() {
             <div className="mt-6 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">No sections available for this track.</div>
           ) : (
             <>
-              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {sections.map((section) => {
-                  const isActive = selectedSectionId === section.sectionId;
-                  return (
-                    <button
-                      key={section.sectionId}
-                      type="button"
-                      onClick={() => void loadSectionPage(section.sectionId, section.firstUnlockedPage || 1, { shouldPreselect: true })}
-                      className={`rounded-[20px] border p-5 text-left transition focus-ring ${isActive ? 'border-foreground bg-foreground text-background shadow-sm' : 'bg-card hover:bg-accent'}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <h2 className="text-sm font-semibold tracking-tight flex items-center gap-1.5"><BookOpen className="h-4 w-4 opacity-60" /> {section.title}</h2>
-                        <span className={`text-xs ${isActive ? 'text-background/70' : 'text-muted-foreground'}`}>§ {section.sectionId}</span>
-                      </div>
-                      <p className={`mt-1 text-sm leading-5 ${isActive ? 'text-background/80' : 'text-muted-foreground'}`}>{section.description}</p>
-                      <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className={isActive ? 'text-background/70' : 'text-muted-foreground'}>Progress</span>
-                        <span className="font-medium">{section.completedLessons}/{section.totalLessons}</span>
-                      </div>
-                      <div className={`mt-1.5 h-2 w-full overflow-hidden rounded-full ${isActive ? 'bg-background/20' : 'bg-muted'}`}>
-                        <div className={`h-full rounded-full ${isActive ? 'bg-background' : 'bg-foreground'}`} style={{ width: `${section.completionPercentage}%` }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {groupedSections &&
+                Object.entries(groupedSections).map(([category, list]) => (
+                <details key={category} open className="mt-6 rounded-[20px] border bg-card/40 p-4">
+                  <summary className="cursor-pointer select-none text-sm font-bold tracking-tight">
+                    {category} <span className="ml-2 text-xs font-normal text-muted-foreground">({list.length} sections)</span>
+                  </summary>
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {list.map((section) => {
+                      const isActive = selectedSectionId === section.sectionId;
+                      return (
+                        <button
+                          key={section.sectionId}
+                          type="button"
+                          onClick={() => void loadSectionPage(section.sectionId, section.firstUnlockedPage || 1, { shouldPreselect: true })}
+                          className={`rounded-[20px] border p-5 text-left transition focus-ring ${isActive ? 'border-foreground bg-foreground text-background shadow-sm' : 'bg-card hover:bg-accent'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-sm font-semibold tracking-tight flex items-center gap-1.5"><BookOpen className="h-4 w-4 opacity-60" /> {section.title}</h2>
+                            <span className={`text-xs ${isActive ? 'text-background/70' : 'text-muted-foreground'}`}>§ {section.sectionId}</span>
+                          </div>
+                          <p className={`mt-1 text-sm leading-5 ${isActive ? 'text-background/80' : 'text-muted-foreground'}`}>{section.description}</p>
+                          <div className="mt-3 flex items-center justify-between text-xs">
+                            <span className={isActive ? 'text-background/70' : 'text-muted-foreground'}>Progress</span>
+                            <span className="font-medium">{section.completedLessons}/{section.totalLessons}</span>
+                          </div>
+                          <div className={`mt-1.5 h-2 w-full overflow-hidden rounded-full ${isActive ? 'bg-background/20' : 'bg-muted'}`}>
+                            <div className={`h-full rounded-full ${isActive ? 'bg-background' : 'bg-foreground'}`} style={{ width: `${section.completionPercentage}%` }} />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
+              ))}
 
               {selectedSectionSummary && (
                 <div className="mt-6 rounded-[20px] border bg-card/60 p-4 md:p-5 backdrop-blur">

@@ -7,7 +7,7 @@ import { Loader2, Sparkles, BarChart3, Clock, Target, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MistakeAnalysis } from '@/components/MistakeAnalysis';
 import { useSession } from 'next-auth/react';
-import { lessonAPI } from '@/lib/api';
+import { lessonAPI, testAPI, achievementAPI } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 interface MistakeDetail { key: string; expected: string; position: number; }
@@ -46,6 +46,13 @@ export default function ResultsScreen({
       try {
         await lessonAPI.saveLessonProgress({ lessonId, wpm, accuracy, completed: accuracy >= 90 });
         if (!isActive) return;
+        // Check achievements after lesson save (backend auto-awards, but frontend needs to refresh cache and show toast)
+        try {
+          await achievementAPI.checkAchievements();
+        } catch {
+          // ignore achievement check failure
+        }
+        if (!isActive) return;
         lastSavedAttemptRef.current = attemptKey;
         toast({ title: 'Progress saved', description: 'Your lesson score has been recorded.' });
       } catch {
@@ -55,6 +62,42 @@ export default function ResultsScreen({
     void persist();
     return () => { isActive = false; savingRef.current = false; };
   }, [session?.accessToken, lessonId, wpm, accuracy, errors, duration, toast]);
+
+  // Auto-save typing test results (non-lesson) and check achievements
+  useEffect(() => {
+    if (!session?.accessToken || lessonId || wpm <= 0 || accuracy <= 0 || savingRef.current) return;
+    // Only for generic typing tests (no lessonId)
+    const attemptKey = `test-${wpm}-${accuracy}-${errors}-${duration}`;
+    if (lastSavedAttemptRef.current === attemptKey) return;
+    let isActive = true;
+    savingRef.current = true;
+    const persistTest = async () => {
+      try {
+        const safeDuration = duration as 30 | 60 | 180;
+        const normalizedDuration: 30 | 60 | 180 = safeDuration === 30 || safeDuration === 60 || safeDuration === 180 ? safeDuration : 60;
+        const rawCalc = Math.round(((correctChars + incorrectChars) / 5 / Math.max(duration, 1)) * 60);
+        await testAPI.saveTestResult({
+          wpm,
+          accuracy,
+          rawWpm: rawCalc || wpm,
+          errors,
+          duration: normalizedDuration,
+          mode: 'WORDS',
+        });
+        if (!isActive) return;
+        lastSavedAttemptRef.current = attemptKey;
+      } catch {
+        if (isActive) lastSavedAttemptRef.current = null;
+      } finally {
+        if (isActive) savingRef.current = false;
+      }
+    };
+    void persistTest();
+    return () => {
+      isActive = false;
+      savingRef.current = false;
+    };
+  }, [session?.accessToken, lessonId, wpm, accuracy, errors, duration, correctChars, incorrectChars]);
 
   const totalChars = correctChars + incorrectChars + missedChars;
   const safeTotal = Math.max(totalChars, 1);

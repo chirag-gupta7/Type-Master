@@ -86,23 +86,29 @@ const checkAchievementRequirements = {
   speedDemon: (metrics: UserMetrics): boolean => metrics.maxWpm >= 50,
   lightningFast: (metrics: UserMetrics): boolean => metrics.maxWpm >= 80,
   typingMaster: (metrics: UserMetrics): boolean => metrics.maxWpm >= 100,
+  velocity120: (metrics: UserMetrics): boolean => metrics.maxWpm >= 120,
 
   // Accuracy achievements
   perfectionist: (metrics: UserMetrics): boolean => metrics.hasPerfectAccuracy,
   sharpshooter: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= 10,
+  accuracyAce: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= 25,
 
   // Consistency achievements
+  earlyBird: (metrics: UserMetrics): boolean => metrics.testCount >= 5,
   dedicated: (metrics: UserMetrics): boolean => metrics.testCount >= 10,
+  centuryClub: (metrics: UserMetrics): boolean => metrics.testCount >= 25,
   committed: (metrics: UserMetrics): boolean => metrics.testCount >= 50,
   unstoppable: (metrics: UserMetrics): boolean => metrics.testCount >= 100,
 
   // Learning achievements
   student: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 5,
   scholar: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 20,
+  codeCrafter: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 30,
   graduateTypist: (metrics: UserMetrics): boolean =>
     metrics.completedLessonsCount >= metrics.totalLessonsCount && metrics.totalLessonsCount > 0,
 
   // Streak achievements
+  hotStreak: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= 3,
   weekWarrior: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= 7,
 
   // First achievements
@@ -169,8 +175,61 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
 };
 
 /**
+ * Internal helper: award achievements for a user without HTTP context
+ * Reusable by test/lesson controllers for auto-award on save
+ * Idempotent via skipDuplicates
+ */
+export const awardAchievementsForUser = async (userId: string) => {
+  const [achievements, userAchievements, metrics] = await Promise.all([
+    prisma.achievement.findMany(),
+    prisma.userAchievement.findMany({
+      where: { userId },
+      select: { achievementId: true },
+    }),
+    fetchUserMetrics(userId),
+  ]);
+
+  const unlockedAchievementIds = new Set(userAchievements.map((ua) => ua.achievementId));
+  const toUnlock: typeof achievements = [];
+
+  for (const achievement of achievements) {
+    if (unlockedAchievementIds.has(achievement.id)) continue;
+    try {
+      const requirement = JSON.parse(achievement.requirement);
+      const checkerFn =
+        checkAchievementRequirements[requirement?.type as keyof typeof checkAchievementRequirements];
+      if (!checkerFn) {
+        logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
+        continue;
+      }
+      if (checkerFn(metrics)) toUnlock.push(achievement);
+    } catch (error) {
+      logger.error(`Error checking achievement ${achievement.id}:`, error);
+    }
+  }
+
+  if (toUnlock.length > 0) {
+    await prisma.userAchievement.createMany({
+      data: toUnlock.map((a) => ({ userId, achievementId: a.id })),
+      skipDuplicates: true,
+    });
+  }
+
+  const now = new Date().toISOString();
+  return toUnlock.map((a) => ({
+    id: a.id,
+    title: a.title,
+    description: a.description,
+    icon: a.icon,
+    points: a.points,
+    unlockedAt: now,
+  }));
+};
+
+/**
  * Check and award new achievements for a user
  * POST /api/v1/achievements/check
+ * Kept as thin wrapper for backward compatibility
  */
 export const checkAndAwardAchievements = async (req: AuthRequest, res: Response) => {
   try {
@@ -179,66 +238,8 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Parallelize initial data fetching
-    const [achievements, userAchievements, metrics] = await Promise.all([
-      prisma.achievement.findMany(),
-      prisma.userAchievement.findMany({
-        where: { userId },
-        select: { achievementId: true },
-      }),
-      fetchUserMetrics(userId),
-    ]);
-
-    const unlockedAchievementIds = new Set(userAchievements.map((ua) => ua.achievementId));
-
-    const toUnlock: typeof achievements = [];
-
-    // Check each achievement using pre-fetched metrics
-    for (const achievement of achievements) {
-      if (unlockedAchievementIds.has(achievement.id)) {
-        continue;
-      }
-
-      try {
-        const requirement = JSON.parse(achievement.requirement);
-        const checkerFn =
-          checkAchievementRequirements[
-            requirement?.type as keyof typeof checkAchievementRequirements
-          ];
-
-        if (!checkerFn) {
-          logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
-          continue;
-        }
-
-        if (checkerFn(metrics)) {
-          toUnlock.push(achievement);
-        }
-      } catch (error) {
-        logger.error(`Error checking achievement ${achievement.id}:`, error);
-      }
-    }
-
-    // Batch award new achievements if any
-    if (toUnlock.length > 0) {
-      await prisma.userAchievement.createMany({
-        data: toUnlock.map((a) => ({
-          userId,
-          achievementId: a.id,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    const now = new Date().toISOString();
-    const newlyUnlocked = toUnlock.map((a) => ({
-      id: a.id,
-      title: a.title,
-      description: a.description,
-      icon: a.icon,
-      points: a.points,
-      unlockedAt: now,
-    }));
+    const achievements = await prisma.achievement.findMany();
+    const newlyUnlocked = await awardAchievementsForUser(userId);
 
     return res.json({
       message: `Checked achievements, ${newlyUnlocked.length} newly unlocked`,
@@ -332,7 +333,9 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
       perfectionist: metrics.hasPerfectAccuracy ? 100 : 0,
 
       // Consistency achievements
+      earlyBird: Math.min((metrics.testCount / 5) * 100, 100),
       dedicated: Math.min((metrics.testCount / 10) * 100, 100),
+      centuryClub: Math.min((metrics.testCount / 25) * 100, 100),
       committed: Math.min((metrics.testCount / 50) * 100, 100),
       unstoppable: Math.min((metrics.testCount / 100) * 100, 100),
 
@@ -340,19 +343,23 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
       speedDemon: Math.min((metrics.maxWpm / 50) * 100, 100),
       lightningFast: Math.min((metrics.maxWpm / 80) * 100, 100),
       typingMaster: Math.min((metrics.maxWpm / 100) * 100, 100),
+      velocity120: Math.min((metrics.maxWpm / 120) * 100, 100),
 
       // Accuracy achievements
       sharpshooter: Math.min((metrics.highAccuracyCount / 10) * 100, 100),
+      accuracyAce: Math.min((metrics.highAccuracyCount / 25) * 100, 100),
 
       // Learning achievements
       student: Math.min((metrics.completedLessonsCount / 5) * 100, 100),
       scholar: Math.min((metrics.completedLessonsCount / 20) * 100, 100),
+      codeCrafter: Math.min((metrics.completedLessonsCount / 30) * 100, 100),
       graduateTypist:
         metrics.totalLessonsCount > 0
           ? Math.min((metrics.completedLessonsCount / metrics.totalLessonsCount) * 100, 100)
           : 0,
 
       // Streak achievements
+      hotStreak: Math.min((metrics.uniqueDaysThisWeek / 3) * 100, 100),
       weekWarrior: Math.min((metrics.uniqueDaysThisWeek / 7) * 100, 100),
     };
 
