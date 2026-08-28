@@ -2,13 +2,56 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, BookOpen, Calendar, Award, TrendingUp, Sparkles } from 'lucide-react';
 import { CircularProgressChart } from './CircularProgressChart';
 import { WPMProgressChart } from './WPMProgressChart';
+import { WpmHistoryChart } from './WpmHistoryChart';
 import { PracticeHeatMap } from './PracticeHeatMap';
 import { SkillTreeVisualization } from './SkillTreeVisualization';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { lessonAPI } from '@/lib/api';
 import type { ProgressVisualizationData } from '@/types';
+import Link from 'next/link';
+
+function SectionSkeleton({ className = '' }: { className?: string }) {
+  return (
+    <Card className={className}>
+      <CardHeader className="space-y-3">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-64" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-[240px] w-full rounded-xl" />
+        <div className="grid grid-cols-3 gap-3">
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyChartCard({ icon: Icon, title, description, ctaHref, ctaLabel }: { icon: typeof BookOpen; title: string; description: string; ctaHref?: string; ctaLabel?: string }) {
+  return (
+    <Card className="border-dashed bg-muted/20">
+      <CardContent className="py-10 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <Icon className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mx-auto mt-1 max-w-[36ch] text-xs text-muted-foreground">{description}</p>
+        {ctaHref && ctaLabel && (
+          <Link href={ctaHref} className="inline-block mt-4">
+            <Button size="sm" variant="outline" className="rounded-full">{ctaLabel}</Button>
+          </Link>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function LearningProgressDashboard() {
   const [data, setData] = useState<ProgressVisualizationData | null>(null);
@@ -16,146 +59,155 @@ export function LearningProgressDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         const response = await lessonAPI.getProgressVisualization();
-        setData(response);
+        if (!alive) return;
+        // ensure additive field always present even if older backend cached
+        const withHistory = response as ProgressVisualizationData & { wpmHistory?: ProgressVisualizationData['wpmHistory'] };
+        if (!withHistory.wpmHistory) withHistory.wpmHistory = [];
+        setData(withHistory as ProgressVisualizationData);
       } catch (err) {
-        console.error('Error fetching progress data:', err);
+        if (!alive) return;
         setError(err instanceof Error ? err.message : 'Failed to load progress data');
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     };
-
     fetchData();
+    return () => { alive = false; };
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[600px]">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading your progress data...</p>
-        </div>
+      <div className="grid grid-cols-12 gap-4 md:gap-6">
+        <div className="col-span-12 lg:col-span-5"><SectionSkeleton /></div>
+        <div className="col-span-12 lg:col-span-7"><SectionSkeleton /></div>
+        <div className="col-span-12"><SectionSkeleton /></div>
+        <div className="col-span-12"><SectionSkeleton /></div>
+        <div className="col-span-12"><SectionSkeleton /></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-center min-h-[600px]"
-      >
-        <div className="bg-red-900/20 border border-red-700 rounded-xl p-8 max-w-md">
-          <div className="flex items-center gap-3 mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-            <h3 className="text-xl font-bold text-white">Error Loading Data</h3>
-          </div>
-          <p className="text-gray-300 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-          >
-            Retry
-          </button>
-        </div>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-8 text-center">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <h3 className="text-sm font-semibold">Couldn&apos;t load progress</h3>
+            <p className="mt-1 text-xs text-muted-foreground max-w-[48ch] mx-auto">{error}</p>
+            <Button onClick={() => window.location.reload()} size="sm" variant="outline" className="mt-4 rounded-full">Retry</Button>
+          </CardContent>
+        </Card>
       </motion.div>
     );
   }
 
-  if (!data) {
-    return null;
-  }
+  if (!data) return null;
 
-  const hasNoData =
-    data.completionByLevel.length === 0 &&
-    data.wpmByLesson.length === 0 &&
-    data.practiceFrequency.length === 0;
-
-  if (hasNoData) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-center min-h-[600px]"
-      >
-        <div className="text-center max-w-md">
-          <TrendingUp className="w-20 h-20 text-gray-600 mx-auto mb-6" />
-          <h3 className="text-2xl font-bold text-white mb-4">No Progress Data Yet</h3>
-          <p className="text-gray-400 mb-6">
-            Start practicing lessons to see your progress visualized here. Your journey to becoming
-            a typing master begins now!
-          </p>
-          <a
-            href="/learn"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-          >
-            Start Learning
-          </a>
-        </div>
-      </motion.div>
-    );
-  }
+  const hasCompletion = data.completionByLevel.length > 0;
+  const hasBestWpm = data.wpmByLesson.length > 0;
+  const hasPractice = data.practiceFrequency.length > 0;
+  const hasHistory = (data.wpmHistory?.length ?? 0) > 0;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
-        <h1 className="text-4xl font-bold text-white mb-3">Your Learning Progress</h1>
-        <p className="text-gray-400 text-lg">
-          Track your improvement and master your typing skills
-        </p>
-      </motion.div>
+    <div className="grid grid-cols-12 gap-4 md:gap-6">
+      {/* Row 1: Completion + Best WPM (5 + 7 = 12) — fixes lg:col-span-2+2 in 3-col regression */}
+      <div className="col-span-12 lg:col-span-5">
+        {hasCompletion ? (
+          <CircularProgressChart data={data.completionByLevel} />
+        ) : (
+          <EmptyChartCard icon={Award} title="No level progress yet" description="Complete lessons to see your completion breakdown by level." ctaHref="/learn" ctaLabel="Browse lessons" />
+        )}
+      </div>
 
-      {/* Circular Progress Chart */}
-      {data.completionByLevel.length > 0 && <CircularProgressChart data={data.completionByLevel} />}
+      <div className="col-span-12 lg:col-span-7">
+        {hasBestWpm ? (
+          <WPMProgressChart data={data.wpmByLesson} />
+        ) : (
+          <EmptyChartCard icon={TrendingUp} title="No best-per-lesson data" description="Your best WPM per lesson (single point from last 90 days) will appear here." ctaHref="/learn" ctaLabel="Start learning" />
+        )}
+      </div>
 
-      {/* WPM Progress Chart */}
-      {data.wpmByLesson.length > 0 && <WPMProgressChart data={data.wpmByLesson} />}
+      {/* Row 2: History time-series — full width */}
+      <div className="col-span-12">
+        {hasHistory ? (
+          <WpmHistoryChart data={data.wpmHistory} />
+        ) : (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10 text-violet-600"><TrendingUp className="h-4 w-4" /></span>
+                WPM History
+              </CardTitle>
+              <CardDescription>Daily average WPM & accuracy from TestResult (90 days) — take a test to seed the timeline.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmptyChartCard icon={TrendingUp} title="No history yet" description="Your daily WPM trend will appear here once you complete typing tests." ctaHref="/dashboard" ctaLabel="Take a test" />
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-      {/* Practice Heat Map */}
-      <PracticeHeatMap data={data.practiceFrequency} />
+      {/* Row 3: Heatmap — full width for readability */}
+      <div className="col-span-12">
+        {hasPractice ? (
+          <PracticeHeatMap data={data.practiceFrequency} />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600"><Calendar className="h-4 w-4" /></span>
+                Practice Frequency
+              </CardTitle>
+              <CardDescription>Shows daily activity (UTC YYYY-MM-DD). Start practicing to fill your heatmap.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmptyChartCard icon={Calendar} title="No practice activity yet" description="Your 365-day heatmap will light up as you practice." ctaHref="/learn" ctaLabel="Start practicing" />
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-      {/* Skill Tree */}
-      {data.skillTree.length > 0 && <SkillTreeVisualization data={data.skillTree} />}
+      {/* Row 4: Skill tree — ALWAYS shown for onboarding (fixes hasNoData ignoring skillTree) */}
+      <div className="col-span-12">
+        <SkillTreeVisualization data={data.skillTree} />
+      </div>
 
-      {/* Tips Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-        className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-700/50 rounded-xl p-6"
-      >
-        <h3 className="text-lg font-bold text-white mb-4">💡 Tips for Improvement</h3>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <p className="text-blue-400 font-semibold mb-2">Practice Regularly</p>
-            <p className="text-gray-400 text-sm">
-              Consistent daily practice is key to building muscle memory and improving speed.
-            </p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <p className="text-green-400 font-semibold mb-2">Focus on Accuracy</p>
-            <p className="text-gray-400 text-sm">
-              Maintain high accuracy before increasing speed. Quality over quantity!
-            </p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <p className="text-purple-400 font-semibold mb-2">Track Progress</p>
-            <p className="text-gray-400 text-sm">
-              Review your progress regularly to identify areas for improvement.
-            </p>
-          </div>
-        </div>
+      {/* Tips — light Card tokens, not dark gradients */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="col-span-12">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/10 text-amber-600"><Sparkles className="h-4 w-4" /></span>
+              Tips for Improvement
+            </CardTitle>
+            <CardDescription>Small habits, big gains — keep it light and consistent.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <p className="text-sm font-semibold flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-blue-600" /> Practice Regularly</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Short daily sessions beat marathon cramming — 10–15 min builds muscle memory.</p>
+              </div>
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <p className="text-sm font-semibold flex items-center gap-1.5"><Award className="h-4 w-4 text-emerald-600" /> Accuracy First</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Lock in 95%+ accuracy before chasing speed — clean strokes scale faster.</p>
+              </div>
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <p className="text-sm font-semibold flex items-center gap-1.5"><TrendingUp className="h-4 w-4 text-violet-600" /> Track Trends</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Compare “Best per Lesson” (peaks) vs “History” (consistency) weekly.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
     </div>
   );

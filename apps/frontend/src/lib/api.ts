@@ -305,7 +305,7 @@ export const testAPI = {
     duration: 30 | 60 | 180;
     mode?: 'WORDS' | 'TIME' | 'QUOTE';
   }) => {
-    return fetchAPI<{
+    const response = await fetchAPI<{
       message: string;
       testResult: {
         id: string;
@@ -322,6 +322,17 @@ export const testAPI = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+
+    // Invalidate achievements cache and auto-check for newly unlocked achievements
+    // (backend also auto-awards, but frontend invalidation ensures UI reflects 100% -> unlocked)
+    await invalidateScoped('achievements:all', 'achievements:stats', 'achievements:progress');
+    try {
+      await achievementAPI.checkAchievements();
+    } catch {
+      // best-effort: backend auto-award already handled, ignore check failure
+    }
+
+    return response;
   },
 
   /**
@@ -516,6 +527,7 @@ export const lessonAPI = {
         sectionId: number;
         title: string;
         description: string;
+        category: 'Coding' | 'Typing';
         totalLessons: number;
         completedLessons: number;
         completionPercentage: number;
@@ -660,6 +672,8 @@ export const lessonAPI = {
       'lessons:sections:assessment'
     );
     await invalidateScopedByPrefix('lessons:section:');
+    // Invalidate achievements so progress 100% doesn't stay locked (backend auto-awards)
+    await invalidateScoped('achievements:all', 'achievements:stats', 'achievements:progress');
 
     return response;
   },
@@ -722,6 +736,12 @@ export const lessonAPI = {
         attempts: number;
         locked: boolean;
         prerequisites: string[];
+      }>;
+      wpmHistory: Array<{
+        date: string;
+        wpm: number;
+        accuracy: number;
+        lessonId?: string;
       }>;
     }>('/lessons/progress/visualization', {
       cacheKey: 'lessons:progress',
@@ -845,16 +865,25 @@ export const achievementAPI = {
   getAchievementProgress: async () => {
     return fetchAPI<{
       progress: {
+        firstSteps: number;
+        firstLesson: number;
+        perfectionist: number;
         dedicated: number;
         committed: number;
         unstoppable: number;
+        earlyBird: number;
+        centuryClub: number;
         speedDemon: number;
         lightningFast: number;
         typingMaster: number;
+        velocity120: number;
         sharpshooter: number;
+        accuracyAce: number;
         student: number;
         scholar: number;
+        codeCrafter: number;
         graduateTypist: number;
+        hotStreak: number;
         weekWarrior: number;
       };
       stats: {

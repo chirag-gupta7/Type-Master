@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Trophy, Zap, Target, Award, Star, Flame, Heart, CheckCircle2 } from 'lucide-react';
+import { Lock, Trophy, Zap, Target, Award, Star, Flame, Heart, CheckCircle2, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Achievement icon mapping
@@ -26,6 +26,7 @@ const ACHIEVEMENT_ICONS = {
   flame: Flame,
   heart: Heart,
   check: CheckCircle2,
+  crown: Crown,
 } as const;
 
 export type AchievementIcon = keyof typeof ACHIEVEMENT_ICONS;

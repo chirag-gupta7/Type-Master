@@ -527,7 +527,8 @@ async function main() {
   for (const lesson of newLessons) {
     const normalizedLesson = {
       ...lesson,
-      unlockAfter: lesson.unlockAfter.map((dependency) => dependency.toString()),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      unlockAfter: (lesson.unlockAfter as any[]).map((dependency: any) => dependency.toString()),
     };
 
     await prisma.lesson.create({ data: normalizedLesson });
