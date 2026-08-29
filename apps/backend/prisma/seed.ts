@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import { PrismaClient, Difficulty, ExerciseType, GameType } from '@prisma/client';
 import { makeLessons } from './seed-utils';
+import { ACHIEVEMENTS } from '../src/config/achievements';
 
 // Import raw content arrays from each seed file
 import { section1Contents, section2Contents, section3Contents } from './comprehensive-seed';
@@ -39,161 +40,8 @@ const allLessons = [
   ...section13Lessons,
 ];
 
-const achievements = [
-  // First achievements
-  {
-    title: 'First Steps',
-    description: 'Complete your first typing test',
-    icon: 'target',
-    requirement: JSON.stringify({ type: 'firstSteps' }),
-    points: 10,
-  },
-  {
-    title: 'First Lesson',
-    description: 'Complete your first lesson',
-    icon: 'check',
-    requirement: JSON.stringify({ type: 'firstLesson' }),
-    points: 10,
-  },
-
-  // Speed achievements
-  {
-    title: 'Speed Demon',
-    description: 'Reach 50 WPM in any test',
-    icon: 'zap',
-    requirement: JSON.stringify({ type: 'speedDemon' }),
-    points: 25,
-  },
-  {
-    title: 'Lightning Fast',
-    description: 'Reach 80 WPM in any test',
-    icon: 'flame',
-    requirement: JSON.stringify({ type: 'lightningFast' }),
-    points: 50,
-  },
-  {
-    title: 'Typing Master',
-    description: 'Reach 100 WPM in any test',
-    icon: 'trophy',
-    requirement: JSON.stringify({ type: 'typingMaster' }),
-    points: 100,
-  },
-
-  // Accuracy achievements
-  {
-    title: 'Perfectionist',
-    description: 'Achieve 100% accuracy in any test',
-    icon: 'star',
-    requirement: JSON.stringify({ type: 'perfectionist' }),
-    points: 30,
-  },
-  {
-    title: 'Sharpshooter',
-    description: 'Achieve 95%+ accuracy in 10 tests',
-    icon: 'target',
-    requirement: JSON.stringify({ type: 'sharpshooter' }),
-    points: 40,
-  },
-
-  // Consistency achievements
-  {
-    title: 'Dedicated',
-    description: 'Complete 10 typing tests',
-    icon: 'heart',
-    requirement: JSON.stringify({ type: 'dedicated' }),
-    points: 20,
-  },
-  {
-    title: 'Committed',
-    description: 'Complete 50 typing tests',
-    icon: 'flame',
-    requirement: JSON.stringify({ type: 'committed' }),
-    points: 50,
-  },
-  {
-    title: 'Unstoppable',
-    description: 'Complete 100 typing tests',
-    icon: 'trophy',
-    requirement: JSON.stringify({ type: 'unstoppable' }),
-    points: 100,
-  },
-
-  // Learning achievements
-  {
-    title: 'Student',
-    description: 'Complete 5 lessons',
-    icon: 'check',
-    requirement: JSON.stringify({ type: 'student' }),
-    points: 25,
-  },
-  {
-    title: 'Scholar',
-    description: 'Complete 20 lessons',
-    icon: 'award',
-    requirement: JSON.stringify({ type: 'scholar' }),
-    points: 75,
-  },
-  {
-    title: 'Graduate Typist',
-    description: 'Complete all available lessons',
-    icon: 'trophy',
-    requirement: JSON.stringify({ type: 'graduateTypist' }),
-    points: 150,
-  },
-
-  // Streak achievements
-  {
-    title: 'Week Warrior',
-    description: 'Practice typing on 7 different days in a week',
-    icon: 'flame',
-    requirement: JSON.stringify({ type: 'weekWarrior' }),
-    points: 50,
-  },
-
-  // --- Expansion: 14 → 20 (fills gaps: 3-day streak, 5/25 tests, 25×95%, 30 lessons, 120 WPM)
-  {
-    title: 'Hot Streak',
-    description: 'Practice typing on 3 different days in a week',
-    icon: 'flame',
-    requirement: JSON.stringify({ type: 'hotStreak' }),
-    points: 30,
-  },
-  {
-    title: 'Accuracy Ace',
-    description: 'Achieve 95%+ accuracy in 25 tests',
-    icon: 'star',
-    requirement: JSON.stringify({ type: 'accuracyAce' }),
-    points: 50,
-  },
-  {
-    title: 'Century Club',
-    description: 'Complete 25 typing tests',
-    icon: 'award',
-    requirement: JSON.stringify({ type: 'centuryClub' }),
-    points: 30,
-  },
-  {
-    title: 'Code Crafter',
-    description: 'Complete 30 lessons',
-    icon: 'check',
-    requirement: JSON.stringify({ type: 'codeCrafter' }),
-    points: 40,
-  },
-  {
-    title: 'Early Bird',
-    description: 'Complete 5 typing tests',
-    icon: 'zap',
-    requirement: JSON.stringify({ type: 'earlyBird' }),
-    points: 15,
-  },
-  {
-    title: 'Velocity 120',
-    description: 'Reach 120 WPM in any test',
-    icon: 'crown',
-    requirement: JSON.stringify({ type: 'velocity120' }),
-    points: 150,
-  },
-];
+// Achievements now sourced from shared single source – see src/config/achievements.ts
+// (kept here as re-export for tooling that expects local const, but canonical is ACHIEVEMENTS import)
 
 async function main() {
   console.log('🌱 Starting comprehensive database seed...');
@@ -241,30 +89,29 @@ async function main() {
   }
   console.log(`✅ Created ${lessonCount} lessons across 13 sections${isProduction ? ` (${lessonSkipped} skipped)` : ''}`);
 
-  // Seed achievements (prod-safe via findFirst by title; avoids need for @unique migration)
+  // Seed achievements via shared ACHIEVEMENTS + @@unique([title]) upsert (works in both dev and prod)
   console.log('🏆 Seeding achievements...');
   let achievementCreated = 0;
-  let achievementSkipped = 0;
-  for (const achievement of achievements) {
-    const existing = await prisma.achievement.findFirst({ where: { title: achievement.title } });
-    if (existing) {
-      achievementSkipped++;
-      if (!isProduction) {
-        // In dev we already cleared, this shouldn't happen; log for visibility
-        console.log(`   ↷ Skipped duplicate achievement: ${achievement.title}`);
-      }
-      continue;
-    }
-    await prisma.achievement.create({
-      data: achievement,
+  for (const a of ACHIEVEMENTS) {
+    await prisma.achievement.upsert({
+      where: { title: a.title },
+      update: {
+        description: a.description,
+        icon: a.icon,
+        requirement: JSON.stringify({ type: a.type }),
+        points: a.points,
+      },
+      create: {
+        title: a.title,
+        description: a.description,
+        icon: a.icon,
+        requirement: JSON.stringify({ type: a.type }),
+        points: a.points,
+      },
     });
     achievementCreated++;
   }
-  if (isProduction) {
-    console.log(`✅ Created ${achievementCreated} achievements (${achievementSkipped} skipped, total ${achievements.length})`);
-  } else {
-    console.log(`✅ Created ${achievementCreated} achievements`);
-  }
+  console.log(`✅ Upserted ${achievementCreated} achievements (total ${ACHIEVEMENTS.length})`);
 
   // Seed fake leaderboard data for motivation
   console.log('🏆 Seeding fake leaderboard data...');
@@ -285,7 +132,7 @@ async function main() {
   console.log('   • Section 11 (Advanced Punctuation): Lessons 226-250');
   console.log('   • Section 12 (Code Syntax): Lessons 251-275');
   console.log('   • Section 13 (Speed Drills): Lessons 276-300');
-  console.log(`   • Total Achievements: ${achievements.length}`);
+  console.log(`   • Total Achievements: ${ACHIEVEMENTS.length}`);
 }
 
 async function seedFakeData() {

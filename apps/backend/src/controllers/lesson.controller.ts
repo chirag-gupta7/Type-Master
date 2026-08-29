@@ -605,7 +605,8 @@ export const getProgressVisualization = async (
       }
     }
 
-    // Format level completion data
+    // ponytail: 100 → 4 tiers — keep raw per-level for dialog, frontend aggregates via tier=Math.min(4,Math.ceil(levelNum/25)) to avoid 100-slice pie; add backend pre-bucketed field only if needed
+    // Format level completion data (raw per-level preserved for dialog; pie buckets to 4 on frontend)
     const completionByLevel = Object.entries(levelStats).map(([level, stats]) => ({
       level: level.replace('level', ''),
       name:
@@ -685,11 +686,16 @@ export const getProgressVisualization = async (
     }
 
     // Build skill tree structure with dependencies in O(N)
+    // ponytail: use DAG unlockAfter if present, else heuristic order/level chain; cap 8 per tier bucket not needed for 100
+    const lessonIdSet = new Set(lessonsWithProgress.map((l) => l.id));
     const skillTree = lessonsWithProgress.map((lesson) => {
       const progress = lesson.userProgress[0];
 
       let prerequisites: string[] = [];
-      if (lesson.order > 1) {
+      const unlockAfter = (lesson as unknown as { unlockAfter?: string[] }).unlockAfter;
+      if (unlockAfter && Array.isArray(unlockAfter) && unlockAfter.length > 0) {
+        prerequisites = unlockAfter.filter((id: string) => lessonIdSet.has(id));
+      } else if (lesson.order > 1) {
         const levelLessons = lessonsByLevel.get(lesson.level) || [];
         const idx = lessonIndexInLevel.get(lesson.id) ?? -1;
         if (idx > 0) {

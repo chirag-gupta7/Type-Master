@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
+import { THRESHOLDS } from '../config/achievements';
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -24,32 +25,8 @@ interface UserMetrics {
   uniqueDaysThisWeek: number;
 }
 
-export const THRESHOLDS = {
-  // Speed (WPM)
-  speedDemon: 50,
-  lightningFast: 80,
-  typingMaster: 100,
-  velocity120: 120,
-  // Accuracy (count of 95%+ tests)
-  sharpshooter: 10,
-  accuracyAce: 25,
-  // Consistency (test count)
-  earlyBird: 5,
-  dedicated: 10,
-  centuryClub: 25,
-  committed: 50,
-  unstoppable: 100,
-  // Learning (lessons)
-  student: 5,
-  scholar: 20,
-  codeCrafter: 30,
-  // Streak (unique days in 7d window)
-  hotStreak: 3,
-  weekWarrior: 7,
-  // First
-  firstSteps: 1,
-  firstLesson: 1,
-} as const;
+// THRESHOLDS now sourced from shared single source
+export { THRESHOLDS };
 
 /**
  * Fetch all required user metrics in parallel for performance

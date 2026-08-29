@@ -159,8 +159,8 @@ export function LearningProgressDashboard() {
 
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
-      {/* Row 1: Completion + Best WPM (5 + 7 = 12) — fixes lg:col-span-2+2 in 3-col regression */}
-      <div className="col-span-12 lg:col-span-5">
+      {/* Row 1: Completion by Level — ONE card only, bucket 100→4 tiers, detail in Dialog */}
+      <div className="col-span-12">
         {hasCompletion ? (
           <CircularProgressChart data={data.completionByLevel} />
         ) : (
@@ -168,15 +168,7 @@ export function LearningProgressDashboard() {
         )}
       </div>
 
-      <div className="col-span-12 lg:col-span-7">
-        {hasBestWpm ? (
-          <WPMProgressChart data={data.wpmByLesson} />
-        ) : (
-          <EmptyChartCard icon={TrendingUp} title="No best-per-lesson data" description="Your best WPM per lesson (single point from last 90 days) will appear here." ctaHref="/learn" ctaLabel="Start learning" />
-        )}
-      </div>
-
-      {/* Row 2: History time-series — full width */}
+      {/* Row 2: WPM History (trend) — full width */}
       <div className="col-span-12">
         {hasHistory ? (
           <WpmHistoryChart data={data.wpmHistory ?? []} />
@@ -196,7 +188,7 @@ export function LearningProgressDashboard() {
         )}
       </div>
 
-      {/* Row 3: Heatmap — full width for readability */}
+      {/* Row 3: Practice Frequency — LeetCode-like, full width */}
       <div className="col-span-12">
         {hasPractice ? (
           <PracticeHeatMap data={data.practiceFrequency} />
@@ -216,9 +208,25 @@ export function LearningProgressDashboard() {
         )}
       </div>
 
-      {/* Row 4: Skill tree — ALWAYS shown for onboarding (fixes hasNoData ignoring skillTree) */}
+      {/* Row 4: Best WPM by Lesson — AFTER frequency as requested */}
       <div className="col-span-12">
-        <SkillTreeVisualization data={data.skillTree} />
+        {hasBestWpm ? (
+          <WPMProgressChart data={data.wpmByLesson} />
+        ) : (
+          <EmptyChartCard icon={TrendingUp} title="No best-per-lesson data" description="Your best WPM per lesson (single point from last 90 days) will appear here." ctaHref="/learn" ctaLabel="Start learning" />
+        )}
+      </div>
+
+      {/* Row 5: Skill tree — real tree layout, capped at 100 for readability */}
+      <div className="col-span-12">
+        {data.skillTree.length > 100 ? (
+          <>
+            <SkillTreeVisualization data={data.skillTree.slice(0, 100)} />
+            <p className="mt-2 text-center text-xs text-muted-foreground">Showing first 100 levels of {data.skillTree.length} — complete to unlock more tiers.</p>
+          </>
+        ) : (
+          <SkillTreeVisualization data={data.skillTree} />
+        )}
       </div>
 
       {/* Tips — light Card tokens, not dark gradients */}

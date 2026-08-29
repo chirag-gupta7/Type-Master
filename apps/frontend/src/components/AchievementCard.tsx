@@ -15,9 +15,13 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Trophy, Zap, Target, Award, Star, Flame, Heart, CheckCircle2, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { AchievementIcon as SharedAchievementIcon } from '@/lib/achievements.shared';
 
-// Achievement icon mapping
-const ACHIEVEMENT_ICONS = {
+// Re-export shared icon type for consumers (single source) — mapping below stays visual.
+export type AchievementIcon = SharedAchievementIcon;
+
+// Achievement icon mapping – must cover every icon in shared ACHIEVEMENTS
+const ACHIEVEMENT_ICONS: Record<SharedAchievementIcon, React.ComponentType<{ className?: string }>> = {
   trophy: Trophy,
   zap: Zap,
   target: Target,
@@ -28,8 +32,6 @@ const ACHIEVEMENT_ICONS = {
   check: CheckCircle2,
   crown: Crown,
 } as const;
-
-export type AchievementIcon = keyof typeof ACHIEVEMENT_ICONS;
 
 export interface AchievementCardProps {
   id: string;

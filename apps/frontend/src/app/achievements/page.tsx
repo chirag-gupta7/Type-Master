@@ -21,29 +21,7 @@ import AchievementUnlockAnimation from '@/components/AchievementUnlockAnimation'
 import { Button } from '@/components/ui/button';
 import { Achievement, AchievementStats, UnlockedAchievement } from '@/types';
 import { useAchievementProgress } from '@/lib/useAchievements';
-
-const TYPE_TO_CATEGORY: Record<string, string> = {
-  firstSteps: 'Intro',
-  firstLesson: 'Intro',
-  earlyBird: 'Intro',
-  speedDemon: 'Speed',
-  lightningFast: 'Speed',
-  typingMaster: 'Speed',
-  velocity120: 'Speed',
-  perfectionist: 'Accuracy',
-  sharpshooter: 'Accuracy',
-  accuracyAce: 'Accuracy',
-  dedicated: 'Consistency',
-  centuryClub: 'Consistency',
-  committed: 'Consistency',
-  unstoppable: 'Consistency',
-  student: 'Learning',
-  scholar: 'Learning',
-  codeCrafter: 'Learning',
-  graduateTypist: 'Learning',
-  hotStreak: 'Streak',
-  weekWarrior: 'Streak',
-};
+import { TYPE_TO_CATEGORY } from '@/lib/achievements.shared';
 
 const groupBy = <T,>(arr: T[], key: (t: T) => string): Record<string, T[]> =>
   arr.reduce(
@@ -58,7 +36,7 @@ const groupBy = <T,>(arr: T[], key: (t: T) => string): Record<string, T[]> =>
 const getAchievementCategory = (a: Achievement): string => {
   try {
     const t = JSON.parse(a.requirement).type as string;
-    const cat = TYPE_TO_CATEGORY[t];
+    const cat = (TYPE_TO_CATEGORY as Record<string, string>)[t];
     if (!cat) {
       console.warn(`Unknown achievement type "${t}" — missing from TYPE_TO_CATEGORY (seed/controller/api drift)`);
       return t; // surface raw type instead of silently hiding in "Other"

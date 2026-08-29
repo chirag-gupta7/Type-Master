@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { Calendar, Flame } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { PracticeDay } from '@/types';
@@ -21,13 +20,14 @@ function getLast365Days(): Date[] {
   return days;
 }
 
+// ponytail: LeetCode 5-bucket palette — 0→#ebedf0, 1→#9be9a8, 2→#40c463, 3-5→#30a14e, 6-9→#216e39, 10+→darker; loop WYSIWYG below
 function getColorIntensity(count: number): string {
-  if (count === 0) return 'bg-muted border border-border/50';
-  if (count === 1) return 'bg-emerald-200 border border-emerald-300 dark:bg-emerald-900/70 dark:border-emerald-800';
-  if (count === 2) return 'bg-emerald-300 border border-emerald-400 dark:bg-emerald-700 dark:border-emerald-600';
-  if (count === 3) return 'bg-emerald-400 border border-emerald-500 dark:bg-emerald-600';
-  if (count >= 4) return 'bg-emerald-500 border border-emerald-600 dark:bg-emerald-500 text-white';
-  return 'bg-muted';
+  if (count === 0) return 'bg-[#ebedf0] border border-[#d0d7de] dark:bg-[#161b22] dark:border-[#30363d]';
+  if (count === 1) return 'bg-[#9be9a8] border border-[#7bc47f] dark:bg-[#0e4429]/90 dark:border-[#006d32]';
+  if (count === 2) return 'bg-[#40c463] border border-[#30a14e] dark:bg-[#006d32] dark:border-[#26a641]';
+  if (count >= 3 && count <= 5) return 'bg-[#30a14e] border border-[#216e39] dark:bg-[#26a641] dark:border-[#39d353]';
+  if (count >= 6 && count <= 9) return 'bg-[#216e39] border border-[#1a4d2e] dark:bg-[#216e39] dark:border-[#1a5a2e] text-white';
+  return 'bg-[#0e4429] border border-[#0a2e1c] dark:bg-[#0e4429] dark:border-[#033a16] text-white';
 }
 
 function getTooltipText(count: number, date: Date): string {
@@ -41,17 +41,21 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
   const days = useMemo(() => getLast365Days(), []);
   const activityMap = useMemo(() => new Map(data.map((d) => [d.date, d.count])), [data]);
 
+  // Exactly 53 cols starting Sunday (UTC), dense 11px / gap 3px / min-w 720
   const weeks = useMemo(() => {
-    const groupedWeeks: Date[][] = [];
-    let currentWeek: Date[] = [];
-    days.forEach((day, index) => {
-      currentWeek.push(day);
-      if (day.getDay() === 6 || index === days.length - 1) {
-        groupedWeeks.push([...currentWeek]);
-        currentWeek = [];
+    if (days.length === 0) return [] as Date[][];
+    const first = days[0];
+    const firstUTCDay = first.getUTCDay(); // 0=Sun ; UTC fixed
+    const startSundayMs = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()) - firstUTCDay * DAY_MS;
+    const weeksArr: Date[][] = [];
+    for (let w = 0; w < 53; w++) {
+      const week: Date[] = [];
+      for (let d = 0; d < 7; d++) {
+        week.push(new Date(startSundayMs + (w * 7 + d) * DAY_MS));
       }
-    });
-    return groupedWeeks;
+      weeksArr.push(week);
+    }
+    return weeksArr;
   }, [days]);
 
   const { totalActivities, activeDays, currentStreak, longestStreak } = useMemo(() => {
@@ -64,8 +68,11 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
 
   const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks]);
 
+  const todayUtcStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  // for future shading: compare ms
+
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}>
+    <div>
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -97,8 +104,8 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
           </div>
 
           <div className="overflow-x-auto scrollbar-thin relative" aria-label="365-day practice heatmap, scrollable horizontally">
-            <div className="inline-block min-w-[640px] w-full">
-              <div className="flex gap-1 mb-2">
+            <div className="inline-block min-w-[720px] w-full">
+              <div className="flex gap-[3px] mb-2">
                 <div className="w-8 shrink-0" />
                 <div className="flex-1 flex">
                   {monthLabels.map((month, index) => (
@@ -109,37 +116,36 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
                 </div>
               </div>
 
-              <div className="flex gap-1">
-                <div className="w-8 shrink-0 flex flex-col justify-between text-xs text-muted-foreground pr-2">
+              <div className="flex gap-[3px]">
+                <div className="w-8 shrink-0 flex flex-col justify-between text-xs text-muted-foreground pr-2" aria-hidden>
                   <span>Mon</span>
                   <span>Wed</span>
                   <span>Fri</span>
                 </div>
-                <div className="flex-1 flex gap-1">
+                <div className="flex-1 flex gap-[3px]" role="grid" aria-label="Practice heatmap grid: 53 weeks starting Sunday, 7 days per week">
                   {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="flex flex-col gap-1">
-                      {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
-                        const day = week.find((d) => d.getDay() === dayOfWeek);
-                        if (!day) return <div key={dayOfWeek} className="h-6 w-6" aria-hidden />;
+                    <div key={weekIndex} className="flex flex-col gap-[3px]" role="row" aria-label={`Week ${weekIndex + 1}`}>
+                      {week.map((day) => {
                         const dateStr = day.toISOString().split('T')[0];
-                        const count = activityMap.get(dateStr) || 0;
+                        const isFuture = dateStr > todayUtcStr;
+                        const count = isFuture ? 0 : (activityMap.get(dateStr) || 0);
+                        const isOutOfRange = day.getTime() < days[0].getTime() || isFuture;
+                        // Out-of-range leading/trailing padding still renders muted #ebedf0 for WYSIWYG grid shape, but dim future
                         return (
-                          <motion.button
-                            key={dayOfWeek}
+                          <button
+                            key={dateStr}
                             type="button"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.12 + weekIndex * 0.004 + dayOfWeek * 0.001, duration: 0.18 }}
-                            whileHover={{ scale: 1.1 }}
                             aria-label={getTooltipText(count, day)}
                             title={getTooltipText(count, day)}
-                            className="group relative flex h-6 w-6 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                            role="gridcell"
+                            aria-selected="false"
+                            className="group relative flex h-[11px] w-[11px] items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                           >
-                            <span className={`h-3 w-3 rounded-sm ${getColorIntensity(count)} block`} aria-hidden />
+                            <span className={`h-[11px] w-[11px] rounded-sm block ${getColorIntensity(isOutOfRange && isFuture ? 0 : count)} ${isOutOfRange ? 'opacity-60' : ''}`} aria-hidden />
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-md border bg-popover text-popover-foreground text-xs shadow-md opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
                               {getTooltipText(count, day)}
                             </span>
-                          </motion.button>
+                          </button>
                         );
                       })}
                     </div>
@@ -153,16 +159,17 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
 
           <div className="flex items-center gap-2 mt-5 justify-end text-xs text-muted-foreground">
             <span>Less</span>
-            <div className="flex gap-1">
-              {[0, 1, 2, 3, 4].map((c) => (
-                <div key={c} className={`h-3 w-3 rounded-sm ${getColorIntensity(c)}`} aria-hidden title={c === 0 ? '0 practices' : `${c}${c === 4 ? '+' : ''} practices`} />
+            <div className="flex gap-[3px]" aria-hidden>
+              {/* WYSIWYG legend loop — same buckets as getColorIntensity */}
+              {[0, 1, 2, 4, 7, 12].map((c) => (
+                <div key={c} className={`h-[11px] w-[11px] rounded-sm ${getColorIntensity(c)}`} title={c === 0 ? '0 practices' : c >= 10 ? '10+ practices' : c >= 6 ? '6-9 practices' : c >= 3 ? '3-5 practices' : `${c} practice${c>1?'s':''}`} />
               ))}
             </div>
             <span>More</span>
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 
@@ -172,10 +179,11 @@ function getMonthLabels(weeks: Date[][]): Array<{ name: string; width: number }>
   let weekCount = 0;
   weeks.forEach((week) => {
     const firstDay = week[0];
-    if (firstDay && firstDay.getMonth() !== currentMonth) {
-      if (weekCount > 0) months[months.length - 1].width = (weekCount / weeks.length) * 100;
-      currentMonth = firstDay.getMonth();
-      months.push({ name: firstDay.toLocaleDateString('en-US', { month: 'short' }), width: 0 });
+    if (!firstDay) return;
+    if (firstDay.getUTCMonth() !== currentMonth) {
+      if (weekCount > 0 && months.length > 0) months[months.length - 1].width = (weekCount / weeks.length) * 100;
+      currentMonth = firstDay.getUTCMonth();
+      months.push({ name: firstDay.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }), width: 0 });
       weekCount = 1;
     } else weekCount++;
   });

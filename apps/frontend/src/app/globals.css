@@ -253,6 +253,16 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* PracticeHeatMap LeetCode palette vars (Tailwind arbitrary hex also used) */
+:root {
+  --heatmap-0: #ebedf0;
+  --heatmap-1: #9be9a8;
+  --heatmap-2: #40c463;
+  --heatmap-3: #30a14e;
+  --heatmap-4: #216e39;
+  --heatmap-5: #0e4429;
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
