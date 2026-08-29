@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { Award, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,19 @@ interface WPMProgressChartProps {
   data: LessonWPMData[];
 }
 
-const LESSON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const MAX_LABEL_LEN = 14;
+const truncateLabel = (s: string, max = MAX_LABEL_LEN) => (s.length > max ? s.slice(0, max) + '…' : s);
+
+const LESSON_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--ring))',
+  'hsl(var(--primary))',
+  'hsl(var(--secondary-foreground))',
+];
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number; payload: Record<string, unknown> }>; label?: string }) => {
   if (active && payload && payload.length) {
@@ -51,7 +63,7 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
     return selected.map((l) => {
       const point = l.data[0];
       return {
-        lesson: l.lessonTitle.length > 14 ? l.lessonTitle.slice(0, 14) + '…' : l.lessonTitle,
+        lesson: truncateLabel(l.lessonTitle),
         fullTitle: l.lessonTitle,
         wpm: point?.wpm ?? 0,
         accuracy: point?.accuracy ?? 0,
@@ -113,13 +125,35 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} barCategoryGap="18%">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="lesson" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" interval={0} angle={-18} textAnchor="end" height={64} />
+                  <XAxis
+                    dataKey="lesson"
+                    tick={{ fontSize: 11 }}
+                    stroke="hsl(var(--muted-foreground))"
+                    interval={0}
+                    angle={barData.length > 4 ? -22 : 0}
+                    textAnchor={barData.length > 4 ? 'end' : 'middle'}
+                    height={barData.length > 4 ? 64 : 32}
+                    tickMargin={8}
+                  />
                   <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: 'hsl(var(--muted-foreground))', fontSize: 11 } }} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.4)' }} />
                   <Legend wrapperStyle={{ paddingTop: 8, fontSize: 12 }} />
-                  <Bar dataKey="wpm" name="WPM" radius={[8, 8, 0, 0]} fill="hsl(var(--primary))" animationDuration={650} />
+                  {/* single bar uses primary token; multi uses distinct LESSON_COLORS via Cell */}
+                  <Bar dataKey="wpm" name="WPM" radius={[8, 8, 0, 0]} fill="hsl(var(--primary))" animationDuration={650}>
+                    {barData.length > 1 && barData.map((_, idx) => (
+                      <Cell key={`cell-${idx}`} fill={LESSON_COLORS[idx % LESSON_COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          ) : filteredSelected.length === 0 && data.length > 0 ? (
+            <div className="h-[300px] grid place-items-center rounded-xl border border-dashed bg-muted/20 p-6 text-center">
+              <div>
+                <Filter className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-sm font-medium">No lessons selected</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[28ch]">Use Filter to select up to 8 lessons.</p>
+              </div>
             </div>
           ) : (
             <div className="h-[300px] grid place-items-center rounded-xl border border-dashed bg-muted/20 p-6 text-center">

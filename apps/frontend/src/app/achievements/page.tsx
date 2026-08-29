@@ -58,9 +58,15 @@ const groupBy = <T,>(arr: T[], key: (t: T) => string): Record<string, T[]> =>
 const getAchievementCategory = (a: Achievement): string => {
   try {
     const t = JSON.parse(a.requirement).type as string;
-    return TYPE_TO_CATEGORY[t] ?? 'Other';
+    const cat = TYPE_TO_CATEGORY[t];
+    if (!cat) {
+      console.warn(`Unknown achievement type "${t}" — missing from TYPE_TO_CATEGORY (seed/controller/api drift)`);
+      return t; // surface raw type instead of silently hiding in "Other"
+    }
+    return cat;
   } catch {
-    return 'Other';
+    console.warn('Failed to parse achievement requirement', a.requirement);
+    return 'Unknown';
   }
 };
 
@@ -77,8 +83,8 @@ const AchievementsPage: React.FC = () => {
   const [currentUnlock, setCurrentUnlock] = useState<UnlockedAchievement | null>(null);
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
-  // Get progress tracking for locked achievements
-  const { progress: achievementProgress } = useAchievementProgress();
+  // Get progress tracking for locked achievements (split-cache: progress separate from achievements list)
+  const { progress: achievementProgress, refetch: refetchProgress } = useAchievementProgress();
 
   // Check authentication status (lazy initializer avoids a state flip that
   // would re-run the fetch effect below and double-fetch on mount)
@@ -125,15 +131,16 @@ const AchievementsPage: React.FC = () => {
           setShowUnlockAnimation(false);
         }
 
-        // Refresh achievements list
-        const data = await achievementAPI.getAllAchievements();
+        // Refresh achievements list + stats (split-cache: invalidated in checkAchievements)
+        const data = await achievementAPI.getAllAchievements({ skipCache: true });
         setAchievements(data.achievements);
 
-        // Refresh stats
-        const statsData = await achievementAPI.getAchievementStats();
+        const statsData = await achievementAPI.getAchievementStats({ skipCache: true });
         setStats(statsData.stats);
         setRecentUnlocks(statsData.recentUnlocks);
       }
+      // Progress was cached separately (5m) — always force refresh so streak & threshold progress is live
+      await refetchProgress({ skipCache: true });
     } catch (error) {
       console.error('Failed to check achievements:', error);
     } finally {

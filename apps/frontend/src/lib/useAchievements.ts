@@ -28,14 +28,14 @@ export function useAchievementProgress() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchProgress = useCallback(async () => {
+  const fetchProgress = useCallback(async (options?: { skipCache?: boolean }) => {
     if (!authAPI.isAuthenticated()) {
       return;
     }
 
     try {
       setLoading(true);
-      const data = await achievementAPI.getAchievementProgress();
+      const data = await achievementAPI.getAchievementProgress(options);
       setProgress(data.progress);
       setStats(data.stats);
     } catch (error) {

@@ -184,17 +184,56 @@ export async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}):
 }
 
 /**
+ * Fallback scope when JWT is expired or missing — decode raw stored token
+ * even if expired, or use typemaster_user persistence. Ensures cache
+ * invalidation still hits the user's namespace when getAuthToken returns null.
+ */
+function getFallbackScope(): string {
+  if (typeof window === 'undefined') return 'guest';
+  try {
+    const raw = localStorage.getItem('accessToken');
+    if (raw) {
+      const payload = decodeJwtPayload(raw);
+      if (payload && typeof payload.userId === 'string' && payload.userId.length > 0) {
+        return `user:${payload.userId}`;
+      }
+    }
+  } catch {
+    // ignore decode errors, fall through to user fallback
+  }
+  try {
+    const rawUser = localStorage.getItem('typemaster_user');
+    if (rawUser) {
+      const parsed = JSON.parse(rawUser) as { id?: string; userId?: string };
+      const id = parsed?.id || parsed?.userId;
+      if (typeof id === 'string' && id.length > 0) return `user:${id}`;
+    }
+  } catch {
+    // ignore JSON parse errors
+  }
+  return 'guest';
+}
+
+async function getEffectiveCacheScope(): Promise<string> {
+  const scope = getCacheScopeFromToken(await getAuthToken());
+  if (scope !== 'guest') return scope;
+  const fallback = getFallbackScope();
+  return fallback !== 'guest' ? fallback : scope;
+}
+
+/**
  * Invalidate cached entries for the currently authenticated user's scope.
  * Keys must be scoped identically to how fetchAPI stores them, otherwise
- * stale data would survive a mutation.
+ * stale data would survive a mutation. Falls back to typemaster_user /
+ * expired token decoding so invalidation works even with an expired JWT.
  */
 async function invalidateScoped(...keys: string[]): Promise<void> {
-  const scope = getCacheScopeFromToken(await getAuthToken());
+  const scope = await getEffectiveCacheScope();
   keys.forEach((key) => invalidateCache(`${scope}:${key}`));
 }
 
 async function invalidateScopedByPrefix(prefix: string): Promise<void> {
-  const scope = getCacheScopeFromToken(await getAuthToken());
+  const scope = await getEffectiveCacheScope();
   invalidateCacheByPrefix(`${scope}:${prefix}`);
 }
 
@@ -679,9 +718,9 @@ export const lessonAPI = {
   },
 
   /**
-   * Get user's learning statistics
+   * Get user's learning statistics — supports skipCache for forced refresh (progress page) + AbortSignal
    */
-  getLearningStats: async () => {
+  getLearningStats: async (options?: { skipCache?: boolean; signal?: AbortSignal }) => {
     return fetchAPI<{
       stats: {
         totalLessons: number;
@@ -692,13 +731,18 @@ export const lessonAPI = {
         averageWpm: number;
         averageAccuracy: number;
       };
-    }>('/lessons/progress/stats', { cacheKey: 'lessons:stats' });
+    }>('/lessons/progress/stats', {
+      cacheKey: options?.skipCache ? undefined : 'lessons:stats',
+      cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
+      signal: options?.signal,
+    });
   },
 
   /**
-   * Get detailed progress data for visualizations
+   * Get detailed progress data for visualizations — supports skipCache + AbortSignal
    */
-  getProgressVisualization: async () => {
+  getProgressVisualization: async (options?: { skipCache?: boolean; signal?: AbortSignal }) => {
     return fetchAPI<{
       completionByLevel: Array<{
         level: string;
@@ -737,15 +781,17 @@ export const lessonAPI = {
         locked: boolean;
         prerequisites: string[];
       }>;
-      wpmHistory: Array<{
+      wpmHistory?: Array<{
         date: string;
         wpm: number;
         accuracy: number;
         lessonId?: string;
       }>;
     }>('/lessons/progress/visualization', {
-      cacheKey: 'lessons:progress',
+      cacheKey: options?.skipCache ? undefined : 'lessons:progress',
       cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
+      signal: options?.signal,
     });
   },
 };
@@ -791,7 +837,7 @@ export const achievementAPI = {
   /**
    * Get all achievements with user's unlock status
    */
-  getAllAchievements: async () => {
+  getAllAchievements: async (options?: { skipCache?: boolean }) => {
     return fetchAPI<{
       achievements: Array<{
         id: string;
@@ -807,7 +853,11 @@ export const achievementAPI = {
       unlockedCount: number;
       totalPoints: number;
       earnedPoints: number;
-    }>('/achievements', { cacheKey: 'achievements:all', cacheTtl: DEFAULT_CACHE_TTL });
+    }>('/achievements', {
+      cacheKey: options?.skipCache ? undefined : 'achievements:all',
+      cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
+    });
   },
 
   /**
@@ -837,7 +887,7 @@ export const achievementAPI = {
   /**
    * Get achievement statistics
    */
-  getAchievementStats: async () => {
+  getAchievementStats: async (options?: { skipCache?: boolean }) => {
     return fetchAPI<{
       stats: {
         totalAchievements: number;
@@ -856,13 +906,17 @@ export const achievementAPI = {
         points: number;
         unlockedAt: string;
       }>;
-    }>('/achievements/stats', { cacheKey: 'achievements:stats', cacheTtl: DEFAULT_CACHE_TTL });
+    }>('/achievements/stats', {
+      cacheKey: options?.skipCache ? undefined : 'achievements:stats',
+      cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
+    });
   },
 
   /**
-   * Get achievement progress for multi-step achievements
+   * Get achievement progress for multi-step achievements (supports skipCache for forced refresh after check)
    */
-  getAchievementProgress: async () => {
+  getAchievementProgress: async (options?: { skipCache?: boolean }) => {
     return fetchAPI<{
       progress: {
         firstSteps: number;
@@ -895,8 +949,9 @@ export const achievementAPI = {
         uniqueDaysThisWeek: number;
       };
     }>('/achievements/progress', {
-      cacheKey: 'achievements:progress',
+      cacheKey: options?.skipCache ? undefined : 'achievements:progress',
       cacheTtl: DEFAULT_CACHE_TTL,
+      skipCache: options?.skipCache,
     });
   },
 };

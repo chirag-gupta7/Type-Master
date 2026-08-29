@@ -10,13 +10,13 @@ interface PracticeHeatMapProps {
   data: PracticeDay[];
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 function getLast365Days(): Date[] {
   const days: Date[] = [];
-  const today = new Date();
+  const now = new Date();
+  const todayUtcMidnightMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   for (let i = 364; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    days.push(date);
+    days.push(new Date(todayUtcMidnightMs - i * DAY_MS));
   }
   return days;
 }
@@ -96,13 +96,13 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <div className="inline-block min-w-full">
+          <div className="overflow-x-auto scrollbar-thin relative" aria-label="365-day practice heatmap, scrollable horizontally">
+            <div className="inline-block min-w-[640px] w-full">
               <div className="flex gap-1 mb-2">
-                <div className="w-8" />
+                <div className="w-8 shrink-0" />
                 <div className="flex-1 flex">
                   {monthLabels.map((month, index) => (
-                    <div key={index} className="text-xs text-muted-foreground" style={{ width: `${month.width}%` }}>
+                    <div key={index} className="text-xs text-muted-foreground truncate" style={{ width: `${month.width}%` }}>
                       {month.name}
                     </div>
                   ))}
@@ -110,7 +110,7 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
               </div>
 
               <div className="flex gap-1">
-                <div className="w-8 flex flex-col justify-between text-xs text-muted-foreground pr-2">
+                <div className="w-8 shrink-0 flex flex-col justify-between text-xs text-muted-foreground pr-2">
                   <span>Mon</span>
                   <span>Wed</span>
                   <span>Fri</span>
@@ -120,23 +120,26 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
                     <div key={weekIndex} className="flex flex-col gap-1">
                       {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
                         const day = week.find((d) => d.getDay() === dayOfWeek);
-                        if (!day) return <div key={dayOfWeek} className="w-3 h-3" />;
+                        if (!day) return <div key={dayOfWeek} className="h-6 w-6" aria-hidden />;
                         const dateStr = day.toISOString().split('T')[0];
                         const count = activityMap.get(dateStr) || 0;
                         return (
-                          <motion.div
+                          <motion.button
                             key={dayOfWeek}
+                            type="button"
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.12 + weekIndex * 0.004 + dayOfWeek * 0.001, duration: 0.18 }}
-                            whileHover={{ scale: 1.35, zIndex: 10 }}
-                            className={`w-3 h-3 rounded-sm ${getColorIntensity(count)} cursor-pointer group relative`}
+                            whileHover={{ scale: 1.1 }}
+                            aria-label={getTooltipText(count, day)}
                             title={getTooltipText(count, day)}
+                            className="group relative flex h-6 w-6 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                           >
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-md border bg-popover text-popover-foreground text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+                            <span className={`h-3 w-3 rounded-sm ${getColorIntensity(count)} block`} aria-hidden />
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-md border bg-popover text-popover-foreground text-xs shadow-md opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
                               {getTooltipText(count, day)}
-                            </div>
-                          </motion.div>
+                            </span>
+                          </motion.button>
                         );
                       })}
                     </div>
@@ -144,16 +147,16 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
                 </div>
               </div>
             </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent opacity-60 sm:hidden" aria-hidden />
           </div>
+          <p className="mt-2 text-[11px] text-muted-foreground sm:hidden">← Scroll to see full year →</p>
 
           <div className="flex items-center gap-2 mt-5 justify-end text-xs text-muted-foreground">
             <span>Less</span>
             <div className="flex gap-1">
-              <div className="w-3 h-3 rounded-sm bg-muted border" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-300 dark:bg-emerald-900/70" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-300 dark:bg-emerald-700" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-600" />
-              <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+              {[0, 1, 2, 3, 4].map((c) => (
+                <div key={c} className={`h-3 w-3 rounded-sm ${getColorIntensity(c)}`} aria-hidden title={c === 0 ? '0 practices' : `${c}${c === 4 ? '+' : ''} practices`} />
+              ))}
             </div>
             <span>More</span>
           </div>
@@ -180,7 +183,6 @@ function getMonthLabels(weeks: Date[][]): Array<{ name: string; width: number }>
   return months;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 function toUtcDayMs(dayKey: string): number { return Date.parse(`${dayKey}T00:00:00Z`); }
 function getSortedActiveDayKeys(data: PracticeDay[]): string[] { return data.filter((d) => d.count > 0).map((d) => d.date).sort(); }
 

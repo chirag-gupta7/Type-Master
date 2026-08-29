@@ -26,6 +26,8 @@ export default function ProgressPage() {
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [todayUtc, setTodayUtc] = useState<string>('');
+  useEffect(() => { setTodayUtc(new Date().toISOString().slice(0, 10)); }, []);
 
   useEffect(() => {
     const ok = authAPI.isAuthenticated();
@@ -34,24 +36,26 @@ export default function ProgressPage() {
     if (!ok) router.push('/');
   }, [router]);
 
+  const fetchStats = async (signal?: AbortSignal) => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
+      const res = await lessonAPI.getLearningStats(signal ? { signal } : undefined);
+      if (signal?.aborted) return;
+      setStats(res.stats);
+    } catch (e) {
+      if (signal?.aborted) return;
+      setStatsError(e instanceof Error ? e.message : 'Failed to load stats');
+    } finally {
+      if (!signal?.aborted) setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
-    let alive = true;
-    (async () => {
-      try {
-        setStatsLoading(true);
-        setStatsError(null);
-        const res = await lessonAPI.getLearningStats();
-        if (!alive) return;
-        setStats(res.stats);
-      } catch (e) {
-        if (!alive) return;
-        setStatsError(e instanceof Error ? e.message : 'Failed to load stats');
-      } finally {
-        if (alive) setStatsLoading(false);
-      }
-    })();
-    return () => { alive = false; };
+    const ctrl = new AbortController();
+    fetchStats(ctrl.signal);
+    return () => { ctrl.abort(); };
   }, [isAuthenticated]);
 
   if (authLoading) {
@@ -73,7 +77,7 @@ export default function ProgressPage() {
               <p className="mt-1.5 text-sm text-muted-foreground max-w-[60ch]">All your learning signals — completion, stars, best-per-lesson peaks, and daily history — in one light, glanceable view.</p>
             </div>
             <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              <Target className="h-3.5 w-3.5 text-violet-600" /> UTC YYYY-MM-DD
+              <Target className="h-3.5 w-3.5 text-violet-600" aria-hidden /> {todayUtc ? `UTC ${todayUtc}` : 'UTC —'}
             </span>
           </div>
         </motion.div>
@@ -86,7 +90,9 @@ export default function ProgressPage() {
                 <Card key={i} className="p-4">
                   <Skeleton className="h-3 w-20 mb-3" />
                   <Skeleton className="h-7 w-16 mb-2" />
-                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-24 mb-2" />
+                  {/* matches real Card p-4 + text-2xl + h-1.5 progress bar (completion card tallest) */}
+                  <Skeleton className={`h-1.5 w-full rounded-full ${i === 2 ? 'opacity-100' : 'opacity-0'}`} aria-hidden />
                 </Card>
               ))}
             </div>
@@ -94,7 +100,7 @@ export default function ProgressPage() {
             <Card className="border-amber-500/30 bg-amber-500/5">
               <CardContent className="py-4 text-sm text-amber-900 dark:text-amber-100 flex items-center gap-2">
                 <span className="text-xs">Couldn’t load summary: {statsError}</span>
-                <button onClick={() => window.location.reload()} className="ml-auto text-xs underline">Retry</button>
+                <button onClick={() => fetchStats()} className="ml-auto text-xs underline">Retry</button>
               </CardContent>
             </Card>
           ) : stats ? (

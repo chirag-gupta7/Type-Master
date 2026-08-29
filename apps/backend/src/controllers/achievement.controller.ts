@@ -24,8 +24,36 @@ interface UserMetrics {
   uniqueDaysThisWeek: number;
 }
 
+export const THRESHOLDS = {
+  // Speed (WPM)
+  speedDemon: 50,
+  lightningFast: 80,
+  typingMaster: 100,
+  velocity120: 120,
+  // Accuracy (count of 95%+ tests)
+  sharpshooter: 10,
+  accuracyAce: 25,
+  // Consistency (test count)
+  earlyBird: 5,
+  dedicated: 10,
+  centuryClub: 25,
+  committed: 50,
+  unstoppable: 100,
+  // Learning (lessons)
+  student: 5,
+  scholar: 20,
+  codeCrafter: 30,
+  // Streak (unique days in 7d window)
+  hotStreak: 3,
+  weekWarrior: 7,
+  // First
+  firstSteps: 1,
+  firstLesson: 1,
+} as const;
+
 /**
  * Fetch all required user metrics in parallel for performance
+ * Streak merges TestResult (createdAt) + UserLessonProgress (lastAttempt) into single UTC YYYY-MM-DD Set
  */
 const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
   const sevenDaysAgo = new Date();
@@ -38,6 +66,7 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
     completedLessonsCount,
     totalLessonsCount,
     recentTests,
+    recentLessonAttempts,
   ] = await Promise.all([
     prisma.testResult.aggregate({
       where: { userId },
@@ -62,9 +91,19 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
       },
       select: { createdAt: true },
     }),
+    prisma.userLessonProgress.findMany({
+      where: {
+        userId,
+        lastAttempt: { gte: sevenDaysAgo },
+      },
+      select: { lastAttempt: true },
+    }),
   ]);
 
-  const uniqueDays = new Set(recentTests.map((r) => r.createdAt.toISOString().split('T')[0]));
+  const uniqueDays = new Set<string>([
+    ...recentTests.map((r) => r.createdAt.toISOString().split('T')[0]),
+    ...recentLessonAttempts.map((r) => r.lastAttempt.toISOString().split('T')[0]),
+  ]);
 
   return {
     testCount: testStats._count._all,
@@ -80,40 +119,41 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
 /**
  * Achievement requirement checkers
  * Optimized to use pre-fetched metrics instead of database calls
+ * Thresholds sourced from THRESHOLDS to prevent drift with getAchievementProgress
  */
 const checkAchievementRequirements = {
   // Speed achievements
-  speedDemon: (metrics: UserMetrics): boolean => metrics.maxWpm >= 50,
-  lightningFast: (metrics: UserMetrics): boolean => metrics.maxWpm >= 80,
-  typingMaster: (metrics: UserMetrics): boolean => metrics.maxWpm >= 100,
-  velocity120: (metrics: UserMetrics): boolean => metrics.maxWpm >= 120,
+  speedDemon: (metrics: UserMetrics): boolean => metrics.maxWpm >= THRESHOLDS.speedDemon,
+  lightningFast: (metrics: UserMetrics): boolean => metrics.maxWpm >= THRESHOLDS.lightningFast,
+  typingMaster: (metrics: UserMetrics): boolean => metrics.maxWpm >= THRESHOLDS.typingMaster,
+  velocity120: (metrics: UserMetrics): boolean => metrics.maxWpm >= THRESHOLDS.velocity120,
 
   // Accuracy achievements
   perfectionist: (metrics: UserMetrics): boolean => metrics.hasPerfectAccuracy,
-  sharpshooter: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= 10,
-  accuracyAce: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= 25,
+  sharpshooter: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= THRESHOLDS.sharpshooter,
+  accuracyAce: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= THRESHOLDS.accuracyAce,
 
   // Consistency achievements
-  earlyBird: (metrics: UserMetrics): boolean => metrics.testCount >= 5,
-  dedicated: (metrics: UserMetrics): boolean => metrics.testCount >= 10,
-  centuryClub: (metrics: UserMetrics): boolean => metrics.testCount >= 25,
-  committed: (metrics: UserMetrics): boolean => metrics.testCount >= 50,
-  unstoppable: (metrics: UserMetrics): boolean => metrics.testCount >= 100,
+  earlyBird: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.earlyBird,
+  dedicated: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.dedicated,
+  centuryClub: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.centuryClub,
+  committed: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.committed,
+  unstoppable: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.unstoppable,
 
   // Learning achievements
-  student: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 5,
-  scholar: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 20,
-  codeCrafter: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 30,
+  student: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.student,
+  scholar: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.scholar,
+  codeCrafter: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.codeCrafter,
   graduateTypist: (metrics: UserMetrics): boolean =>
     metrics.completedLessonsCount >= metrics.totalLessonsCount && metrics.totalLessonsCount > 0,
 
   // Streak achievements
-  hotStreak: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= 3,
-  weekWarrior: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= 7,
+  hotStreak: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= THRESHOLDS.hotStreak,
+  weekWarrior: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= THRESHOLDS.weekWarrior,
 
   // First achievements
-  firstSteps: (metrics: UserMetrics): boolean => metrics.testCount >= 1,
-  firstLesson: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= 1,
+  firstSteps: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.firstSteps,
+  firstLesson: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.firstLesson,
 };
 
 /**
@@ -328,39 +368,39 @@ export const getAchievementProgress = async (req: AuthRequest, res: Response) =>
 
     const progress = {
       // First achievements
-      firstSteps: Math.min((metrics.testCount / 1) * 100, 100),
-      firstLesson: Math.min((metrics.completedLessonsCount / 1) * 100, 100),
+      firstSteps: Math.min((metrics.testCount / THRESHOLDS.firstSteps) * 100, 100),
+      firstLesson: Math.min((metrics.completedLessonsCount / THRESHOLDS.firstLesson) * 100, 100),
       perfectionist: metrics.hasPerfectAccuracy ? 100 : 0,
 
       // Consistency achievements
-      earlyBird: Math.min((metrics.testCount / 5) * 100, 100),
-      dedicated: Math.min((metrics.testCount / 10) * 100, 100),
-      centuryClub: Math.min((metrics.testCount / 25) * 100, 100),
-      committed: Math.min((metrics.testCount / 50) * 100, 100),
-      unstoppable: Math.min((metrics.testCount / 100) * 100, 100),
+      earlyBird: Math.min((metrics.testCount / THRESHOLDS.earlyBird) * 100, 100),
+      dedicated: Math.min((metrics.testCount / THRESHOLDS.dedicated) * 100, 100),
+      centuryClub: Math.min((metrics.testCount / THRESHOLDS.centuryClub) * 100, 100),
+      committed: Math.min((metrics.testCount / THRESHOLDS.committed) * 100, 100),
+      unstoppable: Math.min((metrics.testCount / THRESHOLDS.unstoppable) * 100, 100),
 
       // Speed achievements
-      speedDemon: Math.min((metrics.maxWpm / 50) * 100, 100),
-      lightningFast: Math.min((metrics.maxWpm / 80) * 100, 100),
-      typingMaster: Math.min((metrics.maxWpm / 100) * 100, 100),
-      velocity120: Math.min((metrics.maxWpm / 120) * 100, 100),
+      speedDemon: Math.min((metrics.maxWpm / THRESHOLDS.speedDemon) * 100, 100),
+      lightningFast: Math.min((metrics.maxWpm / THRESHOLDS.lightningFast) * 100, 100),
+      typingMaster: Math.min((metrics.maxWpm / THRESHOLDS.typingMaster) * 100, 100),
+      velocity120: Math.min((metrics.maxWpm / THRESHOLDS.velocity120) * 100, 100),
 
       // Accuracy achievements
-      sharpshooter: Math.min((metrics.highAccuracyCount / 10) * 100, 100),
-      accuracyAce: Math.min((metrics.highAccuracyCount / 25) * 100, 100),
+      sharpshooter: Math.min((metrics.highAccuracyCount / THRESHOLDS.sharpshooter) * 100, 100),
+      accuracyAce: Math.min((metrics.highAccuracyCount / THRESHOLDS.accuracyAce) * 100, 100),
 
       // Learning achievements
-      student: Math.min((metrics.completedLessonsCount / 5) * 100, 100),
-      scholar: Math.min((metrics.completedLessonsCount / 20) * 100, 100),
-      codeCrafter: Math.min((metrics.completedLessonsCount / 30) * 100, 100),
+      student: Math.min((metrics.completedLessonsCount / THRESHOLDS.student) * 100, 100),
+      scholar: Math.min((metrics.completedLessonsCount / THRESHOLDS.scholar) * 100, 100),
+      codeCrafter: Math.min((metrics.completedLessonsCount / THRESHOLDS.codeCrafter) * 100, 100),
       graduateTypist:
         metrics.totalLessonsCount > 0
           ? Math.min((metrics.completedLessonsCount / metrics.totalLessonsCount) * 100, 100)
           : 0,
 
       // Streak achievements
-      hotStreak: Math.min((metrics.uniqueDaysThisWeek / 3) * 100, 100),
-      weekWarrior: Math.min((metrics.uniqueDaysThisWeek / 7) * 100, 100),
+      hotStreak: Math.min((metrics.uniqueDaysThisWeek / THRESHOLDS.hotStreak) * 100, 100),
+      weekWarrior: Math.min((metrics.uniqueDaysThisWeek / THRESHOLDS.weekWarrior) * 100, 100),
     };
 
     return res.json({
