@@ -97,21 +97,23 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
                         const hasPrereq = lesson.prerequisites.length > 0;
                         return (
                           <div key={lesson.id} className="relative">
-                            {lessonIndex > 0 && <div className="hidden sm:block absolute right-full top-1/2 -translate-y-1/2 w-3 h-px bg-border" />}
+                            {lessonIndex > 0 && <div className="absolute right-full top-1/2 -translate-y-1/2 w-3 h-px bg-border" aria-hidden />}
                             {hasPrereq && levelIndex > 0 && (
-                              <svg className="absolute bottom-full left-1/2 -translate-x-1/2 pointer-events-none hidden sm:block" width="2" height="18">
+                              <svg className="absolute bottom-full left-1/2 -translate-x-1/2 pointer-events-none" width="2" height="18" aria-hidden>
                                 <line x1="1" y1="0" x2="1" y2="18" stroke="hsl(var(--border))" strokeWidth="1.5" strokeDasharray="3 3" />
                               </svg>
                             )}
                             <motion.button
                               whileHover={{ scale: lesson.locked ? 1 : 1.04, y: lesson.locked ? 0 : -1 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => setSelectedNode(lesson)}
+                              whileTap={{ scale: lesson.locked ? 1 : 0.97 }}
+                              onClick={() => { if (!lesson.locked) setSelectedNode(lesson); }}
                               onHoverStart={() => setHoveredNode(lesson.id)}
                               onHoverEnd={() => setHoveredNode(null)}
+                              disabled={lesson.locked}
+                              aria-disabled={lesson.locked}
                               aria-label={`${lesson.title} - ${lesson.locked ? 'Locked' : lesson.completed ? 'Completed' : 'Available'}, Target ${lesson.targetWpm} WPM`}
                               aria-expanded={isSelected}
-                              className={`relative group w-[120px] h-[120px] sm:w-32 sm:h-32 rounded-2xl border-2 p-0.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getDifficultyStyles(lesson.difficulty)} ${isSelected ? 'ring-2 ring-violet-500 ring-offset-2' : ''} ${lesson.locked ? 'opacity-60' : ''}`}
+                              className={`relative group w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 p-0.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getDifficultyStyles(lesson.difficulty)} ${isSelected ? 'ring-2 ring-ring ring-offset-2' : ''} ${lesson.locked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                               <div className={`w-full h-full rounded-xl p-2.5 flex flex-col items-center justify-center relative overflow-hidden text-center ${lesson.completed ? 'bg-emerald-500/10' : 'bg-card'}`}>
                                 {lesson.completed && <motion.div initial={{ x: '-100%' }} animate={{ x: '100%' }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 4 }} className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/10 pointer-events-none" />}

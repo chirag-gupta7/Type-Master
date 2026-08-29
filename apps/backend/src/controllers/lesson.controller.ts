@@ -522,10 +522,10 @@ export const getProgressVisualization = async (
     // 1. Parallelize core independent queries (Lessons and Tests).
     // 2. Eliminate redundant 'findMany' queries by deriving historical/activity metrics in-memory from the base dataset.
     // 3. Optimize skill tree O(NÂ²) construction with O(1) Map lookups.
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const ninetyDaysAgo = new Date(nowMs - 90 * DAY_MS);
+    const oneYearAgo = new Date(nowMs - 365 * DAY_MS);
 
     const [lessonsWithProgress, testResults] = await Promise.all([
       prisma.lesson.findMany({
@@ -620,17 +620,22 @@ export const getProgressVisualization = async (
     }));
 
     // Merge test activity into activityByDate
+    // Dedup note: lesson lastAttempt + test on same UTC day currently counts as 2 practices (distinct activity types).
+    // If you need unique-day counting, change to Set-based dedup (one entry per UTC date).
     for (const test of testResults) {
       const date = test.createdAt.toISOString().split('T')[0];
       activityByDate[date] = (activityByDate[date] || 0) + 1;
     }
 
-    const practiceFrequency = Object.entries(activityByDate).map(([date, count]) => ({
-      date,
-      count,
-    }));
+    const practiceFrequency = Object.entries(activityByDate)
+      .map(([date, count]) => ({
+        date,
+        count,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Build wpmHistory (90d) from TestResult — grouped by UTC YYYY-MM-DD, avg per day
+    // Build wpmHistory (90d) from TestResult ONLY — label kept to avoid confusion with lesson bestWpm.
+    // Grouped by UTC YYYY-MM-DD, avg per day; lesson bestWpm stays in wpmByLesson.
     const wpmHistoryGrouped = new Map<string, { totalWpm: number; totalAcc: number; count: number }>();
     for (const t of testResults) {
       if (t.createdAt < ninetyDaysAgo) continue;

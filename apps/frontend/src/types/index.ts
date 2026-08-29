@@ -30,8 +30,12 @@ export interface UnlockedAchievement {
 }
 
 // Progress Visualization types
+// LevelCompletion.level stays string (e.g., "1") for additive compat; numeric `levelNum` helper provided for comparisons.
+// Backend sends level as string; frontend SkillTreeNode.level is number — keep distinct but documented as single source (lesson.level).
 export interface LevelCompletion {
   level: string;
+  /** numeric view of level, derived from string */
+  levelNum?: number;
   name: string;
   percentage: number;
   completed: number;
@@ -85,5 +89,6 @@ export interface ProgressVisualizationData {
   wpmByLesson: LessonWPMData[];
   practiceFrequency: PracticeDay[];
   skillTree: SkillTreeNode[];
-  wpmHistory: WpmHistoryPoint[];
+  /** additive: optional for backward compat with cached older backend responses */
+  wpmHistory?: WpmHistoryPoint[];
 }

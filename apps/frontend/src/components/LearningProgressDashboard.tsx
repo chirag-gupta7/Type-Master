@@ -23,8 +23,27 @@ function SectionSkeleton({ className = '' }: { className?: string }) {
         <Skeleton className="h-4 w-64" />
       </CardHeader>
       <CardContent className="space-y-3">
-        <Skeleton className="h-[240px] w-full rounded-xl" />
+        {/* real charts are h-[300px]; keep skeleton matched to avoid layout shift */}
+        <Skeleton className="h-[300px] w-full rounded-xl" />
         <div className="grid grid-cols-3 gap-3">
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-xl" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TipsSkeleton() {
+  return (
+    <Card>
+      <CardHeader className="space-y-3">
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="h-4 w-64" />
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-3">
           <Skeleton className="h-20 rounded-xl" />
           <Skeleton className="h-20 rounded-xl" />
           <Skeleton className="h-20 rounded-xl" />
@@ -53,32 +72,52 @@ function EmptyChartCard({ icon: Icon, title, description, ctaHref, ctaLabel }: {
   );
 }
 
+function EmptyInline({ icon: Icon, title, description, ctaHref, ctaLabel }: { icon: typeof BookOpen; title: string; description: string; ctaHref?: string; ctaLabel?: string }) {
+  return (
+    <div className="rounded-xl border border-dashed bg-muted/20 py-10 text-center">
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <Icon className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mx-auto mt-1 max-w-[36ch] text-xs text-muted-foreground">{description}</p>
+      {ctaHref && ctaLabel && (
+        <Link href={ctaHref} className="inline-block mt-4">
+          <Button size="sm" variant="outline" className="rounded-full">{ctaLabel}</Button>
+        </Link>
+      )}
+    </div>
+  );
+}
+
 export function LearningProgressDashboard() {
   const [data, setData] = useState<ProgressVisualizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchData = async (signal?: AbortSignal) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await lessonAPI.getProgressVisualization(signal ? { signal } : undefined);
+      if (signal?.aborted) return;
+      // additive-safe: immutable copy, no mutation of cached response
+      const normalized: ProgressVisualizationData = {
+        ...response,
+        wpmHistory: response.wpmHistory ?? [],
+      };
+      setData(normalized);
+    } catch (err) {
+      if (signal?.aborted) return;
+      setError(err instanceof Error ? err.message : 'Failed to load progress data');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let alive = true;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await lessonAPI.getProgressVisualization();
-        if (!alive) return;
-        // ensure additive field always present even if older backend cached
-        const withHistory = response as ProgressVisualizationData & { wpmHistory?: ProgressVisualizationData['wpmHistory'] };
-        if (!withHistory.wpmHistory) withHistory.wpmHistory = [];
-        setData(withHistory as ProgressVisualizationData);
-      } catch (err) {
-        if (!alive) return;
-        setError(err instanceof Error ? err.message : 'Failed to load progress data');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => { alive = false; };
+    const ctrl = new AbortController();
+    fetchData(ctrl.signal);
+    return () => { ctrl.abort(); };
   }, []);
 
   if (loading) {
@@ -89,6 +128,7 @@ export function LearningProgressDashboard() {
         <div className="col-span-12"><SectionSkeleton /></div>
         <div className="col-span-12"><SectionSkeleton /></div>
         <div className="col-span-12"><SectionSkeleton /></div>
+        <div className="col-span-12"><TipsSkeleton /></div>
       </div>
     );
   }
@@ -103,7 +143,7 @@ export function LearningProgressDashboard() {
             </div>
             <h3 className="text-sm font-semibold">Couldn&apos;t load progress</h3>
             <p className="mt-1 text-xs text-muted-foreground max-w-[48ch] mx-auto">{error}</p>
-            <Button onClick={() => window.location.reload()} size="sm" variant="outline" className="mt-4 rounded-full">Retry</Button>
+            <Button onClick={() => fetchData()} size="sm" variant="outline" className="mt-4 rounded-full">Retry</Button>
           </CardContent>
         </Card>
       </motion.div>
@@ -139,7 +179,7 @@ export function LearningProgressDashboard() {
       {/* Row 2: History time-series — full width */}
       <div className="col-span-12">
         {hasHistory ? (
-          <WpmHistoryChart data={data.wpmHistory} />
+          <WpmHistoryChart data={data.wpmHistory ?? []} />
         ) : (
           <Card>
             <CardHeader className="pb-3">
@@ -150,7 +190,7 @@ export function LearningProgressDashboard() {
               <CardDescription>Daily average WPM & accuracy from TestResult (90 days) — take a test to seed the timeline.</CardDescription>
             </CardHeader>
             <CardContent>
-              <EmptyChartCard icon={TrendingUp} title="No history yet" description="Your daily WPM trend will appear here once you complete typing tests." ctaHref="/dashboard" ctaLabel="Take a test" />
+              <EmptyInline icon={TrendingUp} title="No history yet" description="Your daily WPM trend will appear here once you complete typing tests." ctaHref="/dashboard" ctaLabel="Take a test" />
             </CardContent>
           </Card>
         )}
@@ -170,7 +210,7 @@ export function LearningProgressDashboard() {
               <CardDescription>Shows daily activity (UTC YYYY-MM-DD). Start practicing to fill your heatmap.</CardDescription>
             </CardHeader>
             <CardContent>
-              <EmptyChartCard icon={Calendar} title="No practice activity yet" description="Your 365-day heatmap will light up as you practice." ctaHref="/learn" ctaLabel="Start practicing" />
+              <EmptyInline icon={Calendar} title="No practice activity yet" description="Your 365-day heatmap will light up as you practice." ctaHref="/learn" ctaLabel="Start practicing" />
             </CardContent>
           </Card>
         )}

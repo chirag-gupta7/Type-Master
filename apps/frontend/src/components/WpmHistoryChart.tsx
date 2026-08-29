@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useId } from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp } from 'lucide-react';
@@ -31,15 +31,28 @@ const HistoryTooltip = ({ active, payload, label }: { active?: boolean; payload?
   return null;
 };
 
+function formatHistoryDate(isoDate: string, includeYear: boolean): string {
+  const d = new Date(isoDate + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', includeYear ? { month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' });
+}
+
 export function WpmHistoryChart({ data }: WpmHistoryChartProps) {
+  const gradId = useId();
+  const needsYear = useMemo(() => {
+    if (data.length === 0) return false;
+    const years = new Set(data.map((p) => p.date.slice(0, 4)));
+    if (years.size > 1) return true;
+    const currentYear = new Date().getUTCFullYear().toString();
+    return !years.has(currentYear);
+  }, [data]);
   const chartData = useMemo(() => {
     return data.map((p) => ({
       rawDate: p.date,
-      date: new Date(p.date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: formatHistoryDate(p.date, needsYear),
       wpm: p.wpm,
       accuracy: p.accuracy,
     }));
-  }, [data]);
+  }, [data, needsYear]);
 
   const stats = useMemo(() => {
     if (data.length === 0) return null;
@@ -83,7 +96,7 @@ export function WpmHistoryChart({ data }: WpmHistoryChartProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ left: 4, right: 12, top: 6, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="gradWpm" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id={`gradWpm-${gradId}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.28} />
                         <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                       </linearGradient>
@@ -91,11 +104,11 @@ export function WpmHistoryChart({ data }: WpmHistoryChartProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" minTickGap={24} />
                     <YAxis yAxisId="wpm" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: 'hsl(var(--muted-foreground))', fontSize: 11 } }} />
-                    <YAxis yAxisId="acc" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" hide />
+                    <YAxis yAxisId="acc" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={36} label={{ value: 'Acc %', angle: 90, position: 'insideRight', style: { fill: 'hsl(var(--muted-foreground))', fontSize: 11 } }} />
                     <Tooltip content={<HistoryTooltip />} />
                     <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12 }} iconType="circle" />
-                    <Area yAxisId="wpm" type="monotone" dataKey="wpm" name="WPM" stroke="hsl(var(--primary))" strokeWidth={2.2} fill="url(#gradWpm)" dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
-                    <Area yAxisId="acc" type="monotone" dataKey="accuracy" name="Accuracy" stroke="#10b981" strokeWidth={1.8} fill="transparent" dot={false} activeDot={{ r: 3 }} />
+                    <Area yAxisId="wpm" type="monotone" dataKey="wpm" name="WPM" stroke="hsl(var(--primary))" strokeWidth={2.2} fill={`url(#gradWpm-${gradId})`} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                    <Area yAxisId="acc" type="monotone" dataKey="accuracy" name="Accuracy" stroke="hsl(var(--chart-4))" strokeWidth={1.8} fill="transparent" dot={false} activeDot={{ r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

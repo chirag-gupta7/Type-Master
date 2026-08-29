@@ -27,6 +27,7 @@ jest.mock('../utils/prisma', () => ({
     },
     userLessonProgress: {
       count: jest.fn(),
+      findMany: jest.fn(),
     },
     lesson: {
       count: jest.fn(),
@@ -123,6 +124,7 @@ describe('AchievementController', () => {
       (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
       (prisma.lesson.count as jest.Mock).mockResolvedValue(100);
       (prisma.testResult.findMany as jest.Mock).mockResolvedValue([{ createdAt: new Date() }]);
+      (prisma.userLessonProgress.findMany as jest.Mock).mockResolvedValue([]);
 
       (prisma.userAchievement.createMany as jest.Mock).mockResolvedValue({ count: 1 });
 
@@ -257,6 +259,7 @@ describe('AchievementController', () => {
       (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(3);
       (prisma.lesson.count as jest.Mock).mockResolvedValue(10);
       (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.userLessonProgress.findMany as jest.Mock).mockResolvedValue([]);
 
       await getAchievementProgress(mockRequest, mockResponse);
 

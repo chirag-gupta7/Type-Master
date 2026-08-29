@@ -12,10 +12,10 @@ interface CircularProgressChartProps {
 }
 
 const COLORS: Record<string, string> = {
-  Beginner: '#10b981',
-  Intermediate: '#3b82f6',
-  Advanced: '#f59e0b',
-  Expert: '#ef4444',
+  Beginner: 'hsl(var(--chart-4))',
+  Intermediate: 'hsl(var(--chart-1))',
+  Advanced: 'hsl(var(--chart-5))',
+  Expert: 'hsl(var(--destructive))',
 };
 
 const RADIAN = Math.PI / 180;
@@ -38,11 +38,11 @@ const renderCustomizedLabel = (props: {
     <text
       x={x}
       y={y}
-      fill="white"
+      fill="hsl(var(--foreground))"
       textAnchor={x > cx ? 'start' : 'end'}
       dominantBaseline="central"
       className="text-xs font-bold"
-      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
+      style={{ filter: 'drop-shadow(0 1px 2px hsl(var(--foreground) / 0.3))' }}
     >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
@@ -136,7 +136,7 @@ export function CircularProgressChart({ data }: CircularProgressChartProps) {
                     animationDuration={700}
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[entry.name] ?? '#94a3b8'} />
+                      <Cell key={`cell-${index}`} fill={COLORS[entry.name] ?? 'hsl(var(--muted-foreground))'} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
@@ -177,7 +177,7 @@ export function CircularProgressChart({ data }: CircularProgressChartProps) {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ background: COLORS[level.name] ?? '#94a3b8' }} />
+                        <span className="h-2 w-2 rounded-full" style={{ background: COLORS[level.name] ?? 'hsl(var(--muted-foreground))' }} />
                         {level.name}
                       </span>
                       <span className="text-xs text-muted-foreground">{level.completed}/{level.total}</span>
@@ -188,7 +188,7 @@ export function CircularProgressChart({ data }: CircularProgressChartProps) {
                         animate={{ width: `${level.percentage}%` }}
                         transition={{ delay: 0.4 + index * 0.08, duration: 0.6 }}
                         className="absolute h-full rounded-full"
-                        style={{ background: COLORS[level.name] ?? '#94a3b8' }}
+                        style={{ background: COLORS[level.name] ?? 'hsl(var(--muted-foreground))' }}
                       />
                     </div>
                   </motion.div>
