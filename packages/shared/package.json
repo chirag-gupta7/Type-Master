@@ -7,5 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./achievements": "./src/achievements.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "echo no lint"
   }
 }

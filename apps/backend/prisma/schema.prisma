@@ -181,7 +181,6 @@ model Achievement {
   userAchievements UserAchievement[]
 
   @@unique([title])
-  @@index([title])
   @@map("achievements")
 }
 
