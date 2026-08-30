@@ -122,7 +122,7 @@ jobs:
         run: npm run prisma:generate --workspace=apps/backend
 
       - name: Run migrations
-        run: npm run prisma:migrate --workspace=apps/backend
+        run: npm run prisma:migrate:deploy --workspace=apps/backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/typemaster_test?schema=public
 
