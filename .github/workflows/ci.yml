@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Cache node_modules
@@ -28,7 +28,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Restore node_modules
@@ -55,7 +55,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
 
       - name: Run linter
         run: npm run lint --workspace=apps/frontend
@@ -100,7 +100,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Restore node_modules
@@ -110,7 +110,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
 
       - name: Run linter
         run: npm run lint --workspace=apps/backend
@@ -150,7 +150,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Restore node_modules
@@ -160,7 +160,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
 
       - name: Build
         run: npm run build --workspace=apps/frontend
@@ -182,7 +182,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Restore node_modules
@@ -192,7 +192,7 @@ jobs:
             node_modules
             apps/frontend/node_modules
             apps/backend/node_modules
-          key: ${{ runner.os }}-node18-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
 
       - name: Build
         run: npm run build --workspace=apps/backend
