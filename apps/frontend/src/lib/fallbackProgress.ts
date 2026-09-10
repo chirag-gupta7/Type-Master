@@ -12,20 +12,20 @@ export type FallbackProgress = {
   stats: Record<string, FallbackLessonStats>;
 };
 
-const DEFAULT_PROGRESS: FallbackProgress = {
+const freshDefault = (): FallbackProgress => ({
   completedLessonIds: [],
   stats: {},
-};
+});
 
 const readFromStorage = (): FallbackProgress => {
   if (typeof window === 'undefined') {
-    return DEFAULT_PROGRESS;
+    return freshDefault();
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return DEFAULT_PROGRESS;
+      return freshDefault();
     }
 
     const parsed = JSON.parse(raw) as Partial<FallbackProgress>;
@@ -35,7 +35,7 @@ const readFromStorage = (): FallbackProgress => {
     };
   } catch (error) {
     console.error('Failed to read fallback progress:', error);
-    return DEFAULT_PROGRESS;
+    return freshDefault();
   }
 };
 
