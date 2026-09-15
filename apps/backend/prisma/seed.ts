@@ -23,7 +23,7 @@ const javaLessons = makeLessons(8, ExerciseType.CODE, Difficulty.INTERMEDIATE, j
 const cppLessons = makeLessons(9, ExerciseType.CODE, Difficulty.ADVANCED, cppContents);
 const cLessons = makeLessons(10, ExerciseType.CODE, Difficulty.ADVANCED, cContents);
 
-// Combine all lesson sections (260 lessons total)
+// Combine all lesson sections (326 lessons total across 13 sections)
 const allLessons = [
   ...section1Lessons, // Foundation
   ...section2Lessons, // Skill Building
@@ -118,20 +118,21 @@ async function main() {
   await seedFakeData();
 
   console.log('🎉 Comprehensive database seed completed successfully!');
-  console.log('\n📊 Summary:');
-  console.log('   • Section 1 (Foundation): Lessons 1-25');
-  console.log('   • Section 2 (Skill Building): Lessons 26-50');
-  console.log('   • Section 3 (Advanced Techniques): Lessons 51-75');
-  console.log('   • Section 4 (Speed & Fluency): Lessons 76-85');
-  console.log('   • Section 5 (Mastery): Lessons 86-95');
-  console.log('   • Section 6 (Programming): Lessons 96-105');
-  console.log('   • Section 7 (Python): Lessons 106-135');
-  console.log('   • Section 8 (Java): Lessons 136-165');
-  console.log('   • Section 9 (C++): Lessons 166-195');
-  console.log('   • Section 10 (C): Lessons 196-225');
-  console.log('   • Section 11 (Advanced Punctuation): Lessons 226-250');
-  console.log('   • Section 12 (Code Syntax): Lessons 251-275');
-  console.log('   • Section 13 (Speed Drills): Lessons 276-300');
+  console.log('📊 Summary (actual seeded counts):');
+  console.log('   • Section 1 (Foundation): 24 lessons');
+  console.log('   • Section 2 (Skill Building): 36 lessons');
+  console.log('   • Section 3 (Advanced Techniques): 41 lessons');
+  console.log('   • Section 4 (Speed & Fluency): 25 lessons');
+  console.log('   • Section 5 (Mastery): 25 lessons');
+  console.log('   • Section 6 (Programming): 25 lessons');
+  console.log('   • Section 7 (Python): 30 lessons');
+  console.log('   • Section 8 (Java): 30 lessons');
+  console.log('   • Section 9 (C++): 30 lessons');
+  console.log('   • Section 10 (C): 30 lessons');
+  console.log('   • Section 11 (Advanced Punctuation): 10 lessons');
+  console.log('   • Section 12 (Code Syntax): 10 lessons');
+  console.log('   • Section 13 (Speed Drills): 10 lessons');
+  console.log('   • Total: 326 lessons across 13 sections');
   console.log(`   • Total Achievements: ${ACHIEVEMENTS.length}`);
 }
 

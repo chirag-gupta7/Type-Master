@@ -11,7 +11,7 @@ Base URL: `/api/v1`
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/refresh`
-- `POST /auth/token`
+- `POST /auth/token` (internal-only, `INTERNAL_API_SECRET`)
 
 ## Tests (`/tests`) - Auth Required
 
@@ -31,6 +31,7 @@ Public/optional auth:
 
 - `GET /lessons`
 - `GET /lessons/checkpoints`
+- `GET /lessons/sections`
 - `GET /lessons/section/:sectionId`
 - `GET /lessons/:id`
 
@@ -78,3 +79,10 @@ Private:
 - `POST /mistakes/log`
 - `GET /mistakes/analysis/:userId` (request user must match authenticated user)
 - `GET /mistakes/practice/:userId` (request user must match authenticated user)
+
+## AI (`/ai`) - Auth Required (Gemini proxy)
+
+- `POST /ai/typing-feedback`
+- `GET /ai/writing-prompt`
+- `POST /ai/writing-feedback`
+- `POST /ai/story-response`

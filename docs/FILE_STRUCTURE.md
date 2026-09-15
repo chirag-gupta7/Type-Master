@@ -20,13 +20,20 @@
 ## Backend (`apps/backend/src`)
 
 - `index.ts` - server bootstrap + middleware + route mounts
-- `routes/` - route grouping
+- `routes/` - route grouping (`auth`, `tests`, `users`, `lessons`, `achievements`,
+  `games`, `assessment`, `mistakes`, `ai`)
 - `controllers/` - request handlers
+- `config/achievements.ts` - single source for the 20 achievements
 - `middleware/` - auth, rate limiting, error handling
 - `utils/` - prisma client, logger
 
 ## Database (`apps/backend/prisma`)
 
-- `schema.prisma` - data model and enums
+- `schema.prisma` - data model and enums (13 models: User, Account, Session,
+  VerificationToken, TestResult, Lesson, UserLessonProgress, Achievement,
+  UserAchievement, GameScore, TypingMistake, UserWeakKeys, UserSkillAssessment)
 - `migrations/` - migration history
-- `seed.ts` and other seed scripts - data initialization
+- `seed.ts` + `comprehensive-seed.ts` (S1-S3: 24/36/41) +
+  `seed-sections-4-6.ts` (S4-S6: 25 each) + `seed-coding-lessons.ts`
+  (Python/Java/C++/C: 30 each) + `seed-new-lessons.ts` (S11-S13: 10 each) -
+  data initialization (326 lessons total)

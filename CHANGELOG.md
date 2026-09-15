@@ -5,6 +5,29 @@ All notable changes to TypeMaster will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Content scale (actual seeded data)
+
+- **326 lessons across 13 sections** (was documented as 100 across 6):
+  S1 Foundation (24), S2 Skill Building (36), S3 Advanced Techniques (41),
+  S4 Speed & Fluency (25), S5 Mastery (25), S6 Programming (25),
+  S7 Python (30), S8 Java (30), S9 C++ (30), S10 C (30),
+  S11 Advanced Punctuation (10), S12 Code Syntax (10), S13 Speed Drills (10)
+- **20 achievements** from `apps/backend/src/config/achievements.ts`
+- **3 games:** WordBlitz, PromptDash, StoryChain
+
+### API (current `/api/v1` surface)
+
+- 9 route groups: `/auth`, `/tests`, `/users`, `/lessons`, `/achievements`,
+  `/games`, `/assessment`, `/mistakes`, `/ai`
+- Added `GET /lessons/sections`
+- Added AI Gemini proxy: `POST /ai/typing-feedback`, `GET /ai/writing-prompt`,
+  `POST /ai/writing-feedback`, `POST /ai/story-response`
+- `POST /auth/token` is internal-only (`INTERNAL_API_SECRET`)
+- Mistakes surface is 3 endpoints (`POST /mistakes/log`,
+  `GET /mistakes/analysis/:userId`, `GET /mistakes/practice/:userId`)
+
 ## [2.0.0] - 2025-10-30
 
 ### Added - Comprehensive 100-Lesson System
@@ -267,4 +290,4 @@ No environment variable changes required.
 - `/docs/ACHIEVEMENT_SYSTEM.md` - Achievement system documentation
 - `/docs/API.md` - API endpoint reference
 
-**Last Updated:** October 30, 2025
+**Last Updated:** September 15, 2026

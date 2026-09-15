@@ -65,10 +65,10 @@
 
 - **Typing Test** — 30 / 60 / 180-second modes, hidden-input capture, live WPM / accuracy / error metrics, and a results screen with a WPM ring and character breakdown.
 - **Visual Keyboard & Hand Model** — an interactive on-screen keyboard plus a 3-D hand overlay that highlights the exact finger/key to press next.
-- **Learning Path** — a skill-tree of lessons with unlock states, progress tracking, and weak-key coaching.
+- **Learning Path** — 326 lessons across 13 sections (foundations → speed drills → Python/Java/C++/C → punctuation/syntax) with unlock states, progress tracking, and weak-key coaching.
 - **AI Coaching** — Gemini-powered feedback on your typing and adaptive prompts for the story game.
 - **Mini-Games** — `WordBlitz` (timed combos), `PromptDash` (AI prompt racing), and `StoryChain` (collaborative AI storytelling).
-- **Leaderboards & Achievements** — per-game global leaderboards and a badge system with toasts.
+- **Leaderboards & Achievements** — per-game global leaderboards (WordBlitz, PromptDash, StoryChain) and 20 badges with toasts.
 - **Progress Dashboard** — heatmap, streaks, and analytics for lessons, tests, and weak keys.
 - **Accessible & Responsive** — WCAG-AA contrast, keyboard navigation, reduced-motion support, and mobile-first layouts.
 
@@ -165,7 +165,7 @@ docker compose up --build
 .
 ├── apps/
 │   ├── frontend/            # Next.js 14 app (this README's focus)
-│   │   ├── app/             # routes: dashboard, learn, games, leaderboard, progress, achievements
+│   │   ├── app/             # routes: dashboard, learn (+[id]/normal/coding/assessment), games, leaderboard, progress, achievements, history, settings
 │   │   ├── components/      # TypingTest, VisualKeyboard, HandModel3D, games/*
 │   │   └── lib/             # api client, auth (NextAuth), store (Zustand)
 │   └── backend/             # Express + Prisma API

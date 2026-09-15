@@ -1,8 +1,10 @@
 # TypeMaster Documentation
 
-Last updated: 2026-02-19
+Last updated: 2026-09-15
 
 This folder is the source of truth for project docs aligned to the current codebase and live deployment.
+
+Current scale: **326 lessons across 13 sections**, **20 achievements**, **3 games** (WordBlitz, PromptDash, StoryChain), **9 API groups** under `/api/v1` (incl. `/ai`).
 
 ## Start Here
 
