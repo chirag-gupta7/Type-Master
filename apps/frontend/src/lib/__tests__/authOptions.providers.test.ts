@@ -7,15 +7,25 @@
  * could never work on a deployment without Google configured.
  */
 
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
+
+const mockPrismaAdapter = PrismaAdapter as unknown as jest.Mock;
+
 const findUniqueMock = jest.fn();
+const findFirstMock = jest.fn();
 const compareMock = jest.fn();
 
 jest.mock('@/lib/auth/prisma', () => ({
-  prisma: { user: { findUnique: (...args: unknown[]) => findUniqueMock(...args) } },
+  prisma: {
+    user: {
+      findUnique: (...args: unknown[]) => findUniqueMock(...args),
+      findFirst: (...args: unknown[]) => findFirstMock(...args),
+    },
+  },
 }));
 
 jest.mock('@next-auth/prisma-adapter', () => ({
-  PrismaAdapter: jest.fn(() => ({})),
+  PrismaAdapter: jest.fn(() => ({ __adapter: true })),
 }));
 
 jest.mock('bcryptjs', () => ({
@@ -134,6 +144,7 @@ describe('credentials authorize email handling', () => {
       username: 'testuser',
       password: 'hashed',
     });
+    findFirstMock.mockResolvedValue(null);
   });
 
   it('normalizes mixed-case and padded email before the DB lookup', async () => {
@@ -175,5 +186,95 @@ describe('credentials authorize email handling', () => {
     await expect(authorize({ email: 'test@example.com' })).rejects.toThrow(
       /Email and password are required/
     );
+  });
+
+  it('authenticates a legacy row stored with uppercase email', async () => {
+    // Regression guard: exact findUnique misses `Legacy.User@Example.COM`, so
+    // without the insensitive fallback this user is locked out.
+    findUniqueMock.mockResolvedValue(null);
+    findFirstMock.mockResolvedValue({
+      id: 'user-legacy',
+      email: 'Legacy.User@Example.COM',
+      username: 'legacyuser',
+      password: 'hashed',
+    });
+
+    const { authOptions } = loadAuthOptions();
+    const authorize = getCredentialsAuthorize(authOptions);
+    const user = (await authorize({ email: 'legacy.user@example.com', password: 'P1' })) as {
+      id: string;
+    };
+
+    expect(user.id).toBe('user-legacy');
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: { email: { equals: 'legacy.user@example.com', mode: 'insensitive' } },
+    });
+  });
+
+  it('does not run the case-insensitive query when the exact lookup hits', async () => {
+    const { authOptions } = loadAuthOptions();
+    const authorize = getCredentialsAuthorize(authOptions);
+    await authorize({ email: 'test@example.com', password: 'P1' });
+
+    expect(findUniqueMock).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+    expect(findFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('adapter email normalization', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeAll(() => {
+    for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
+    process.env.NEXTAUTH_SECRET = 'test-secret';
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
+  });
+
+  afterAll(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+  });
+
+  const getAdapter = (options: { adapter?: unknown }) =>
+    options.adapter as {
+      createUser: (d: { email: string }) => Promise<unknown>;
+      getUserByEmail: (e: string) => Promise<unknown>;
+    };
+
+  it('lowercases the email the adapter persists on OAuth sign-up', async () => {
+    // Without this, an OAuth row keeps the provider's casing and the backend's
+    // normalized lookup can never match it.
+    const captured: { email: string }[] = [];
+    mockPrismaAdapter.mockReturnValueOnce({
+      createUser: (d: { email: string }) => {
+        captured.push(d);
+        return Promise.resolve({ id: 'u1', email: d.email });
+      },
+      getUserByEmail: () => Promise.resolve(null),
+    });
+
+    const { authOptions } = loadAuthOptions();
+    await getAdapter(authOptions).createUser({ email: 'Person@Example.COM' });
+
+    expect(captured[0].email).toBe('person@example.com');
+  });
+
+  it('lowercases the email the adapter looks up', async () => {
+    const seen: string[] = [];
+    mockPrismaAdapter.mockReturnValueOnce({
+      createUser: () => Promise.resolve(null),
+      getUserByEmail: (e: string) => {
+        seen.push(e);
+        return Promise.resolve(null);
+      },
+    });
+
+    const { authOptions } = loadAuthOptions();
+    await getAdapter(authOptions).getUserByEmail('  Person@Example.COM ');
+
+    expect(seen).toEqual(['person@example.com']);
   });
 });

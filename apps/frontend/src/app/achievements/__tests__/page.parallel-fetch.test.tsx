@@ -122,6 +122,20 @@ describe('AchievementsPage data loading', () => {
     expect(mockApi.getAchievementStats).not.toHaveBeenCalled();
   });
 
+  it('still renders the list when only the stats request fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockApi.getAllAchievements.mockResolvedValue(ALL_ACHIEVEMENTS);
+    mockApi.getAchievementStats.mockRejectedValue(new Error('401 expired token'));
+
+    render(<AchievementsPage />);
+
+    // Regression guard: Promise.all would reject here and render an empty page.
+    expect(await screen.findByText('Speed Demon')).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
   it('surfaces a failed load without crashing the page', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockApi.getAllAchievements.mockRejectedValue(new Error('network down'));

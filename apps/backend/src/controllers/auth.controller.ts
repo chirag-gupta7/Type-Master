@@ -105,8 +105,26 @@ const ensureUniqueUsername = async (seed: string): Promise<string> => {
   throw new AppError(500, 'Unable to generate unique username');
 };
 
+/**
+ * Look up a user by email, tolerating rows stored with non-canonical casing.
+ *
+ * `findUnique` uses the unique index and resolves every account created since
+ * normalization. The case-insensitive `findFirst` is the fallback for legacy
+ * rows written before normalization existed -- without it, lowercasing the
+ * lookup key would lock those users out of their own accounts.
+ */
+const findUserByEmail = async (email: string) => {
+  const exact = await prisma.user.findUnique({ where: { email } });
+  if (exact) {
+    return exact;
+  }
+  return prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+  });
+};
+
 const findOrCreateUserForToken = async (payload: z.infer<typeof tokenProvisionSchema>) => {
-  const existingUser = await prisma.user.findUnique({ where: { email: payload.email } });
+  const existingUser = await findUserByEmail(payload.email);
   if (existingUser) {
     return existingUser;
   }
@@ -172,15 +190,18 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     // Validate input
     const { email, username, password } = registerSchema.parse(req.body);
 
-    // Check if user already exists
+    // Check if user already exists. Email is compared case-insensitively so a
+    // legacy row stored with its original casing is still detected.
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { username }],
+        OR: [{ email: { equals: email, mode: 'insensitive' } }, { username }],
       },
     });
 
     if (existingUser) {
-      if (existingUser.email === email) {
+      // Compare normalized: a legacy row may still hold its original casing,
+      // which would otherwise be misreported as a username conflict.
+      if (existingUser.email?.toLowerCase() === email) {
         throw new AppError(409, 'Email already registered');
       }
       throw new AppError(409, 'Username already taken');
@@ -251,9 +272,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const { email, password } = loginSchema.parse(req.body);
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await findUserByEmail(email);
 
     if (!user || !user.password) {
       throw new AppError(401, 'Invalid email or password');

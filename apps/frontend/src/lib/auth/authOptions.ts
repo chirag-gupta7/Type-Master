@@ -1,5 +1,6 @@
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import type { NextAuthOptions } from 'next-auth';
+import type { Adapter } from 'next-auth/adapters';
 import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
@@ -17,6 +18,11 @@ const API_BASE_URL = getApiBaseUrl();
 // any deployment without Google configured. Register the provider only when it
 // is actually usable so credentials login never depends on it.
 export const isGoogleAuthEnabled = Boolean(googleClientId && googleClientSecret);
+
+const googleProvider =
+  googleClientId && googleClientSecret
+    ? GoogleProvider({ clientId: googleClientId, clientSecret: googleClientSecret })
+    : null;
 
 type ExtendedUser = {
   id: string;
@@ -95,6 +101,42 @@ const normalizeEmail = (email?: string | null): string | null => {
   return trimmed ? trimmed.toLowerCase() : null;
 };
 
+/**
+ * Look up a user by email, tolerating rows stored with non-canonical casing.
+ *
+ * Mirrors the backend helper of the same name: `findUnique` resolves every
+ * account created since normalization via the unique index, while the
+ * case-insensitive `findFirst` keeps pre-normalization accounts usable.
+ */
+const findUserByEmail = async (email: string) => {
+  const exact = await prisma.user.findUnique({ where: { email } });
+  if (exact) {
+    return exact;
+  }
+  return prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+  });
+};
+
+/**
+ * Enforce canonical email casing at the adapter boundary.
+ *
+ * Normalizing inside individual call sites was not sufficient: the Prisma
+ * adapter persists OAuth users with whatever casing the provider returned, so
+ * a Workspace address like "Person@x.com" could still produce a row that the
+ * backend's normalized lookup would never match -- the duplicate-account bug
+ * this normalization exists to prevent. Wrapping the adapter makes it
+ * impossible for a future call site to skip the rule.
+ */
+const withNormalizedEmail = (adapter: Adapter): Adapter => ({
+  ...adapter,
+  // Annotate explicitly: `createUser` is a union of two call signatures, so
+  // TypeScript cannot infer the parameter on its own.
+  createUser: (data: { email: string }) =>
+    adapter.createUser!({ ...data, email: normalizeEmail(data.email) ?? data.email }),
+  getUserByEmail: (email) => adapter.getUserByEmail!(normalizeEmail(email) ?? email),
+});
+
 const requestBackendToken = async (payload: TokenRequestPayload): Promise<string | null> => {
   const normalizedEmail = normalizeEmail(payload.email);
 
@@ -166,20 +208,13 @@ if (!authSecret) {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: withNormalizedEmail(PrismaAdapter(prisma)),
   secret: authSecret,
   session: {
     strategy: 'jwt',
   },
   providers: [
-    ...(isGoogleAuthEnabled
-      ? [
-          GoogleProvider({
-            clientId: googleClientId as string,
-            clientSecret: googleClientSecret as string,
-          }),
-        ]
-      : []),
+    ...(googleProvider ? [googleProvider] : []),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -199,9 +234,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
+        // Postgres `findUnique` on a text column is case-sensitive, so an
+        // exact lookup alone misses users whose row still holds its original
+        // casing. `findUnique` keeps the indexed fast path for canonical rows;
+        // the case-insensitive `findFirst` is the legacy fallback.
+        const user = await findUserByEmail(email);
 
         if (!user || !user.password) {
           throw new Error('Invalid email or password');

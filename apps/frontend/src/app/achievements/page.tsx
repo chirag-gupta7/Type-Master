@@ -72,16 +72,26 @@ const AchievementsPage: React.FC = () => {
       try {
         setLoading(true);
         // Independent requests: fetch concurrently instead of paying two
-        // sequential round-trips before the page can render.
-        const [data, statsData] = await Promise.all([
+        // sequential round-trips before the page can render. allSettled (not
+        // all) so a stats failure -- e.g. an expired backend token -- cannot
+        // blank out the achievements list the way it did when this was
+        // sequential.
+        const [listResult, statsResult] = await Promise.allSettled([
           achievementAPI.getAllAchievements(),
           isAuthenticated ? achievementAPI.getAchievementStats() : Promise.resolve(null),
         ]);
-        setAchievements(data.achievements);
 
-        if (statsData) {
-          setStats(statsData.stats);
-          setRecentUnlocks(statsData.recentUnlocks);
+        if (listResult.status === 'fulfilled') {
+          setAchievements(listResult.value.achievements);
+        } else {
+          console.error('Failed to fetch achievements:', listResult.reason);
+        }
+
+        if (statsResult.status === 'fulfilled' && statsResult.value) {
+          setStats(statsResult.value.stats);
+          setRecentUnlocks(statsResult.value.recentUnlocks);
+        } else if (statsResult.status === 'rejected') {
+          console.error('Failed to fetch achievement stats:', statsResult.reason);
         }
       } catch (error) {
         console.error('Failed to fetch achievements:', error);
