@@ -12,6 +12,12 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const API_BASE_URL = getApiBaseUrl();
 
+// Google is optional. Throwing on missing OAuth env vars used to take down the
+// whole NextAuth route handler, which made email/password sign-in impossible on
+// any deployment without Google configured. Register the provider only when it
+// is actually usable so credentials login never depends on it.
+export const isGoogleAuthEnabled = Boolean(googleClientId && googleClientSecret);
+
 type ExtendedUser = {
   id: string;
   email: string;
@@ -159,10 +165,6 @@ if (!authSecret) {
   throw new Error('NEXTAUTH_SECRET environment variable is not set.');
 }
 
-if (!googleClientId || !googleClientSecret) {
-  throw new Error('Google OAuth credentials are not configured.');
-}
-
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   secret: authSecret,
@@ -170,10 +172,14 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   providers: [
-    GoogleProvider({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-    }),
+    ...(isGoogleAuthEnabled
+      ? [
+          GoogleProvider({
+            clientId: googleClientId as string,
+            clientSecret: googleClientSecret as string,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -185,8 +191,16 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
+        // Postgres `findUnique` on a text column is case-sensitive, so an
+        // un-normalized lookup misses users who signed up with mixed-case email
+        // (and would not match the lowercased row created via Google sign-in).
+        const email = normalizeEmail(credentials.email);
+        if (!email) {
+          throw new Error('Email and password are required');
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user || !user.password) {

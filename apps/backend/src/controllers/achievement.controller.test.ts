@@ -110,6 +110,7 @@ describe('AchievementController', () => {
         },
       ];
       (prisma.achievement.findMany as jest.Mock).mockResolvedValue(mockAchievements);
+      (prisma.achievement.count as jest.Mock).mockResolvedValue(mockAchievements.length);
 
       (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([
         { achievementId: 'ach-2' },
@@ -130,7 +131,10 @@ describe('AchievementController', () => {
 
       await checkAndAwardAchievements(mockRequest as any, mockResponse as any);
 
-      expect(prisma.achievement.findMany).toHaveBeenCalled();
+      expect(prisma.achievement.count).toHaveBeenCalled();
+      // totalChecked comes from count(); the full table must be read only once
+      // (inside awardAchievementsForUser), not twice per check.
+      expect(prisma.achievement.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.testResult.aggregate).toHaveBeenCalledWith({
         where: { userId: 'user-123' },
         _max: { wpm: true },

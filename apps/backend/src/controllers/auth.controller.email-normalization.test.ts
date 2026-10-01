@@ -1,0 +1,162 @@
+/**
+ * Email normalization regression tests.
+ *
+ * Postgres `findUnique` on a text column is case-sensitive, so an un-normalized
+ * email splits one human into two rows ("User@x.com" from register vs
+ * "user@x.com" from OAuth) and makes sign-in fail on the "wrong" casing.
+ * Normalization is applied at the zod schema boundary for every auth entry
+ * point, so these tests assert the *lookup key*, not just the HTTP outcome.
+ */
+
+import express from 'express';
+import request from 'supertest';
+import authRoutes from '../routes/auth.routes';
+import { errorHandler } from '../middleware/error-handler';
+import { prisma } from '../utils/prisma';
+
+jest.mock('bcrypt', () => ({
+  __esModule: true,
+  default: {
+    hash: jest.fn().mockResolvedValue('hashed-password'),
+    compare: jest.fn().mockResolvedValue(true),
+  },
+}));
+
+process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+
+const createTestApp = () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/v1/auth', authRoutes);
+  app.use(errorHandler);
+  return app;
+};
+
+// The canonical, already-lowercased row stored in the DB.
+const STORED_USER = {
+  id: 'user-1',
+  email: 'test@example.com',
+  username: 'testuser',
+  password: 'hashed-password',
+};
+
+const findUnique = ((prisma.user.findUnique as any) = jest.fn());
+const findFirst = ((prisma.user.findFirst as any) = jest.fn());
+const create = ((prisma.user.create as any) = jest.fn());
+
+describe('Auth email normalization', () => {
+  const app = createTestApp();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    findUnique.mockImplementation((args: { where: { email?: string; id?: string } }) => {
+      if (args.where.email) {
+        return Promise.resolve(args.where.email === STORED_USER.email ? STORED_USER : null);
+      }
+      if (args.where.id === STORED_USER.id) {
+        return Promise.resolve(STORED_USER);
+      }
+      return Promise.resolve(null);
+    });
+
+    findFirst.mockImplementation((args: { where: { OR: { email: string; username: string }[] } }) =>
+      Promise.resolve(
+        args.where.OR.some((clause) => clause.email === STORED_USER.email) ? STORED_USER : null
+      )
+    );
+
+    create.mockImplementation((args: { data: { email: string } }) =>
+      Promise.resolve({ id: 'new-id', createdAt: new Date(), ...args.data })
+    );
+  });
+
+  afterAll(async () => {
+    jest.restoreAllMocks();
+    await prisma.$disconnect();
+  });
+
+  describe('POST /api/v1/auth/login', () => {
+    it('normalizes mixed-case and padded email before the DB lookup', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: '  TeSt@ExAmPlE.CoM  ', password: 'Password1' })
+        .expect(200);
+
+      expect(findUnique).toHaveBeenCalledWith({ where: { email: STORED_USER.email } });
+      expect(response.body.user.email).toBe(STORED_USER.email);
+    });
+
+    it('accepts an all-uppercase email that differs from the stored casing', async () => {
+      await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'TEST@EXAMPLE.COM', password: 'Password1' })
+        .expect(200);
+
+      expect(findUnique).toHaveBeenCalledWith({ where: { email: STORED_USER.email } });
+    });
+
+    it('still rejects a wrong password for a correctly-cased email', async () => {
+      // Guards against "fixing" login by skipping the password check.
+      const bcrypt = (await import('bcrypt')).default;
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'Test@Example.com', password: 'WrongPass1' })
+        .expect(401);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('rejects a genuinely invalid email after trimming', async () => {
+      await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: '   not-an-email   ', password: 'Password1' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /api/v1/auth/register', () => {
+    it('persists the lowercased email', async () => {
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: 'NewUser@Example.COM', username: 'newuser', password: 'Password1' })
+        .expect(201);
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ email: 'newuser@example.com' }),
+        })
+      );
+    });
+
+    it('reports "Email already registered" for a casing variant of a taken email', async () => {
+      // Before normalization the `existingUser.email === email` comparison was
+      // false, so this wrongly surfaced as "Username already taken".
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: 'TEST@EXAMPLE.COM', username: 'otheruser', password: 'Password1' })
+        .expect(409);
+
+      expect(response.body.error).toBe('Email already registered');
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/v1/auth/token', () => {
+    it('resolves a casing variant to the existing user instead of creating a duplicate', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/token')
+        .set('X-Internal-Token', 'test-internal-secret')
+        .send({ email: '  Test@EXAMPLE.com  ' })
+        .expect(200);
+
+      expect(findUnique).toHaveBeenCalledWith({ where: { email: STORED_USER.email } });
+      expect(create).not.toHaveBeenCalled();
+      expect(response.body.user.id).toBe(STORED_USER.id);
+    });
+  });
+});

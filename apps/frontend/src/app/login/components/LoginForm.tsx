@@ -1,8 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
-import { FormEvent, useState } from 'react';
+import { getProviders, signIn } from 'next-auth/react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,8 +12,28 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Google is optional (see authOptions.ts). Ask NextAuth which providers are
+  // actually registered instead of assuming, so deployments without OAuth
+  // creds never render a button that would fail.
+  const [googleEnabled, setGoogleEnabled] = useState(false);
 
   const callbackUrl = params.get('callbackUrl') ?? '/';
+
+  useEffect(() => {
+    let active = true;
+    void getProviders()
+      .then((providers) => {
+        if (active) setGoogleEnabled(Boolean(providers?.google));
+      })
+      // A failed lookup must not break credentials sign-in, so default to
+      // "no Google" and swallow the error instead of rejecting unhandled.
+      .catch(() => {
+        if (active) setGoogleEnabled(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleGoogleSignIn = () => {
     void signIn('google', { callbackUrl });
@@ -54,23 +74,25 @@ export default function LoginForm() {
         </div>
       )}
 
-      <div className="space-y-4 mb-8">
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-white/90 px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-white"
-        >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white">
-            <span className="text-sm font-bold text-[#4285F4]">G</span>
-          </span>
-          Continue with Google
-        </button>
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-          <span className="flex-1 border-t border-border" aria-hidden="true" />
-          <span>or use your email</span>
-          <span className="flex-1 border-t border-border" aria-hidden="true" />
+      {googleEnabled && (
+        <div className="space-y-4 mb-8">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-white/90 px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-white"
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white">
+              <span className="text-sm font-bold text-[#4285F4]">G</span>
+            </span>
+            Continue with Google
+          </button>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="flex-1 border-t border-border" aria-hidden="true" />
+            <span>or use your email</span>
+            <span className="flex-1 border-t border-border" aria-hidden="true" />
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

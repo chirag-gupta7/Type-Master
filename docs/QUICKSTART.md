@@ -36,9 +36,11 @@ Minimum frontend vars:
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace_me
-GOOGLE_CLIENT_ID=replace_me
-GOOGLE_CLIENT_SECRET=replace_me
 ```
+
+Email/password sign-in works with only these. Google OAuth is optional — add
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (both, or neither) to enable the
+"Continue with Google" button.
 
 ## 3) Prepare Database
 

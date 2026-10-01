@@ -255,13 +255,15 @@ export const checkAndAwardAchievements = async (req: AuthRequest, res: Response)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const achievements = await prisma.achievement.findMany();
+    // count() instead of findMany(): this value is only used for .length, and
+    // awardAchievementsForUser below already reads the full table.
+    const totalChecked = await prisma.achievement.count();
     const newlyUnlocked = await awardAchievementsForUser(userId);
 
     return res.json({
       message: `Checked achievements, ${newlyUnlocked.length} newly unlocked`,
       newlyUnlocked,
-      totalChecked: achievements.length,
+      totalChecked,
     });
   } catch (error) {
     logger.error('Check achievements error:', error);

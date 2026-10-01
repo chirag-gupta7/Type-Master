@@ -71,12 +71,15 @@ const AchievementsPage: React.FC = () => {
     const fetchAchievements = async () => {
       try {
         setLoading(true);
-        const data = await achievementAPI.getAllAchievements();
+        // Independent requests: fetch concurrently instead of paying two
+        // sequential round-trips before the page can render.
+        const [data, statsData] = await Promise.all([
+          achievementAPI.getAllAchievements(),
+          isAuthenticated ? achievementAPI.getAchievementStats() : Promise.resolve(null),
+        ]);
         setAchievements(data.achievements);
 
-        // Fetch stats if authenticated
-        if (isAuthenticated) {
-          const statsData = await achievementAPI.getAchievementStats();
+        if (statsData) {
           setStats(statsData.stats);
           setRecentUnlocks(statsData.recentUnlocks);
         }
@@ -110,10 +113,11 @@ const AchievementsPage: React.FC = () => {
         }
 
         // Refresh achievements list + stats (split-cache: invalidated in checkAchievements)
-        const data = await achievementAPI.getAllAchievements({ skipCache: true });
+        const [data, statsData] = await Promise.all([
+          achievementAPI.getAllAchievements({ skipCache: true }),
+          achievementAPI.getAchievementStats({ skipCache: true }),
+        ]);
         setAchievements(data.achievements);
-
-        const statsData = await achievementAPI.getAchievementStats({ skipCache: true });
         setStats(statsData.stats);
         setRecentUnlocks(statsData.recentUnlocks);
       }

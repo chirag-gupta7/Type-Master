@@ -16,10 +16,23 @@ In `apps/frontend/.env.local`:
 ```env
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace_me
+NEXT_PUBLIC_API_URL=http://localhost:5000
+DATABASE_URL=postgresql://...
+```
+
+`NEXTAUTH_SECRET` is the only auth variable the NextAuth route handler hard-requires.
+
+## Optional: Google OAuth
+
+```env
 GOOGLE_CLIENT_ID=replace_me
 GOOGLE_CLIENT_SECRET=replace_me
-NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
+
+The Google provider is registered **only when both are set**. Email/password
+sign-in never depends on it: if these are missing the login page omits the
+"Continue with Google" button and keeps working with credentials alone. Setting
+only one of the two also leaves Google disabled.
 
 In `apps/backend/.env`:
 

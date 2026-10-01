@@ -8,11 +8,21 @@ import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 
 // Validation schemas
-const registerSchema = z.object({
-  email: z
+// `trim().toLowerCase()` run BEFORE `.email()` on purpose: zod applies string
+// transforms in chain order, so validating first would reject padded input.
+// Normalizing at the schema boundary keeps a single canonical casing per user
+// and stops Postgres case-sensitive `findUnique` from splitting one account
+// into two rows (e.g. "User@x.com" via register vs "user@x.com" via OAuth).
+const emailField = (message = 'Invalid email address') =>
+  z
     .string()
-    .email('Invalid email address')
-    .max(255, 'Email must not exceed 255 characters'),
+    .trim()
+    .toLowerCase()
+    .email(message)
+    .max(255, 'Email must not exceed 255 characters');
+
+const registerSchema = z.object({
+  email: emailField(),
   username: z
     .string()
     .min(3, 'Username must be at least 3 characters')
@@ -28,10 +38,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z
-    .string()
-    .email('Invalid email address')
-    .max(255, 'Email must not exceed 255 characters'),
+  email: emailField(),
   password: z
     .string()
     .min(1, 'Password is required')
@@ -43,10 +50,7 @@ const refreshTokenSchema = z.object({
 });
 
 const tokenProvisionSchema = z.object({
-  email: z
-    .string()
-    .email('Invalid email')
-    .max(255, 'Email must not exceed 255 characters'),
+  email: emailField('Invalid email'),
   name: z.string().min(1).max(100).nullable().optional(),
   username: z.string().min(1).max(50).nullable().optional(),
   image: z
