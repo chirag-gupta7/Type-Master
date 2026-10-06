@@ -31,39 +31,70 @@ const HistoryTooltip = ({ active, payload, label }: { active?: boolean; payload?
   return null;
 };
 
-function formatHistoryDate(isoDate: string, includeYear: boolean): string {
-  const d = new Date(isoDate + 'T00:00:00Z');
-  return d.toLocaleDateString('en-US', includeYear ? { month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' });
+// Fast static month lookup table to eliminate Date object instantiation and Intl formatting overhead
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Optimization: Fast date string formatting for UTC ISO dates ("YYYY-MM-DD") without Date object allocations
+function formatHistoryDateFast(isoDate: string, includeYear: boolean): string {
+  const monthIdx = parseInt(isoDate.slice(5, 7), 10) - 1;
+  const day = parseInt(isoDate.slice(8, 10), 10);
+  const monthStr = MONTH_NAMES[monthIdx] || '';
+  if (includeYear) {
+    return `${monthStr} ${day}, ${isoDate.slice(0, 4)}`;
+  }
+  return `${monthStr} ${day}`;
 }
 
 export function WpmHistoryChart({ data }: WpmHistoryChartProps) {
   const gradId = useId();
-  const needsYear = useMemo(() => {
-    if (data.length === 0) return false;
-    const years = new Set(data.map((p) => p.date.slice(0, 4)));
-    if (years.size > 1) return true;
-    const currentYear = new Date().getUTCFullYear().toString();
-    return !years.has(currentYear);
-  }, [data]);
-  const chartData = useMemo(() => {
-    return data.map((p) => ({
-      rawDate: p.date,
-      date: formatHistoryDate(p.date, needsYear),
-      wpm: p.wpm,
-      accuracy: p.accuracy,
-    }));
-  }, [data, needsYear]);
 
-  const stats = useMemo(() => {
-    if (data.length === 0) return null;
-    const wpms = data.map((d) => d.wpm);
-    const accs = data.map((d) => d.accuracy);
-    const latest = data[data.length - 1];
+  // Optimization: Consolidate data formatting, year-check logic, and statistics derivation into a single O(N) pass.
+  // This avoids 5 array .map() allocations, 2 .reduce() traversals, Set creation, and per-point Date object overhead.
+  const { chartData, stats } = useMemo(() => {
+    if (data.length === 0) {
+      return { chartData: [], stats: null };
+    }
+
+    const currentYear = new Date().getUTCFullYear().toString();
+    const firstYear = data[0].date.slice(0, 4);
+    let needsYear = firstYear !== currentYear;
+
+    if (!needsYear) {
+      for (let i = 1; i < data.length; i++) {
+        if (data[i].date.slice(0, 4) !== firstYear) {
+          needsYear = true;
+          break;
+        }
+      }
+    }
+
+    let sumWpm = 0;
+    let sumAcc = 0;
+    const count = data.length;
+    const chartDataArr = new Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const p = data[i];
+      sumWpm += p.wpm;
+      sumAcc += p.accuracy;
+      chartDataArr[i] = {
+        rawDate: p.date,
+        date: formatHistoryDateFast(p.date, needsYear),
+        wpm: p.wpm,
+        accuracy: p.accuracy,
+      };
+    }
+
     const first = data[0];
-    const avgWpm = Math.round(wpms.reduce((a, b) => a + b, 0) / wpms.length);
-    const avgAcc = Math.round((accs.reduce((a, b) => a + b, 0) / accs.length) * 10) / 10;
+    const latest = data[count - 1];
+    const avgWpm = Math.round(sumWpm / count);
+    const avgAcc = Math.round((sumAcc / count) * 10) / 10;
     const trend = latest.wpm - first.wpm;
-    return { avgWpm, avgAcc, latestWpm: latest.wpm, latestAcc: latest.accuracy, trend, count: data.length };
+
+    return {
+      chartData: chartDataArr,
+      stats: { avgWpm, avgAcc, latestWpm: latest.wpm, latestAcc: latest.accuracy, trend, count },
+    };
   }, [data]);
 
   return (
