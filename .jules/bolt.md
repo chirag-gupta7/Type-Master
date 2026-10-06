@@ -189,3 +189,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-08-22 - Single-pass Memoization and Fast Date Formatting in WpmHistoryChart
+**Learning:** Formatting ISO UTC dates (`YYYY-MM-DD`) with `new Date().toLocaleDateString()` inside chart rendering loops causes excessive object allocations and Intl overhead. Replacing `Date` instantiations with fast string slicing (`.slice()`) and a static month array lookup (`formatHistoryDateFast`), while consolidating data transformations and statistic derivations into a single `useMemo` pass, avoids redundant array traversals and garbage collection pressure.
+**Action:** In charting or dashboard components, replace `new Date().toLocaleDateString()` date formatting with string slicing and static lookup tables, and merge multi-step data pipelines into a single-pass `useMemo` computation.
