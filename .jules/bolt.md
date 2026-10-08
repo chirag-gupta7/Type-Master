@@ -189,3 +189,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-10-08 - Single-Pass State and Metric Accumulation in Lesson Controllers
+**Learning:** Performing subsequent array filtering or counting operations (e.g., `lessonsWithState.filter(l => l.isCompleted).length`) after mapping a collection allocates temporary intermediate arrays and causes redundant O(N) traversals. Accumulating metrics like completed count directly inside the primary mapping function (`buildLessonsWithUnlockState`) avoids extra array allocations and reduces array processing to a single O(N) pass.
+**Action:** When building enriched object representations from database lists, compute summary statistics and count flags inline within the primary mapping loop instead of running secondary `.filter()` calls.
