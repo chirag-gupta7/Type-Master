@@ -161,9 +161,18 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
       userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt as Date] as const)
     );
 
-    // Combine data
+    // Optimization: Consolidate data formatting, totalPoints, and earnedPoints into a single O(A) pass
+    // eliminating redundant array traversals (.reduce, .filter) and intermediate array allocations.
+    let totalPoints = 0;
+    let earnedPoints = 0;
+
     const achievementsWithStatus = achievements.map((achievement) => {
       const unlockedAt = userAchievementMap.get(achievement.id);
+      totalPoints += achievement.points;
+      if (unlockedAt) {
+        earnedPoints += achievement.points;
+      }
+
       return {
         id: achievement.id,
         title: achievement.title,
@@ -180,10 +189,8 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
       achievements: achievementsWithStatus,
       totalAchievements: achievements.length,
       unlockedCount: userAchievements.length,
-      totalPoints: achievements.reduce((sum, a) => sum + a.points, 0),
-      earnedPoints: achievements
-        .filter((a) => userAchievementMap.has(a.id))
-        .reduce((sum, a) => sum + a.points, 0),
+      totalPoints,
+      earnedPoints,
     });
   } catch (error) {
     logger.error('Get all achievements error:', error);
