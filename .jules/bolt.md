@@ -189,3 +189,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-08-21 - Extracting sub-components and O(1) map lookups in AnimatedHandOverlay
+**Learning:** Declaring functional sub-components (like `HandSVG`) inside a React component's render body forces React to redefine the component function and recreate DOM subtrees on every render pass. Moving sub-components outside the parent render scope and wrapping them in `React.memo` allows React to reuse DOM nodes. Furthermore, replacing key-array searches (`Object.entries` + `.includes()`) with a pre-computed module-scoped `Map` converts key lookup complexity from O(F * K) to O(1).
+**Action:** Always declare helper React components outside parent render functions, wrap them in `React.memo` when rendered inside real-time interactive parents, and pre-index static search arrays into Maps at module load time.
