@@ -56,11 +56,23 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
 
   const filteredSelected = useMemo(() => selectedLessons.filter((id) => availableIds.has(id)), [selectedLessons, availableIds]);
 
-  // Data for bar chart: one bar per lesson (single point per lesson from lastAttempt 90d)
-  // Use best value from data[0] as single-point display
-  const barData = useMemo(() => {
-    const selected = data.filter((l) => filteredSelected.includes(l.lessonId));
-    return selected.map((l) => {
+  // Optimization:
+  // 1. Precompute a lessonIndexMap (Map<string, number>) to convert O(N) data.findIndex() array scans into O(1) lookups.
+  // 2. Precompute a Set for filteredSelected for O(1) membership checks.
+  // 3. Consolidate barData and selectedLessonData calculation into a single O(N) pass.
+  const lessonIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < data.length; i++) {
+      map.set(data[i].lessonId, i);
+    }
+    return map;
+  }, [data]);
+
+  const filteredSelectedSet = useMemo(() => new Set(filteredSelected), [filteredSelected]);
+
+  const { barData, selectedLessonData } = useMemo(() => {
+    const selected = data.filter((l) => filteredSelectedSet.has(l.lessonId));
+    const formattedBarData = selected.map((l) => {
       const point = l.data[0];
       return {
         lesson: truncateLabel(l.lessonTitle),
@@ -70,13 +82,16 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
         level: l.level,
       };
     });
-  }, [data, filteredSelected]);
+
+    return {
+      barData: formattedBarData,
+      selectedLessonData: selected,
+    };
+  }, [data, filteredSelectedSet]);
 
   const toggleLesson = (lessonId: string) => {
     setSelectedLessons((prev) => (prev.includes(lessonId) ? prev.filter((id) => id !== lessonId) : prev.length >= 8 ? prev : [...prev, lessonId]));
   };
-
-  const selectedLessonData = useMemo(() => data.filter((l) => filteredSelected.includes(l.lessonId)), [data, filteredSelected]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.06 }}>
@@ -171,10 +186,11 @@ export function WPMProgressChart({ data }: WPMProgressChartProps) {
                 const point = lesson.data[0];
                 const wpm = point?.wpm ?? 0;
                 const acc = point?.accuracy ?? 0;
+                const lessonIndex = lessonIndexMap.get(lesson.lessonId) ?? 0;
                 return (
                   <div key={lesson.lessonId} className="rounded-xl border bg-muted/30 p-3">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: LESSON_COLORS[data.findIndex((d) => d.lessonId === lesson.lessonId) % LESSON_COLORS.length] }} />
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: LESSON_COLORS[lessonIndex % LESSON_COLORS.length] }} />
                       <p className="text-xs text-muted-foreground truncate">{lesson.lessonTitle}</p>
                     </div>
                     <p className="text-lg font-bold tracking-tight">{wpm} <span className="text-xs font-normal text-muted-foreground">WPM</span></p>
