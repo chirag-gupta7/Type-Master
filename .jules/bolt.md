@@ -186,6 +186,10 @@
 **Learning:** The `getAchievementStats` endpoint was performing two separate `findMany` queries on `userAchievement` (one for total unlocked count / earned points and another with `take: 5` sorted descending for recent unlocks). Fetching all user achievements sorted by `unlockedAt: 'desc'` in a single query allows computing totals and deriving the top 5 recent unlocks via `.slice(0, 5)` in-memory, reducing database round-trips from 3 to 2.
 **Action:** When an endpoint fetches both a full user relation list and a recent subset of that same list, consolidate into a single sorted database fetch and slice in-memory.
 
+## 2026-08-25 - Pre-parsing JSON Metadata and Memoizing Achievements Page Calculations
+**Learning:** React page components displaying lists of items with serialized JSON metadata (like achievement requirement definitions) will repeatedly invoke `JSON.parse` inside render loops during every state update (e.g., toggling filters or triggering animations). Pre-parsing this metadata into a `Map` via `useMemo` once per dataset update and memoizing derived lists/groupings avoids redundant JSON parsing and array traversals, maintaining smooth 60fps rendering.
+**Action:** When rendering lists with stringified JSON attributes, pre-parse them into a memoized `Map` lookup and wrap filtering/grouping derivations in `useMemo`.
+
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.

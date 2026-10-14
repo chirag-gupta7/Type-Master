@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Trophy, Award, Lock, Sparkles, TrendingUp, Target } from 'lucide-react';
@@ -32,21 +32,6 @@ const groupBy = <T,>(arr: T[], key: (t: T) => string): Record<string, T[]> =>
     },
     {} as Record<string, T[]>
   );
-
-const getAchievementCategory = (a: Achievement): string => {
-  try {
-    const t = JSON.parse(a.requirement).type as string;
-    const cat = (TYPE_TO_CATEGORY as Record<string, string>)[t];
-    if (!cat) {
-      console.warn(`Unknown achievement type "${t}" — missing from TYPE_TO_CATEGORY (seed/controller/api drift)`);
-      return t; // surface raw type instead of silently hiding in "Other"
-    }
-    return cat;
-  } catch {
-    console.warn('Failed to parse achievement requirement', a.requirement);
-    return 'Unknown';
-  }
-};
 
 const AchievementsPage: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -140,29 +125,68 @@ const AchievementsPage: React.FC = () => {
     }
   };
 
-  // Filter achievements
-  const filteredAchievements = achievements.filter((achievement) => {
-    if (filter === 'unlocked') return achievement.unlocked;
-    if (filter === 'locked') return !achievement.unlocked;
-    return true;
-  });
-
-  const groupedAchievements = groupBy(filteredAchievements, getAchievementCategory);
-
-  // Calculate progress for locked achievements
-  const getProgress = (achievement: Achievement): number => {
-    if (achievement.unlocked || !achievementProgress) return 0;
-
-    // Parse requirement to get achievement type
-    try {
-      const requirement = JSON.parse(achievement.requirement);
-      const achievementType = requirement.type;
-
-      // Return progress percentage for this achievement type
-      return achievementProgress[achievementType] || 0;
-    } catch {
-      return 0;
+  // Optimization: Pre-parse achievement metadata and requirement types once per achievement array update
+  // to avoid calling JSON.parse repeatedly inside render loops and grouping calls.
+  const parsedAchievementMap = useMemo(() => {
+    const map = new Map<string, { category: string; type: string | null }>();
+    for (const achievement of achievements) {
+      let category = 'Unknown';
+      let type: string | null = null;
+      try {
+        type = JSON.parse(achievement.requirement).type as string;
+        const cat = (TYPE_TO_CATEGORY as Record<string, string>)[type];
+        category = cat || type;
+      } catch {
+        // Fallback for unparseable requirements
+      }
+      map.set(achievement.id, { category, type });
     }
+    return map;
+  }, [achievements]);
+
+  // Optimization: Memoize filtered achievements, category groupings, and unlocked/locked counts
+  // to prevent unnecessary array traversals and object allocations on state updates like modal animations or check status.
+  const { filteredAchievements, groupedAchievements, unlockedCount, lockedCount } = useMemo(() => {
+    let unlocked = 0;
+    let locked = 0;
+    const filtered: Achievement[] = [];
+
+    for (const a of achievements) {
+      if (a.unlocked) unlocked++;
+      else locked++;
+
+      if (filter === 'unlocked' && !a.unlocked) continue;
+      if (filter === 'locked' && a.unlocked) continue;
+      filtered.push(a);
+    }
+
+    const grouped = groupBy(filtered, (a) => parsedAchievementMap.get(a.id)?.category || 'Unknown');
+
+    return {
+      filteredAchievements: filtered,
+      groupedAchievements: grouped,
+      unlockedCount: unlocked,
+      lockedCount: locked,
+    };
+  }, [achievements, filter, parsedAchievementMap]);
+
+  // Optimization: Precompute progress percentage map for O(1) constant-time lookups during render
+  const progressMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!achievementProgress) return map;
+
+    for (const a of achievements) {
+      if (a.unlocked) continue;
+      const meta = parsedAchievementMap.get(a.id);
+      if (meta?.type) {
+        map.set(a.id, achievementProgress[meta.type] || 0);
+      }
+    }
+    return map;
+  }, [achievements, achievementProgress, parsedAchievementMap]);
+
+  const getProgress = (achievement: Achievement): number => {
+    return progressMap.get(achievement.id) || 0;
   };
 
   return (
@@ -259,7 +283,7 @@ const AchievementsPage: React.FC = () => {
               className="gap-2"
             >
               <Award className="w-4 h-4" />
-              Unlocked ({achievements.filter((a) => a.unlocked).length})
+              Unlocked ({unlockedCount})
             </Button>
             <Button
               variant={filter === 'locked' ? 'default' : 'outline'}
@@ -267,7 +291,7 @@ const AchievementsPage: React.FC = () => {
               className="gap-2"
             >
               <Lock className="w-4 h-4" />
-              Locked ({achievements.filter((a) => !a.unlocked).length})
+              Locked ({lockedCount})
             </Button>
           </div>
 
