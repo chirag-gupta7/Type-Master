@@ -9,6 +9,12 @@ interface PracticeHeatMapProps {
   data: PracticeDay[];
 }
 
+interface HeatMapCell {
+  dateObj: Date;
+  dateStr: string;
+  timeMs: number;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 function getLast365Days(): Date[] {
   const days: Date[] = [];
@@ -41,35 +47,45 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
   const days = useMemo(() => getLast365Days(), []);
   const activityMap = useMemo(() => new Map(data.map((d) => [d.date, d.count])), [data]);
 
-  // Exactly 53 cols starting Sunday (UTC), dense 11px / gap 3px / min-w 720
+  // Pre-calculate cells with precomputed dateStr and timeMs to eliminate 371 .toISOString() calls per render
   const weeks = useMemo(() => {
-    if (days.length === 0) return [] as Date[][];
+    if (days.length === 0) return [] as HeatMapCell[][];
     const first = days[0];
     const firstUTCDay = first.getUTCDay(); // 0=Sun ; UTC fixed
     const startSundayMs = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()) - firstUTCDay * DAY_MS;
-    const weeksArr: Date[][] = [];
+    const weeksArr: HeatMapCell[][] = [];
     for (let w = 0; w < 53; w++) {
-      const week: Date[] = [];
+      const week: HeatMapCell[] = [];
       for (let d = 0; d < 7; d++) {
-        week.push(new Date(startSundayMs + (w * 7 + d) * DAY_MS));
+        const timeMs = startSundayMs + (w * 7 + d) * DAY_MS;
+        const dateObj = new Date(timeMs);
+        const dateStr = dateObj.toISOString().split('T')[0];
+        week.push({ dateObj, dateStr, timeMs });
       }
       weeksArr.push(week);
     }
     return weeksArr;
   }, [days]);
 
+  // Consolidate summary metrics derivation into a single pass
   const { totalActivities, activeDays, currentStreak, longestStreak } = useMemo(() => {
-    const total = data.reduce((sum, d) => sum + d.count, 0);
-    const active = data.filter((d) => d.count > 0).length;
+    let total = 0;
+    let activeCount = 0;
+    for (let i = 0; i < data.length; i++) {
+      total += data[i].count;
+      if (data[i].count > 0) {
+        activeCount++;
+      }
+    }
     const current = calculateCurrentStreak(data);
     const longest = calculateLongestStreak(data);
-    return { totalActivities: total, activeDays: active, currentStreak: current, longestStreak: longest };
+    return { totalActivities: total, activeDays: activeCount, currentStreak: current, longestStreak: longest };
   }, [data]);
 
   const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks]);
 
+  const minDayMs = useMemo(() => days[0]?.getTime() ?? 0, [days]);
   const todayUtcStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  // for future shading: compare ms
 
   return (
     <div>
@@ -125,25 +141,25 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
                 <div className="flex-1 flex gap-[3px]" role="grid" aria-label="Practice heatmap grid: 53 weeks starting Sunday, 7 days per week">
                   {weeks.map((week, weekIndex) => (
                     <div key={weekIndex} className="flex flex-col gap-[3px]" role="row" aria-label={`Week ${weekIndex + 1}`}>
-                      {week.map((day) => {
-                        const dateStr = day.toISOString().split('T')[0];
+                      {week.map((cell) => {
+                        const { dateStr, timeMs, dateObj } = cell;
                         const isFuture = dateStr > todayUtcStr;
                         const count = isFuture ? 0 : (activityMap.get(dateStr) || 0);
-                        const isOutOfRange = day.getTime() < days[0].getTime() || isFuture;
+                        const isOutOfRange = timeMs < minDayMs || isFuture;
                         // Out-of-range leading/trailing padding still renders muted #ebedf0 for WYSIWYG grid shape, but dim future
                         return (
                           <button
                             key={dateStr}
                             type="button"
-                            aria-label={getTooltipText(count, day)}
-                            title={getTooltipText(count, day)}
+                            aria-label={getTooltipText(count, dateObj)}
+                            title={getTooltipText(count, dateObj)}
                             role="gridcell"
                             aria-selected="false"
                             className="group relative flex h-[11px] w-[11px] items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                           >
                             <span className={`h-[11px] w-[11px] rounded-sm block ${getColorIntensity(isOutOfRange && isFuture ? 0 : count)} ${isOutOfRange ? 'opacity-60' : ''}`} aria-hidden />
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-md border bg-popover text-popover-foreground text-xs shadow-md opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
-                              {getTooltipText(count, day)}
+                              {getTooltipText(count, dateObj)}
                             </span>
                           </button>
                         );
@@ -173,12 +189,12 @@ export function PracticeHeatMap({ data }: PracticeHeatMapProps) {
   );
 }
 
-function getMonthLabels(weeks: Date[][]): Array<{ name: string; width: number }> {
+function getMonthLabels(weeks: HeatMapCell[][]): Array<{ name: string; width: number }> {
   const months: Array<{ name: string; width: number }> = [];
   let currentMonth = -1;
   let weekCount = 0;
   weeks.forEach((week) => {
-    const firstDay = week[0];
+    const firstDay = week[0]?.dateObj;
     if (!firstDay) return;
     if (firstDay.getUTCMonth() !== currentMonth) {
       if (weekCount > 0 && months.length > 0) months[months.length - 1].width = (weekCount / weeks.length) * 100;
@@ -191,30 +207,52 @@ function getMonthLabels(weeks: Date[][]): Array<{ name: string; width: number }>
   return months;
 }
 
-function toUtcDayMs(dayKey: string): number { return Date.parse(`${dayKey}T00:00:00Z`); }
-function getSortedActiveDayKeys(data: PracticeDay[]): string[] { return data.filter((d) => d.count > 0).map((d) => d.date).sort(); }
+function toUtcDayMs(dayKey: string): number {
+  return Date.parse(`${dayKey}T00:00:00Z`);
+}
+
+function getSortedActiveDayKeys(data: PracticeDay[]): string[] {
+  const activeSet = new Set<string>();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i].count > 0) {
+      activeSet.add(data[i].date);
+    }
+  }
+  return Array.from(activeSet).sort();
+}
 
 export function calculateCurrentStreak(data: PracticeDay[], today: Date = new Date()): number {
-  const activeKeys = Array.from(new Set(getSortedActiveDayKeys(data)));
+  const activeKeys = getSortedActiveDayKeys(data);
   if (activeKeys.length === 0) return 0;
   const todayKey = today.toISOString().split('T')[0];
   const mostRecentKey = activeKeys[activeKeys.length - 1];
   const daysDiff = Math.round((toUtcDayMs(todayKey) - toUtcDayMs(mostRecentKey)) / DAY_MS);
   if (daysDiff > 1) return 0;
-  const activeSet = new Set(activeKeys);
-  let streak = 0;
-  let expectedMs = toUtcDayMs(mostRecentKey);
-  while (activeSet.has(new Date(expectedMs).toISOString().split('T')[0])) { streak++; expectedMs -= DAY_MS; }
+  let streak = 1;
+  for (let i = activeKeys.length - 1; i > 0; i--) {
+    const diff = Math.round((toUtcDayMs(activeKeys[i]) - toUtcDayMs(activeKeys[i - 1])) / DAY_MS);
+    if (diff === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
   return streak;
 }
+
 export function calculateLongestStreak(data: PracticeDay[]): number {
-  const activeKeys = Array.from(new Set(getSortedActiveDayKeys(data)));
+  const activeKeys = getSortedActiveDayKeys(data);
   if (activeKeys.length === 0) return 0;
   let maxStreak = 1;
   let currentRun = 1;
   for (let i = 1; i < activeKeys.length; i++) {
-    const dayDiff = (toUtcDayMs(activeKeys[i]) - toUtcDayMs(activeKeys[i - 1])) / DAY_MS;
-    if (dayDiff === 1) { currentRun++; maxStreak = Math.max(maxStreak, currentRun); } else currentRun = 1;
+    const dayDiff = Math.round((toUtcDayMs(activeKeys[i]) - toUtcDayMs(activeKeys[i - 1])) / DAY_MS);
+    if (dayDiff === 1) {
+      currentRun++;
+      maxStreak = Math.max(maxStreak, currentRun);
+    } else {
+      currentRun = 1;
+    }
   }
   return maxStreak;
 }
