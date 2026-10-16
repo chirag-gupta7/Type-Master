@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Trophy, Award, Lock, Sparkles, TrendingUp, Target } from 'lucide-react';
@@ -140,14 +140,37 @@ const AchievementsPage: React.FC = () => {
     }
   };
 
-  // Filter achievements
-  const filteredAchievements = achievements.filter((achievement) => {
-    if (filter === 'unlocked') return achievement.unlocked;
-    if (filter === 'locked') return !achievement.unlocked;
-    return true;
-  });
+  // --- OPTIMIZATION (Before vs. After) ---
+  // Before:
+  //   - `filteredAchievements`, `groupedAchievements` (with JSON.parse per item in getAchievementCategory),
+  //     and unlocked/locked filter counts were recalculated on every render pass (e.g. animation frames, checking state updates).
+  //   - Time Complexity: O(A) array iterations, JSON parsing, and object allocations on every render.
+  // After:
+  //   - Memoize unlocked/locked count derivations from `achievements`.
+  //   - Memoize `filteredAchievements` dependent on `[achievements, filter]`.
+  //   - Memoize `groupedAchievements` dependent on `[filteredAchievements]`.
+  //   - Time Complexity: Constant O(1) on unrelated re-renders, recalculating only when raw achievement state or filter mode changes.
+  const { unlockedCount, lockedCount } = useMemo(() => {
+    let unlocked = 0;
+    let locked = 0;
+    for (const a of achievements) {
+      if (a.unlocked) unlocked++;
+      else locked++;
+    }
+    return { unlockedCount: unlocked, lockedCount: locked };
+  }, [achievements]);
 
-  const groupedAchievements = groupBy(filteredAchievements, getAchievementCategory);
+  const filteredAchievements = useMemo(() => {
+    return achievements.filter((achievement) => {
+      if (filter === 'unlocked') return achievement.unlocked;
+      if (filter === 'locked') return !achievement.unlocked;
+      return true;
+    });
+  }, [achievements, filter]);
+
+  const groupedAchievements = useMemo(() => {
+    return groupBy(filteredAchievements, getAchievementCategory);
+  }, [filteredAchievements]);
 
   // Calculate progress for locked achievements
   const getProgress = (achievement: Achievement): number => {
@@ -259,7 +282,7 @@ const AchievementsPage: React.FC = () => {
               className="gap-2"
             >
               <Award className="w-4 h-4" />
-              Unlocked ({achievements.filter((a) => a.unlocked).length})
+              Unlocked ({unlockedCount})
             </Button>
             <Button
               variant={filter === 'locked' ? 'default' : 'outline'}
@@ -267,7 +290,7 @@ const AchievementsPage: React.FC = () => {
               className="gap-2"
             >
               <Lock className="w-4 h-4" />
-              Locked ({achievements.filter((a) => !a.unlocked).length})
+              Locked ({lockedCount})
             </Button>
           </div>
 
