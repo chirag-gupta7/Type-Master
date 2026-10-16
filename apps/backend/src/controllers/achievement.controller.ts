@@ -161,9 +161,20 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
       userAchievements.map((ua) => [ua.achievementId, ua.unlockedAt as Date] as const)
     );
 
-    // Combine data
+    // Optimization: Consolidate data transformation, totalPoints, and earnedPoints into a single pass (O(A))
+    // avoiding redundant array .reduce() traversals and .filter() allocations.
+    let totalPoints = 0;
+    let earnedPoints = 0;
+
     const achievementsWithStatus = achievements.map((achievement) => {
       const unlockedAt = userAchievementMap.get(achievement.id);
+      const isUnlocked = !!unlockedAt;
+
+      totalPoints += achievement.points;
+      if (isUnlocked) {
+        earnedPoints += achievement.points;
+      }
+
       return {
         id: achievement.id,
         title: achievement.title,
@@ -171,7 +182,7 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
         icon: achievement.icon,
         points: achievement.points,
         requirement: achievement.requirement,
-        unlocked: !!unlockedAt,
+        unlocked: isUnlocked,
         unlockedAt: unlockedAt ? unlockedAt.toISOString() : null,
       };
     });
@@ -180,10 +191,8 @@ export const getAllAchievements = async (req: AuthRequest, res: Response) => {
       achievements: achievementsWithStatus,
       totalAchievements: achievements.length,
       unlockedCount: userAchievements.length,
-      totalPoints: achievements.reduce((sum, a) => sum + a.points, 0),
-      earnedPoints: achievements
-        .filter((a) => userAchievementMap.has(a.id))
-        .reduce((sum, a) => sum + a.points, 0),
+      totalPoints,
+      earnedPoints,
     });
   } catch (error) {
     logger.error('Get all achievements error:', error);
