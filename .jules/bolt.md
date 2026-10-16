@@ -186,6 +186,10 @@
 **Learning:** The `getAchievementStats` endpoint was performing two separate `findMany` queries on `userAchievement` (one for total unlocked count / earned points and another with `take: 5` sorted descending for recent unlocks). Fetching all user achievements sorted by `unlockedAt: 'desc'` in a single query allows computing totals and deriving the top 5 recent unlocks via `.slice(0, 5)` in-memory, reducing database round-trips from 3 to 2.
 **Action:** When an endpoint fetches both a full user relation list and a recent subset of that same list, consolidate into a single sorted database fetch and slice in-memory.
 
+## 2026-10-13 - WPMProgressChart Indexing and Derivation Optimization
+**Learning:** Performing array linear searches (`.findIndex()`) inside React component render loops (e.g., inside `.map()`) degrades rendering efficiency from O(N) to O(N^2) as dataset size increases. Precomputing an index map (`Map<string, number>`) using `useMemo` converts these lookups into O(1) hash map operations. Furthermore, consolidating multiple filtering passes into a single `useMemo` derivation pass with `Set` membership checking eliminates redundant array traversals.
+**Action:** When rendering charts or grids with repeated item lookups by ID, precompute a lookup Map in `useMemo` to ensure O(1) per-item access during render.
+
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
