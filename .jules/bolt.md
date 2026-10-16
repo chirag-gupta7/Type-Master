@@ -190,6 +190,10 @@
 **Learning:** Performing array linear searches (`.findIndex()`) inside React component render loops (e.g., inside `.map()`) degrades rendering efficiency from O(N) to O(N^2) as dataset size increases. Precomputing an index map (`Map<string, number>`) using `useMemo` converts these lookups into O(1) hash map operations. Furthermore, consolidating multiple filtering passes into a single `useMemo` derivation pass with `Set` membership checking eliminates redundant array traversals.
 **Action:** When rendering charts or grids with repeated item lookups by ID, precompute a lookup Map in `useMemo` to ensure O(1) per-item access during render.
 
+## 2026-08-25 - Pre-parsing JSON Metadata and Memoizing Achievements Page Calculations
+**Learning:** React page components displaying lists of items with serialized JSON metadata (like achievement requirement definitions) will repeatedly invoke `JSON.parse` inside render loops during every state update (e.g., toggling filters or triggering animations). Pre-parsing this metadata into a `Map` via `useMemo` once per dataset update and memoizing derived lists/groupings avoids redundant JSON parsing and array traversals, maintaining smooth 60fps rendering.
+**Action:** When rendering lists with stringified JSON attributes, pre-parse them into a memoized `Map` lookup and wrap filtering/grouping derivations in `useMemo`.
+
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
