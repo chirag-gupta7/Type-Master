@@ -36,10 +36,11 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+  // Optimization: Consolidate testResult _max.accuracy into aggregate query instead of issuing
+  // a separate findFirst query for 100% accuracy checks. This drops Promise.all queries from 7 to 6.
   const [
     testStats,
     highAccuracyCount,
-    perfectAccuracy,
     completedLessonsCount,
     totalLessonsCount,
     recentTests,
@@ -48,14 +49,10 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
     prisma.testResult.aggregate({
       where: { userId },
       _count: { _all: true },
-      _max: { wpm: true },
+      _max: { wpm: true, accuracy: true },
     }),
     prisma.testResult.count({
       where: { userId, accuracy: { gte: 95 } },
-    }),
-    prisma.testResult.findFirst({
-      where: { userId, accuracy: 100 },
-      select: { id: true },
     }),
     prisma.userLessonProgress.count({
       where: { userId, completed: true },
@@ -86,7 +83,7 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
     testCount: testStats._count._all,
     maxWpm: testStats._max.wpm || 0,
     highAccuracyCount,
-    hasPerfectAccuracy: !!perfectAccuracy,
+    hasPerfectAccuracy: (testStats._max.accuracy || 0) >= 100,
     completedLessonsCount,
     totalLessonsCount,
     uniqueDaysThisWeek: uniqueDays.size,
