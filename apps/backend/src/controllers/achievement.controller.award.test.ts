@@ -19,12 +19,12 @@ const seedMetrics = (overrides: Record<string, unknown> = {}) => {
   const testCount = (overrides.testCount as number) ?? 0;
   (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
     _count: { _all: testCount },
-    _max: { wpm: (overrides.maxWpm as number) ?? 0 },
+    _max: {
+      wpm: (overrides.maxWpm as number) ?? 0,
+      accuracy: (overrides.hasPerfectAccuracy as boolean) ? 100 : 95,
+    },
   });
   (prisma.testResult.count as jest.Mock).mockResolvedValue((overrides.highAccuracyCount as number) ?? 0);
-  (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(
-    (overrides.hasPerfectAccuracy as boolean) ? { id: 'p1' } : null
-  );
   (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(
     (overrides.completedLessonsCount as number) ?? 0
   );
