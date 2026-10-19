@@ -43,6 +43,9 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
   const [paths, setPaths] = useState<Array<{ d: string; locked: boolean; key: string }>>([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
 
+  // Optimization: Map lesson ID to node for O(1) constant-time prerequisite lookups
+  const nodeMap = useMemo(() => new Map(data.map((node) => [node.id, node])), [data]);
+
   const { lessonsByLevel, levels } = useMemo(() => {
     const grouped = data.reduce((acc, lesson) => {
       if (!acc[lesson.level]) acc[lesson.level] = [];
@@ -306,7 +309,7 @@ export function SkillTreeVisualization({ data }: SkillTreeVisualizationProps) {
                       <p className="text-xs text-muted-foreground mb-1.5">Prerequisites</p>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedNode.prerequisites.map((prereqId) => {
-                          const prereq = data.find((l) => l.id === prereqId);
+                          const prereq = nodeMap.get(prereqId);
                           return <span key={prereqId} className="inline-flex rounded-full border bg-card px-2.5 py-1 text-xs">{prereq?.title || 'Unknown'}</span>;
                         })}
                       </div>
