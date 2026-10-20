@@ -197,3 +197,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-10-20 - Consolidating 100% Accuracy Query in fetchUserMetrics
+**Learning:** Performing a separate database `findFirst` query to check if a user has achieved 100% accuracy adds unnecessary database roundtrips when an aggregate query (`testResult.aggregate`) is already executing for that user's test results. Adding `_max: { accuracy: true }` to the existing aggregate query allows checking `_max.accuracy === 100` in-memory, eliminating a separate database query and reducing parallel database roundtrips in `fetchUserMetrics` from 7 to 6.
+**Action:** When gathering metrics, inspect existing `aggregate` queries to see if secondary threshold checks (like `findFirst` for maximums or target values) can be derived directly from `_max` or `_min` fields.
