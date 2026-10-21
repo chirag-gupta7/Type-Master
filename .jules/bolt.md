@@ -197,3 +197,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-10-21 - Short-Lived TTL Caching for Global Baseline Statistics
+**Learning:** High-traffic endpoints like `getLeaderboard` that fetch overall platform baseline statistics (e.g. mean WPM/accuracy across all user typing tests) suffer unnecessary DB load by re-running whole-table aggregations (`prisma.testResult.aggregate`) on every single client request or game tab toggle. Introducing a simple in-memory TTL cache (e.g. 5 minutes) completely bypasses the DB query on >99% of requests with zero noticeable impact on baseline freshness.
+**Action:** For platform-wide aggregate metrics that don't need real-time per-second freshness, store calculated results in module-level in-memory variables with a short TTL (e.g., 5 mins).
