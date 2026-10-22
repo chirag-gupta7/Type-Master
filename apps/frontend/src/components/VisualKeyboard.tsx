@@ -3,7 +3,24 @@
 import { useEffect, useState, memo } from 'react';
 import { cn } from '@/lib/utils';
 
-const KEYBOARD_LAYOUT = [
+// PERFORMANCE OPTIMIZATION:
+// Static module-level key lookup map eliminates object allocation on every normalizeKey invocation.
+const KEY_MAP: Record<string, string> = {
+  ' ': 'Space',
+  Enter: 'Enter',
+  Backspace: 'Backspace',
+  Tab: 'Tab',
+  Shift: 'ShiftLeft',
+  Control: 'ControlLeft',
+  Alt: 'AltLeft',
+  Meta: 'MetaLeft',
+};
+
+const normalizeKey = (key: string): string => {
+  return KEY_MAP[key] ?? key.toUpperCase();
+};
+
+const RAW_KEYBOARD_LAYOUT = [
   [
     { key: '`', code: 'Backquote', width: 'w-11' },
     { key: '1', code: 'Digit1', width: 'w-11' },
@@ -76,6 +93,16 @@ const KEYBOARD_LAYOUT = [
   ],
 ];
 
+// PERFORMANCE OPTIMIZATION:
+// Pre-compute upperKey property once at module load time to avoid calling k.key.toUpperCase()
+// ~60 times per render pass during real-time typing tests.
+const KEYBOARD_LAYOUT = RAW_KEYBOARD_LAYOUT.map((row) =>
+  row.map((k) => ({
+    ...k,
+    upperKey: k.key.toUpperCase(),
+  }))
+);
+
 interface KeyboardKeyProps {
   keyCode: string;
   keyLabel: string;
@@ -140,20 +167,6 @@ interface VisualKeyboardProps {
   className?: string;
 }
 
-const normalizeKey = (key: string): string => {
-  const map: Record<string, string> = {
-    ' ': 'Space',
-    Enter: 'Enter',
-    Backspace: 'Backspace',
-    Tab: 'Tab',
-    Shift: 'ShiftLeft',
-    Control: 'ControlLeft',
-    Alt: 'AltLeft',
-    Meta: 'MetaLeft',
-  };
-  return map[key] ?? key.toUpperCase();
-};
-
 export function VisualKeyboard({
   targetKey,
   pressedKey,
@@ -163,6 +176,7 @@ export function VisualKeyboard({
   className,
 }: VisualKeyboardProps) {
   const [animatingKey, setAnimatingKey] = useState<string | null>(null);
+
   const normalizedTarget = targetKey ? normalizeKey(targetKey) : null;
   const normalizedPressed = pressedKey ? normalizeKey(pressedKey) : null;
 
@@ -181,7 +195,7 @@ export function VisualKeyboard({
           {KEYBOARD_LAYOUT.map((row, rowIdx) => (
             <div key={rowIdx} className="flex gap-1.5 justify-center">
               {row.map((k) => {
-                const upper = k.key.toUpperCase();
+                const upper = k.upperKey;
                 let state: 'target' | 'correct' | 'incorrect' | 'neutral' = 'neutral';
                 const isTarget =
                   normalizedTarget === k.code ||
