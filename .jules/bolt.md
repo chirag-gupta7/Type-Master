@@ -197,3 +197,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-08-26 - VisualKeyboard Key Normalization and Layout Pre-computation Optimization
+**Learning:** In high-frequency typing components triggered on every keystroke, declaring object literals inside normalization functions or calling `.toUpperCase()` on ~60 layout keys inside the render loop causes significant garbage collection overhead and string allocation churn. Extracting key lookup maps to module scope and pre-computing uppercase key properties on static layout definitions eliminates per-frame allocations during typing sessions.
+**Action:** Static key mappings and string attributes on fixed layout grids should be pre-computed at module load time rather than derived during component renders.
