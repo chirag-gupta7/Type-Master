@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { testAPI } from '@/lib/api';
 
@@ -48,23 +48,49 @@ export default function HistoryPage() {
     setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  // PERFORMANCE OPTIMIZATION:
+  // Consolidate date parsing (`new Date`), locale formatting (`toLocaleString`), duration formatting,
+  // fixed-point precision rounding (`toFixed(1)`), and accuracy CSS class assignments into a single
+  // O(N) `useMemo` pass dependent on `tests`. This eliminates repeated `Date` object instantiations,
+  // locale string computations, and string allocations on component re-renders.
+  const formattedTests = useMemo(() => {
+    return tests.map((test) => {
+      const date = new Date(test.createdAt);
+      const formattedDate = date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
-  const formatDuration = (seconds: number) => {
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-  };
+      let formattedDuration: string;
+      if (test.duration < 60) {
+        formattedDuration = `${test.duration}s`;
+      } else {
+        const minutes = Math.floor(test.duration / 60);
+        const remainingSeconds = test.duration % 60;
+        formattedDuration =
+          remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+      }
+
+      const accuracyClass =
+        test.accuracy >= 95
+          ? 'text-green-600 dark:text-green-400'
+          : test.accuracy >= 90
+            ? 'text-yellow-600 dark:text-yellow-400'
+            : '';
+
+      return {
+        ...test,
+        formattedDate,
+        formattedDuration,
+        formattedWpm: test.wpm.toFixed(1),
+        formattedAccuracy: test.accuracy.toFixed(1),
+        accuracyClass,
+      };
+    });
+  }, [tests]);
 
   if (loading) {
     return (
@@ -114,29 +140,19 @@ export default function HistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tests.map((test) => (
+                  {formattedTests.map((test) => (
                     <tr
                       key={test.id}
                       className="border-b last:border-b-0 hover:bg-muted/50 transition-colors"
                     >
-                      <td className="p-4">{formatDate(test.createdAt)}</td>
+                      <td className="p-4">{test.formattedDate}</td>
                       <td className="p-4">
-                        <span className="font-semibold text-primary">{test.wpm.toFixed(1)}</span>
+                        <span className="font-semibold text-primary">{test.formattedWpm}</span>
                       </td>
                       <td className="p-4">
-                        <span
-                          className={
-                            test.accuracy >= 95
-                              ? 'text-green-600 dark:text-green-400'
-                              : test.accuracy >= 90
-                                ? 'text-yellow-600 dark:text-yellow-400'
-                                : ''
-                          }
-                        >
-                          {test.accuracy.toFixed(1)}%
-                        </span>
+                        <span className={test.accuracyClass}>{test.formattedAccuracy}%</span>
                       </td>
-                      <td className="p-4">{formatDuration(test.duration)}</td>
+                      <td className="p-4">{test.formattedDuration}</td>
                     </tr>
                   ))}
                 </tbody>
