@@ -60,6 +60,33 @@ const parseMetadata = (metadata: string | null): Record<string, unknown> | null 
   }
 };
 
+// In-memory cache for global motivational baseline stats (5-minute TTL)
+// Prevents executing an unindexed full-table aggregate query on every leaderboard request.
+const GLOBAL_AVG_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedGlobalAvg: { wpm: number; accuracy: number; totalTests: number } | null = null;
+let cachedGlobalAvgTimestamp = 0;
+
+const getGlobalAvg = async (): Promise<{ wpm: number; accuracy: number; totalTests: number }> => {
+  const now = Date.now();
+  if (cachedGlobalAvg && now - cachedGlobalAvgTimestamp < GLOBAL_AVG_CACHE_TTL_MS) {
+    return cachedGlobalAvg;
+  }
+
+  const globalAgg = await prisma.testResult.aggregate({
+    _avg: { wpm: true, accuracy: true },
+    _count: { _all: true },
+  });
+
+  cachedGlobalAvg = {
+    wpm: Math.round(globalAgg._avg.wpm ?? 0),
+    accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
+    totalTests: globalAgg._count._all,
+  };
+  cachedGlobalAvgTimestamp = now;
+
+  return cachedGlobalAvg;
+};
+
 export const saveGameScore = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
@@ -130,7 +157,7 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
     //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
     //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
     //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
-    const [topGrouped, globalAgg] = await Promise.all([
+    const [topGrouped, globalAvg] = await Promise.all([
       prisma.gameScore.groupBy({
         by: ['userId'],
         where: {
@@ -146,18 +173,9 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
         },
         take: limit,
       }),
-      // Global motivational baseline: mean WPM / accuracy across ALL typing tests.
-      prisma.testResult.aggregate({
-        _avg: { wpm: true, accuracy: true },
-        _count: { _all: true },
-      }),
+      // Global motivational baseline: mean WPM / accuracy across ALL typing tests (5-min in-memory cached).
+      getGlobalAvg(),
     ]);
-
-    const globalAvg = {
-      wpm: Math.round(globalAgg._avg.wpm ?? 0),
-      accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
-      totalTests: globalAgg._count._all,
-    };
 
     if (topGrouped.length === 0) {
       res.json({
