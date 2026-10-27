@@ -197,3 +197,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-10-27 - Caching Global Baseline Aggregates in Leaderboard Endpoint
+**Learning:** Endpoints that compute global system baseline stats (such as mean WPM, mean accuracy, and total tests across all users) alongside page-specific listings can trigger expensive whole-table database scans (`prisma.testResult.aggregate`) on every single API request. Because global baseline numbers change slowly, caching them in-memory with a 5-minute TTL eliminates redundant DB queries and drops endpoint response overhead.
+**Action:** Caching slow-changing global aggregated metrics in module memory with short TTLs (e.g. 5m) avoids whole-table database scanning on high-frequency endpoints like leaderboards.

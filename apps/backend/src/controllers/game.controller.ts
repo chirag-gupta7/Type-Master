@@ -103,6 +103,13 @@ export const saveGameScore = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+// 5-minute in-memory cache for global avg stats to avoid whole-table aggregate DB queries on every leaderboard request
+const GLOBAL_AVG_CACHE_TTL_MS = 5 * 60 * 1000;
+let globalAvgCache: {
+  data: { wpm: number; accuracy: number; totalTests: number };
+  timestamp: number;
+} | null = null;
+
 export const getLeaderboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const rawType = parseGameType(req.query.gameType);
@@ -114,50 +121,56 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const now = Date.now();
+    const isGlobalAvgCached = globalAvgCache !== null && now - globalAvgCache.timestamp < GLOBAL_AVG_CACHE_TTL_MS;
+
     // --- OPTIMIZATION (Before vs. After) ---
     // Before:
-    //   - We fetched up to `limit` raw gameScores in a single `findMany` query.
-    //   - Deduplication was done in-memory via Map: `bestByUser`.
-    //   - Correctness bug: If a single user held the top `limit` scores, the returned leaderboard
-    //     would contain only that 1 user instead of `limit` unique users. Also, other users' high
-    //     scores would be missed because they were pushed out of the raw `take: limit` fetch.
-    //   - Time Complexity: O(limit * log(limit)) sorting in memory after fetching.
+    //   - Executed whole-table `prisma.testResult.aggregate` on EVERY leaderboard request to compute global avg WPM/accuracy/totalTests.
     // After:
-    //   - Two-stage database-level approach:
-    //     1. Database-level `groupBy` on `userId` fetches exactly the top `limit` unique users
-    //        and their max scores (`_max.score`). This is O(1) query complexity for the app layer.
-    //     2. Targeted `findMany` fetches the details of these unique `userId` and `score` pairings.
-    //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
-    //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
-    //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
-    const [topGrouped, globalAgg] = await Promise.all([
-      prisma.gameScore.groupBy({
-        by: ['userId'],
-        where: {
-          gameType: rawType,
-        },
+    //   - Introduced a 5-minute in-memory TTL cache for globalAvg baseline stats.
+    //   - If cache is valid, skips the database aggregate query entirely, eliminating unnecessary database load and latency.
+    const topGroupedPromise = prisma.gameScore.groupBy({
+      by: ['userId'],
+      where: {
+        gameType: rawType,
+      },
+      _max: {
+        score: true,
+      },
+      orderBy: {
         _max: {
-          score: true,
+          score: 'desc',
         },
-        orderBy: {
-          _max: {
-            score: 'desc',
-          },
-        },
-        take: limit,
-      }),
-      // Global motivational baseline: mean WPM / accuracy across ALL typing tests.
-      prisma.testResult.aggregate({
-        _avg: { wpm: true, accuracy: true },
-        _count: { _all: true },
-      }),
-    ]);
+      },
+      take: limit,
+    });
 
-    const globalAvg = {
-      wpm: Math.round(globalAgg._avg.wpm ?? 0),
-      accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
-      totalTests: globalAgg._count._all,
-    };
+    let topGrouped;
+    let globalAvg: { wpm: number; accuracy: number; totalTests: number };
+
+    if (isGlobalAvgCached && globalAvgCache) {
+      topGrouped = await topGroupedPromise;
+      globalAvg = globalAvgCache.data;
+    } else {
+      const [topResult, globalAgg] = await Promise.all([
+        topGroupedPromise,
+        prisma.testResult.aggregate({
+          _avg: { wpm: true, accuracy: true },
+          _count: { _all: true },
+        }),
+      ]);
+      topGrouped = topResult;
+      globalAvg = {
+        wpm: Math.round(globalAgg._avg.wpm ?? 0),
+        accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
+        totalTests: globalAgg._count._all,
+      };
+      globalAvgCache = {
+        data: globalAvg,
+        timestamp: now,
+      };
+    }
 
     if (topGrouped.length === 0) {
       res.json({
