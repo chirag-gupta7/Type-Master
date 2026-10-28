@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore } from './game.controller';
+import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore, resetGlobalAvgCacheForTesting } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -580,6 +580,19 @@ describe('GameController - getLeaderboard', () => {
       },
     };
     jest.clearAllMocks();
+    resetGlobalAvgCacheForTesting();
+  });
+
+  it('should cache global baseline aggregate stats and avoid repeated aggregate queries', async () => {
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue([]);
+
+    // First call: populates cache
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+    expect(prisma.testResult.aggregate).toHaveBeenCalledTimes(1);
+
+    // Second call: hits cache, testResult.aggregate is not called again
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+    expect(prisma.testResult.aggregate).toHaveBeenCalledTimes(1);
   });
 
   it('should return 400 if gameType is invalid or missing', async () => {

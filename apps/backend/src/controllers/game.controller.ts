@@ -60,6 +60,51 @@ const parseMetadata = (metadata: string | null): Record<string, unknown> | null 
   }
 };
 
+// In-memory cache for system-wide global average test result statistics.
+// Avoids running expensive whole-table aggregation queries on every leaderboard fetch.
+interface GlobalAvgCache {
+  wpm: number;
+  accuracy: number;
+  totalTests: number;
+  timestamp: number;
+}
+
+let cachedGlobalAvg: GlobalAvgCache | null = null;
+const GLOBAL_AVG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+
+export const resetGlobalAvgCacheForTesting = (): void => {
+  cachedGlobalAvg = null;
+};
+
+const getCachedGlobalAvg = async (): Promise<{ wpm: number; accuracy: number; totalTests: number }> => {
+  const now = Date.now();
+  if (cachedGlobalAvg && now - cachedGlobalAvg.timestamp < GLOBAL_AVG_CACHE_TTL_MS) {
+    return {
+      wpm: cachedGlobalAvg.wpm,
+      accuracy: cachedGlobalAvg.accuracy,
+      totalTests: cachedGlobalAvg.totalTests,
+    };
+  }
+
+  const globalAgg = await prisma.testResult.aggregate({
+    _avg: { wpm: true, accuracy: true },
+    _count: { _all: true },
+  });
+
+  const result = {
+    wpm: Math.round(globalAgg._avg.wpm ?? 0),
+    accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
+    totalTests: globalAgg._count._all,
+  };
+
+  cachedGlobalAvg = {
+    ...result,
+    timestamp: now,
+  };
+
+  return result;
+};
+
 export const saveGameScore = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
@@ -130,7 +175,10 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
     //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
     //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
     //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
-    const [topGrouped, globalAgg] = await Promise.all([
+    // Optimization: Parallelize top score grouping with cached global baseline stats fetch.
+    // Whole-table aggregate for global test averages is cached in-memory for 5 minutes (GLOBAL_AVG_CACHE_TTL_MS)
+    // to prevent repeated expensive full-table queries on frequent leaderboard requests.
+    const [topGrouped, globalAvg] = await Promise.all([
       prisma.gameScore.groupBy({
         by: ['userId'],
         where: {
@@ -146,18 +194,8 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
         },
         take: limit,
       }),
-      // Global motivational baseline: mean WPM / accuracy across ALL typing tests.
-      prisma.testResult.aggregate({
-        _avg: { wpm: true, accuracy: true },
-        _count: { _all: true },
-      }),
+      getCachedGlobalAvg(),
     ]);
-
-    const globalAvg = {
-      wpm: Math.round(globalAgg._avg.wpm ?? 0),
-      accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
-      totalTests: globalAgg._count._all,
-    };
 
     if (topGrouped.length === 0) {
       res.json({
