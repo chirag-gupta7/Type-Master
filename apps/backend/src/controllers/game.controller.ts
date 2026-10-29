@@ -14,10 +14,28 @@ export const saveGameScoreSchema = z.object({
   gameType: z.nativeEnum(GameType, {
     errorMap: () => ({ message: 'Invalid game type' }),
   }),
-  score: z.number({ invalid_type_error: 'Invalid score value' }).min(0, 'Invalid score value').max(1000000, 'Score exceeds maximum limit'),
-  wpm: z.number().min(0, 'WPM must be non-negative').max(300, 'WPM exceeds maximum limit').optional().nullable(),
-  accuracy: z.number().min(0, 'Accuracy must be at least 0').max(100, 'Accuracy cannot exceed 100').optional().nullable(),
-  duration: z.number().min(0, 'Duration must be non-negative').max(86400, 'Duration exceeds maximum limit').optional().nullable(),
+  score: z
+    .number({ invalid_type_error: 'Invalid score value' })
+    .min(0, 'Invalid score value')
+    .max(1000000, 'Score exceeds maximum limit'),
+  wpm: z
+    .number()
+    .min(0, 'WPM must be non-negative')
+    .max(300, 'WPM exceeds maximum limit')
+    .optional()
+    .nullable(),
+  accuracy: z
+    .number()
+    .min(0, 'Accuracy must be at least 0')
+    .max(100, 'Accuracy cannot exceed 100')
+    .optional()
+    .nullable(),
+  duration: z
+    .number()
+    .min(0, 'Duration must be non-negative')
+    .max(86400, 'Duration exceeds maximum limit')
+    .optional()
+    .nullable(),
   metadata: z.record(z.unknown()).optional().nullable(),
 });
 
@@ -58,6 +76,45 @@ const parseMetadata = (metadata: string | null): Record<string, unknown> | null 
   } catch {
     return null;
   }
+};
+
+interface GlobalAvgData {
+  wpm: number;
+  accuracy: number;
+  totalTests: number;
+}
+
+// In-memory cache for site-wide global test result statistics
+let cachedGlobalAvg: { data: GlobalAvgData; expiresAt: number } | null = null;
+const GLOBAL_AVG_CACHE_TTL_MS = 5 * 60 * 1000; // 5-minute TTL
+
+/**
+ * Retrieves cached global average typing metrics across all tests.
+ * Performs database-level whole-table aggregation only if cache is empty or expired.
+ */
+const getGlobalAvgCached = async (): Promise<GlobalAvgData> => {
+  const now = Date.now();
+  if (cachedGlobalAvg && now < cachedGlobalAvg.expiresAt) {
+    return cachedGlobalAvg.data;
+  }
+
+  const globalAgg = await prisma.testResult.aggregate({
+    _avg: { wpm: true, accuracy: true },
+    _count: { _all: true },
+  });
+
+  const data: GlobalAvgData = {
+    wpm: Math.round(globalAgg._avg.wpm ?? 0),
+    accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
+    totalTests: globalAgg._count._all,
+  };
+
+  cachedGlobalAvg = {
+    data,
+    expiresAt: now + GLOBAL_AVG_CACHE_TTL_MS,
+  };
+
+  return data;
 };
 
 export const saveGameScore = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -130,7 +187,8 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
     //   - Dedupes ties in-memory (in the rare case a user has identical max scores) using the latest `createdAt`.
     //   - Time Complexity: O(limit) lookup and array mapping, offloading sorting and grouping to indexed DB queries.
     //   - Guarantees returning exactly up to `limit` unique users on the leaderboard.
-    const [topGrouped, globalAgg] = await Promise.all([
+    //   - Added 5-minute TTL in-memory caching for `globalAvg` to eliminate whole-table `testResult.aggregate` database queries on every leaderboard request.
+    const [topGrouped, globalAvg] = await Promise.all([
       prisma.gameScore.groupBy({
         by: ['userId'],
         where: {
@@ -146,18 +204,8 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
         },
         take: limit,
       }),
-      // Global motivational baseline: mean WPM / accuracy across ALL typing tests.
-      prisma.testResult.aggregate({
-        _avg: { wpm: true, accuracy: true },
-        _count: { _all: true },
-      }),
+      getGlobalAvgCached(),
     ]);
-
-    const globalAvg = {
-      wpm: Math.round(globalAgg._avg.wpm ?? 0),
-      accuracy: Math.round(globalAgg._avg.accuracy ?? 0),
-      totalTests: globalAgg._count._all,
-    };
 
     if (topGrouped.length === 0) {
       res.json({
