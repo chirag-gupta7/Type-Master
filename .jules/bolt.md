@@ -50,7 +50,7 @@
 **Action Pattern:** Always memoize derived arrays for charting components using `useMemo` and replace `.find()` inside mapping loops with pre-computed `Map` or `Set` lookups to reduce algorithmic complexity to O(N).
 
 ## 2026-07-25 - Concurrency in Weak Key Analysis
-**Learning:** Fetching separate kinds of analysis data (e.g., user weak keys, raw finger error queries, and recent typing mistakes) sequentially can introduce substantial network and query latency. Wrapping these independent queries inside a single `Promise.all` allows them to execute concurrently, lowering the overall request duration from the sum of the queries to the single slowest one.
+**Learning:** Fetching separate kinds of analysis data (e.g., user weak keys, raw finger error patterns via $queryRaw, and recent typing mistakes) sequentially can introduce substantial network and query latency. Wrapping these independent queries inside a single `Promise.all` allows them to execute concurrently, lowering the overall request duration from the sum of the queries to the single slowest one.
 **Action:** Ensure that independent retrieval queries are bundled via `Promise.all` inside controllers to achieve maximum concurrency.
 
 ## 2026-07-24 - Parallelizing sequential database requests in getWeakKeyAnalysis
@@ -197,3 +197,7 @@
 ## 2026-08-20 - HandPositionGuide Key Mapping and Render Optimization
 **Learning:** Key-to-finger mapping lookups executed on every keystroke using array linear scans (`.find()`) introduce overhead in real-time typing components. Replacing linear scans with a static pre-computed `Map<string, KeyMapping>` achieves constant-time O(1) lookups. Additionally, wrapping the `Hand` component in `React.memo` prevents re-rendering the unaffected hand silhouette on keypresses.
 **Action:** For interactive components triggered on keystrokes, replace array `.find()` lookups with static `Map` lookups and memoize subcomponents with `React.memo`.
+
+## 2026-10-30 - Memoization of Falling Word Subcomponents in WordBlitz
+**Learning:** High-frequency game animation loops (e.g., 42ms / 24 FPS position updates) that render dynamic array elements directly inline cause React to re-instantiate component definitions and re-evaluate motion attributes on every frame. Extracting individual elements into module-scoped `React.memo` subcomponents prevents DOM reconciler churn and reduces garbage collection pressure during active gameplay.
+**Action:** Isolate high-frequency list/grid items in animation or game components into module-scoped `React.memo` subcomponents.
