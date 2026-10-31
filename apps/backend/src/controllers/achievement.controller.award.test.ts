@@ -5,7 +5,12 @@ jest.mock('../utils/prisma', () => ({
   prisma: {
     achievement: { findMany: jest.fn() },
     userAchievement: { findMany: jest.fn(), createMany: jest.fn() },
-    testResult: { aggregate: jest.fn(), count: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
+    testResult: {
+      aggregate: jest.fn(),
+      count: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+    },
     userLessonProgress: { count: jest.fn(), findMany: jest.fn() },
     lesson: { count: jest.fn() },
   },
@@ -19,16 +24,20 @@ const seedMetrics = (overrides: Record<string, unknown> = {}) => {
   const testCount = (overrides.testCount as number) ?? 0;
   (prisma.testResult.aggregate as jest.Mock).mockResolvedValue({
     _count: { _all: testCount },
-    _max: { wpm: (overrides.maxWpm as number) ?? 0 },
+    _max: {
+      wpm: (overrides.maxWpm as number) ?? 0,
+      accuracy: (overrides.hasPerfectAccuracy as boolean) ? 100 : 95,
+    },
   });
-  (prisma.testResult.count as jest.Mock).mockResolvedValue((overrides.highAccuracyCount as number) ?? 0);
-  (prisma.testResult.findFirst as jest.Mock).mockResolvedValue(
-    (overrides.hasPerfectAccuracy as boolean) ? { id: 'p1' } : null
+  (prisma.testResult.count as jest.Mock).mockResolvedValue(
+    (overrides.highAccuracyCount as number) ?? 0
   );
   (prisma.userLessonProgress.count as jest.Mock).mockResolvedValue(
     (overrides.completedLessonsCount as number) ?? 0
   );
-  (prisma.lesson.count as jest.Mock).mockResolvedValue((overrides.totalLessonsCount as number) ?? 10);
+  (prisma.lesson.count as jest.Mock).mockResolvedValue(
+    (overrides.totalLessonsCount as number) ?? 10
+  );
   (prisma.testResult.findMany as jest.Mock).mockResolvedValue([]);
   (prisma.userLessonProgress.findMany as jest.Mock).mockResolvedValue([]);
 };
@@ -39,7 +48,14 @@ describe('AchievementController - awardAchievementsForUser', () => {
   it('unlocks newly earned achievement and persists via createMany', async () => {
     seedMetrics({ testCount: 1 });
     (prisma.achievement.findMany as jest.Mock).mockResolvedValue([
-      { id: 'a1', title: 'First Steps', description: 'd', icon: 'target', points: 10, requirement: JSON.stringify({ type: 'firstSteps' }) },
+      {
+        id: 'a1',
+        title: 'First Steps',
+        description: 'd',
+        icon: 'target',
+        points: 10,
+        requirement: JSON.stringify({ type: 'firstSteps' }),
+      },
     ]);
     (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.userAchievement.createMany as jest.Mock).mockResolvedValue({ count: 1 });
@@ -54,10 +70,38 @@ describe('AchievementController - awardAchievementsForUser', () => {
     });
   });
 
+  it('correctly awards perfectionist achievement based on aggregated max accuracy', async () => {
+    seedMetrics({ hasPerfectAccuracy: true });
+    (prisma.achievement.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: 'perf-1',
+        title: 'Perfectionist',
+        description: 'd',
+        icon: 'star',
+        points: 50,
+        requirement: JSON.stringify({ type: 'perfectionist' }),
+      },
+    ]);
+    (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.userAchievement.createMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+    const unlocked = await awardAchievementsForUser('user-123');
+
+    expect(unlocked).toHaveLength(1);
+    expect(unlocked[0]).toMatchObject({ id: 'perf-1' });
+  });
+
   it('skips already-unlocked achievements (returns empty, no write)', async () => {
     seedMetrics({ testCount: 50 });
     (prisma.achievement.findMany as jest.Mock).mockResolvedValue([
-      { id: 'a1', title: 'T', description: 'd', icon: 'i', points: 10, requirement: JSON.stringify({ type: 'firstSteps' }) },
+      {
+        id: 'a1',
+        title: 'T',
+        description: 'd',
+        icon: 'i',
+        points: 10,
+        requirement: JSON.stringify({ type: 'firstSteps' }),
+      },
     ]);
     (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([{ achievementId: 'a1' }]);
 
@@ -70,7 +114,14 @@ describe('AchievementController - awardAchievementsForUser', () => {
   it('returns empty when requirements not met', async () => {
     seedMetrics({ testCount: 0 });
     (prisma.achievement.findMany as jest.Mock).mockResolvedValue([
-      { id: 'a1', title: 'T', description: 'd', icon: 'i', points: 10, requirement: JSON.stringify({ type: 'firstSteps' }) },
+      {
+        id: 'a1',
+        title: 'T',
+        description: 'd',
+        icon: 'i',
+        points: 10,
+        requirement: JSON.stringify({ type: 'firstSteps' }),
+      },
     ]);
     (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([]);
 
@@ -84,7 +135,14 @@ describe('AchievementController - awardAchievementsForUser', () => {
     seedMetrics({ testCount: 100 });
     (prisma.achievement.findMany as jest.Mock).mockResolvedValue([
       { id: 'bad1', title: 'X', description: 'd', icon: 'i', points: 1, requirement: 'not-json' },
-      { id: 'bad2', title: 'Y', description: 'd', icon: 'i', points: 1, requirement: JSON.stringify({ type: 'nope' }) },
+      {
+        id: 'bad2',
+        title: 'Y',
+        description: 'd',
+        icon: 'i',
+        points: 1,
+        requirement: JSON.stringify({ type: 'nope' }),
+      },
     ]);
     (prisma.userAchievement.findMany as jest.Mock).mockResolvedValue([]);
 
