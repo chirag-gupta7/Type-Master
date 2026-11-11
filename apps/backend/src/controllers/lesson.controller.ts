@@ -133,6 +133,8 @@ type LessonForSectionResponse = {
   isCompleted: boolean;
 };
 
+// Optimization: Return completedCount alongside lessonsWithState to eliminate
+// redundant array .filter() traversals and intermediate array allocations when calculating completion stats.
 const buildLessonsWithUnlockState = (
   lessons: Array<
     Prisma.LessonGetPayload<{
@@ -150,20 +152,28 @@ const buildLessonsWithUnlockState = (
     }>
   >,
   userId?: string
-): LessonForSectionResponse[] => {
+): { lessonsWithState: LessonForSectionResponse[]; completedCount: number } => {
   if (!userId) {
-    return lessons.map((lesson) => ({
-      ...lesson,
-      userProgress: [],
-      isUnlocked: true,
-      isCompleted: false,
-    }));
+    return {
+      lessonsWithState: lessons.map((lesson) => ({
+        ...lesson,
+        userProgress: [],
+        isUnlocked: true,
+        isCompleted: false,
+      })),
+      completedCount: 0,
+    };
   }
 
   let previousCompleted = true;
-  return lessons.map((lesson, index) => {
+  let completedCount = 0;
+
+  const lessonsWithState = lessons.map((lesson, index) => {
     const currentProgress = lesson.userProgress?.[0];
     const isCompleted = Boolean(currentProgress?.completed);
+    if (isCompleted) {
+      completedCount++;
+    }
     const isUnlocked = index === 0 || previousCompleted;
     previousCompleted = isCompleted;
 
@@ -173,6 +183,8 @@ const buildLessonsWithUnlockState = (
       isCompleted,
     };
   });
+
+  return { lessonsWithState, completedCount };
 };
 
 /**
@@ -811,20 +823,19 @@ export const getSectionSummaries = async (req: AuthRequest, res: Response, next:
           return null;
         }
 
-        const lessonsWithState = buildLessonsWithUnlockState(sectionLessons, userId);
+        const { lessonsWithState, completedCount: completedLessons } = buildLessonsWithUnlockState(
+          sectionLessons,
+          userId
+        );
         const totalLessons = lessonsWithState.length;
 
-        // Optimization: Consolidate stats calculation and index lookups into a single O(N) pass
-        // instead of separate .filter() and multiple .findIndex() calls.
-        let completedLessons = 0;
+        // Optimization: Consolidate index lookups into a single O(N) pass
+        // while using pre-calculated completedLessons from buildLessonsWithUnlockState.
         let firstUnlockedIncompleteIndex = -1;
         let firstUnlockedIndex = -1;
 
         for (let i = 0; i < totalLessons; i++) {
           const lesson = lessonsWithState[i];
-          if (lesson.isCompleted) {
-            completedLessons++;
-          }
           if (lesson.isUnlocked) {
             if (firstUnlockedIndex === -1) {
               firstUnlockedIndex = i;
@@ -936,9 +947,13 @@ export const getLessonsBySection = async (req: AuthRequest, res: Response, next:
       throw new AppError(404, `Section ${section} not found`);
     }
 
-    const lessonsWithState = buildLessonsWithUnlockState(lessons, userId);
+    // Optimization: Derive completedLessons directly from buildLessonsWithUnlockState
+    // to avoid an extra array .filter() iteration and intermediate array allocation.
+    const { lessonsWithState, completedCount: completedLessons } = buildLessonsWithUnlockState(
+      lessons,
+      userId
+    );
     const totalLessons = lessonsWithState.length;
-    const completedLessons = lessonsWithState.filter((lesson) => lesson.isCompleted).length;
     const completionPercentage =
       totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
