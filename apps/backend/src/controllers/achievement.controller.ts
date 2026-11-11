@@ -36,10 +36,12 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+  // Optimization: Consolidate the 100% accuracy check into the testResult.aggregate query
+  // via `_max: { wpm: true, accuracy: true }`, eliminating the separate `testResult.findFirst` query.
+  // This reduces parallel queries from 7 to 6, reducing database connection pool overhead.
   const [
     testStats,
     highAccuracyCount,
-    perfectAccuracy,
     completedLessonsCount,
     totalLessonsCount,
     recentTests,
@@ -48,14 +50,10 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
     prisma.testResult.aggregate({
       where: { userId },
       _count: { _all: true },
-      _max: { wpm: true },
+      _max: { wpm: true, accuracy: true },
     }),
     prisma.testResult.count({
       where: { userId, accuracy: { gte: 95 } },
-    }),
-    prisma.testResult.findFirst({
-      where: { userId, accuracy: 100 },
-      select: { id: true },
     }),
     prisma.userLessonProgress.count({
       where: { userId, completed: true },
@@ -86,7 +84,7 @@ const fetchUserMetrics = async (userId: string): Promise<UserMetrics> => {
     testCount: testStats._count._all,
     maxWpm: testStats._max.wpm || 0,
     highAccuracyCount,
-    hasPerfectAccuracy: !!perfectAccuracy,
+    hasPerfectAccuracy: (testStats._max.accuracy ?? 0) >= 100,
     completedLessonsCount,
     totalLessonsCount,
     uniqueDaysThisWeek: uniqueDays.size,
@@ -107,8 +105,10 @@ const checkAchievementRequirements = {
 
   // Accuracy achievements
   perfectionist: (metrics: UserMetrics): boolean => metrics.hasPerfectAccuracy,
-  sharpshooter: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= THRESHOLDS.sharpshooter,
-  accuracyAce: (metrics: UserMetrics): boolean => metrics.highAccuracyCount >= THRESHOLDS.accuracyAce,
+  sharpshooter: (metrics: UserMetrics): boolean =>
+    metrics.highAccuracyCount >= THRESHOLDS.sharpshooter,
+  accuracyAce: (metrics: UserMetrics): boolean =>
+    metrics.highAccuracyCount >= THRESHOLDS.accuracyAce,
 
   // Consistency achievements
   earlyBird: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.earlyBird,
@@ -120,17 +120,20 @@ const checkAchievementRequirements = {
   // Learning achievements
   student: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.student,
   scholar: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.scholar,
-  codeCrafter: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.codeCrafter,
+  codeCrafter: (metrics: UserMetrics): boolean =>
+    metrics.completedLessonsCount >= THRESHOLDS.codeCrafter,
   graduateTypist: (metrics: UserMetrics): boolean =>
     metrics.completedLessonsCount >= metrics.totalLessonsCount && metrics.totalLessonsCount > 0,
 
   // Streak achievements
   hotStreak: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= THRESHOLDS.hotStreak,
-  weekWarrior: (metrics: UserMetrics): boolean => metrics.uniqueDaysThisWeek >= THRESHOLDS.weekWarrior,
+  weekWarrior: (metrics: UserMetrics): boolean =>
+    metrics.uniqueDaysThisWeek >= THRESHOLDS.weekWarrior,
 
   // First achievements
   firstSteps: (metrics: UserMetrics): boolean => metrics.testCount >= THRESHOLDS.firstSteps,
-  firstLesson: (metrics: UserMetrics): boolean => metrics.completedLessonsCount >= THRESHOLDS.firstLesson,
+  firstLesson: (metrics: UserMetrics): boolean =>
+    metrics.completedLessonsCount >= THRESHOLDS.firstLesson,
 };
 
 /**
@@ -223,9 +226,13 @@ export const awardAchievementsForUser = async (userId: string) => {
     try {
       const requirement = JSON.parse(achievement.requirement);
       const checkerFn =
-        checkAchievementRequirements[requirement?.type as keyof typeof checkAchievementRequirements];
+        checkAchievementRequirements[
+          requirement?.type as keyof typeof checkAchievementRequirements
+        ];
       if (!checkerFn) {
-        logger.warn(`No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`);
+        logger.warn(
+          `No checker defined for achievement ${achievement.id} (type: ${requirement?.type})`
+        );
         continue;
       }
       if (checkerFn(metrics)) toUnlock.push(achievement);
