@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Loader2, Sparkles, BarChart3, Clock, Target, Zap } from 'lucide-react';
@@ -105,15 +105,25 @@ export default function ResultsScreen({
   const rawWpm = Math.round(((correctChars + incorrectChars) / 5 / safeDuration) * 60);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
 
-  const weakKeys = mistakes.length > 0
-    ? Object.values(mistakes.reduce((acc, m) => {
+  // Optimization: Memoize weak key reduction/sorting and practice text generation
+  // to avoid redundant O(N log N) array traversals and string allocations on every re-render
+  // (e.g. when AI feedback loads or user toggles detailed analysis view).
+  const weakKeys = useMemo(() => {
+    if (!mistakes || mistakes.length === 0) return [];
+    return Object.values(
+      mistakes.reduce((acc, m) => {
         const key = m.key === ' ' ? '␣' : m.key;
         if (!acc[key]) acc[key] = { key, errorCount: 0 };
-        acc[key].errorCount++; return acc;
-      }, {} as Record<string, { key: string; errorCount: number }>)).sort((a, b) => b.errorCount - a.errorCount)
-    : [];
+        acc[key].errorCount++;
+        return acc;
+      }, {} as Record<string, { key: string; errorCount: number }>)
+    ).sort((a, b) => b.errorCount - a.errorCount);
+  }, [mistakes]);
 
-  const practiceText = weakKeys.length > 0 ? weakKeys.slice(0, 10).map((wk) => wk.key).join(' ').repeat(10).slice(0, 200) : '';
+  const practiceText = useMemo(() => {
+    if (!weakKeys || weakKeys.length === 0) return '';
+    return weakKeys.slice(0, 10).map((wk) => wk.key).join(' ').repeat(10).slice(0, 200);
+  }, [weakKeys]);
 
   if (showDetailedAnalysis) {
     return (
