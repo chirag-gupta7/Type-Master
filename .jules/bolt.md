@@ -201,3 +201,7 @@
 ## 2026-10-08 - Single-Pass State and Metric Accumulation in Lesson Controllers
 **Learning:** Performing subsequent array filtering or counting operations (e.g., `lessonsWithState.filter(l => l.isCompleted).length`) after mapping a collection allocates temporary intermediate arrays and causes redundant O(N) traversals. Accumulating metrics like completed count directly inside the primary mapping function (`buildLessonsWithUnlockState`) avoids extra array allocations and reduces array processing to a single O(N) pass.
 **Action:** When building enriched object representations from database lists, compute summary statistics and count flags inline within the primary mapping loop instead of running secondary `.filter()` calls.
+
+## 2026-08-26 - VisualKeyboard Key Normalization and Layout Pre-computation Optimization
+**Learning:** In high-frequency typing components triggered on every keystroke, declaring object literals inside normalization functions or calling `.toUpperCase()` on ~60 layout keys inside the render loop causes significant garbage collection overhead and string allocation churn. Extracting key lookup maps to module scope and pre-computing uppercase key properties on static layout definitions eliminates per-frame allocations during typing sessions.
+**Action:** Static key mappings and string attributes on fixed layout grids should be pre-computed at module load time rather than derived during component renders.
