@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GameType } from '@prisma/client';
-import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore } from './game.controller';
+import { getGameStats, getUserHighScores, getLeaderboard, saveGameScore, resetGlobalAvgCache } from './game.controller';
 import { prisma } from '../utils/prisma';
 
 // Mock Prisma
@@ -45,6 +45,7 @@ describe('GameController - saveGameScore', () => {
       },
     };
     jest.clearAllMocks();
+    resetGlobalAvgCache();
   });
 
   it('should return 401 if userId is missing', async () => {
@@ -560,6 +561,53 @@ describe('GameController - getUserHighScores', () => {
   });
 });
 
+describe('GameController - getLeaderboard caching', () => {
+  let mockRequest: Partial<Request>;
+  let mockResponse: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnThis();
+    mockResponse = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    mockRequest = {
+      query: { gameType: 'WORD_BLITZ' },
+    };
+    jest.clearAllMocks();
+    resetGlobalAvgCache();
+  });
+
+  it('should cache globalAvg stats across consecutive calls within TTL', async () => {
+    (prisma.gameScore.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.testResult.aggregate as jest.Mock).mockResolvedValueOnce({
+      _avg: { wpm: 60, accuracy: 96 },
+      _count: { _all: 150 },
+    });
+
+    // First call - triggers DB aggregate query
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+    expect(prisma.testResult.aggregate).toHaveBeenCalledTimes(1);
+
+    // Second call - should hit in-memory cache and NOT query DB aggregate again
+    await getLeaderboard(mockRequest as Request, mockResponse as Response);
+    expect(prisma.testResult.aggregate).toHaveBeenCalledTimes(1);
+
+    expect(jsonMock).toHaveBeenLastCalledWith({
+      success: true,
+      data: {
+        gameType: GameType.WORD_BLITZ,
+        leaderboard: [],
+        total: 0,
+        globalAvg: { wpm: 60, accuracy: 96, totalTests: 150 },
+      },
+    });
+  });
+});
+
 describe('GameController - getLeaderboard', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
@@ -580,6 +628,7 @@ describe('GameController - getLeaderboard', () => {
       },
     };
     jest.clearAllMocks();
+    resetGlobalAvgCache();
   });
 
   it('should return 400 if gameType is invalid or missing', async () => {
@@ -732,6 +781,7 @@ describe('GameController - getLeaderboard', () => {
       query: {},
     };
     jest.clearAllMocks();
+    resetGlobalAvgCache();
   });
 
   it('should return 400 if gameType is missing or invalid', async () => {
