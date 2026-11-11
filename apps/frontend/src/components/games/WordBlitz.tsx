@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useGameStore } from '@/store/games';
 import { Button } from '@/components/ui/button';
 import { Timer, ArrowLeft, Zap, Trophy, Sparkles, Target } from 'lucide-react';
@@ -8,6 +8,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 const WORDS = ['the','be','to','of','and','a','in','that','have','I','it','for','not','on','with','he','as','you','do','at','this','but','his','by','from','they','we','say','her','she','or','an','will','my','one','all','would','there','their','what','so','up','out','if','about','who','get','which','go','me','when','make','can','like','time','no','just','him','know','take','people','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us'];
 
 type Word = { id: number; text: string; x: number; y: number; };
+
+// PERFORMANCE OPTIMIZATION: Extract individual falling word node into a memoized subcomponent.
+// During active gameplay, fallInterval updates word positions every 42ms (~24 FPS).
+// Memoizing FallingWord prevents re-instantiating element types and re-evaluating motion attributes
+// on every frame, reducing DOM reconciler work and GC churn during fast typing sessions.
+const FallingWord = memo(function FallingWord({ text, x, y }: { text: string; x: number; y: number }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="absolute rounded-full border bg-card px-3 py-1 text-sm font-medium shadow-sm"
+      style={{ left: x, top: y }}
+    >
+      {text}
+    </motion.span>
+  );
+});
 
 export function WordBlitz() {
   const [gameState, setGameState] = useState<'idle' | 'running' | 'finished'>('idle');
@@ -145,16 +163,7 @@ export function WordBlitz() {
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-red-500/10 to-transparent" />
             <AnimatePresence>
               {words.map((word) => (
-                <motion.span
-                  key={word.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute rounded-full border bg-card px-3 py-1 text-sm font-medium shadow-sm"
-                  style={{ left: word.x, top: word.y }}
-                >
-                  {word.text}
-                </motion.span>
+                <FallingWord key={word.id} text={word.text} x={word.x} y={word.y} />
               ))}
             </AnimatePresence>
           </div>
