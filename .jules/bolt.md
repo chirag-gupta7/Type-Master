@@ -213,3 +213,7 @@
 ## 2026-08-26 - VisualKeyboard Key Normalization and Layout Pre-computation Optimization
 **Learning:** In high-frequency typing components triggered on every keystroke, declaring object literals inside normalization functions or calling `.toUpperCase()` on ~60 layout keys inside the render loop causes significant garbage collection overhead and string allocation churn. Extracting key lookup maps to module scope and pre-computing uppercase key properties on static layout definitions eliminates per-frame allocations during typing sessions.
 **Action:** Static key mappings and string attributes on fixed layout grids should be pre-computed at module load time rather than derived during component renders.
+
+## 2026-08-21 - Extracting sub-components and O(1) map lookups in AnimatedHandOverlay
+**Learning:** Declaring functional sub-components (like `HandSVG`) inside a React component's render body forces React to redefine the component function and recreate DOM subtrees on every render pass. Moving sub-components outside the parent render scope and wrapping them in `React.memo` allows React to reuse DOM nodes. Furthermore, replacing key-array searches (`Object.entries` + `.includes()`) with a pre-computed module-scoped `Map` converts key lookup complexity from O(F * K) to O(1).
+**Action:** Always declare helper React components outside parent render functions, wrap them in `React.memo` when rendered inside real-time interactive parents, and pre-index static search arrays into Maps at module load time.
